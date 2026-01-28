@@ -30,7 +30,6 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
 
   const [open, setOpen] = useState(false);
   const [pools, setPools] = useState([]);
-  const [activeTab, setActiveTab] = useState('tvl');
 
   useEffect(() => {
     const fetchPools = async () => {
@@ -143,7 +142,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
         )}
       </div>
       {/* TVL Dropdown */}
-      <TVLDropMenu pools={pools} activeTab={activeTab} setActiveTab={setActiveTab} />
+      <TVLDropMenu pools={pools} />
       {/* Last Updated */}
       <p className="text-xs text-gray-500 dark:text-gray-400 text-right">
         Last updated: {new Date(stats.lastUpdated).toLocaleString()}
@@ -153,7 +152,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
 
 }
 
-function TVLDropMenu({ pools, activeTab, setActiveTab }: { pools: any[], activeTab: string, setActiveTab: (tab: string) => void }) {
+function TVLDropMenu({ pools }: { pools: any[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-lg shadow-lg border border-blue-200 dark:border-blue-700 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900 dark:to-cyan-900 mb-4">
@@ -177,52 +176,56 @@ function TVLDropMenu({ pools, activeTab, setActiveTab }: { pools: any[], activeT
       </button>
       {open && (
         <div className="p-6 pt-0">
-          <div className="flex space-x-4 mb-4">
-            <button
-              className={`px-4 py-2 rounded font-semibold ${activeTab === 'tvl' ? 'bg-blue-500 text-white' : 'bg-blue-100 dark:bg-blue-800 text-blue-900 dark:text-blue-100'}`}
-              onClick={() => setActiveTab('tvl')}
-            >
-              TVL
-            </button>
-            <button
-              className={`px-4 py-2 rounded font-semibold ${activeTab === 'pools' ? 'bg-blue-500 text-white' : 'bg-blue-100 dark:bg-blue-800 text-blue-900 dark:text-blue-100'}`}
-              onClick={() => setActiveTab('pools')}
-            >
-              Pools
-            </button>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    Value
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Back-end
+                  </td>
+                  <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">
+                    $88.45m - Verified by{' '}
+                    <a
+                      href="https://app.rwa.io/project/ixs-finance?tab=Project-Token"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
+                    >
+                      RWA.IO
+                    </a>
+                  </td>
+                </tr>
+                {pools.map((pool: any) => (
+                  <tr key={pool.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {pool.type}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">
+                      {formatValue(pool.value)} IXS - {pool.name}{' '}
+                      <a
+                        href={`https://etherscan.io/address/${pool.address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
+                      >
+                        (View)
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          {activeTab === 'tvl' && (
-            <div className="text-lg font-semibold text-blue-900 dark:text-blue-100">
-              $88.45m - Verified by{' '}
-              <a
-                href="https://app.rwa.io/project/ixs-finance?tab=Project-Token"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
-              >
-                RWA.IO
-              </a>
-            </div>
-          )}
-          {activeTab === 'pools' && (
-            <div>
-              {pools.map((pool: any) => (
-                <div key={pool.name} className="mb-4">
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{pool.type}</div>
-                  <div className="text-lg font-semibold text-blue-900 dark:text-blue-100">{pool.name}</div>
-                  <div className="text-md text-blue-700 dark:text-blue-300">{formatValue(pool.value)} IXS</div>
-                  <a
-                    href={`https://etherscan.io/address/${pool.address}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline text-sm"
-                  >
-                    View on Etherscan
-                  </a>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>
