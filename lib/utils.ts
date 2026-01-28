@@ -1,0 +1,18 @@
+export function formatAddress(address: string): string {
+  if (address.length <= 10) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+export function formatValue(value: string | bigint, decimals: number = 2): string {
+  try {
+    const bigValue = typeof value === 'string' ? BigInt(value) : value;
+    const numberValue = Number(bigValue) / 1e18;
+    return numberValue.toFixed(decimals);
+  } catch {
+    return '0';
+  }
+}
+
+export function formatDate(timestamp: number): string {
+  return new Date(timestamp * 1000).toLocaleString();
+}
