@@ -69,11 +69,13 @@ async function fetchBalancesForNetwork(
         status: response.data.status,
         message: response.data.message,
         resultLength: response.data.result ? response.data.result.length : 0,
+        fullResponse: response.data, // Log full response for debugging
       });
 
       if (response.data.status !== '1' || response.data.message !== 'OK') {
         console.warn(
-          `[burnStats API] API returned non-OK status for ${trimmedAddress} on ${network}: ${response.data.message}`
+          `[burnStats API] API returned non-OK status for ${trimmedAddress} on ${network}: ${response.data.message}`,
+          { fullResponse: response.data }
         );
         balances[trimmedAddress] = '0';
         continue;
