@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const API_BASE_URL = 'https://api.etherscan.io/v2/api';
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
-const API_TIMEOUT = 10000; // 10 seconds
+const API_TIMEOUT = 15000; // 15 seconds (increased from 10s to handle slower API responses)
 
 // Ethereum Configuration
 const ETH_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_ETH_TOKEN_ADDRESS || '').trim();
