@@ -50,7 +50,7 @@ async function fetchBalancesForNetwork(
     }
 
     try {
-      console.log(`[burnStats API] Fetching ${network} balance for ${trimmedAddress}`);
+      console.log(`[burnStats API] Fetching ${network} balance for ${trimmedAddress} with chainid ${chainId}`);
 
       const response = await axios.get(API_BASE_URL, {
         params: {
@@ -65,9 +65,15 @@ async function fetchBalancesForNetwork(
         timeout: API_TIMEOUT,
       });
 
+      console.log(`[burnStats API] ${network} response for ${trimmedAddress}:`, {
+        status: response.data.status,
+        message: response.data.message,
+        resultLength: response.data.result ? response.data.result.length : 0,
+      });
+
       if (response.data.status !== '1' || response.data.message !== 'OK') {
         console.warn(
-          `[burnStats API] API returned non-OK status for ${trimmedAddress} on ${network}`
+          `[burnStats API] API returned non-OK status for ${trimmedAddress} on ${network}: ${response.data.message}`
         );
         balances[trimmedAddress] = '0';
         continue;
@@ -87,9 +93,9 @@ async function fetchBalancesForNetwork(
       }
 
       balances[trimmedAddress] = balance;
-      console.log(`[burnStats API] ${network} balance retrieved for ${trimmedAddress}`);
+      console.log(`[burnStats API] ${network} balance for ${trimmedAddress}: ${balance}`);
     } catch (error) {
-      console.error(`[burnStats API] Error fetching ${network} balance for ${trimmedAddress}`);
+      console.error(`[burnStats API] Error fetching ${network} balance for ${trimmedAddress}:`, error);
       // Don't expose API error details to client
       balances[trimmedAddress] = '0';
     }
