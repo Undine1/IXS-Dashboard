@@ -12,6 +12,15 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
   const ethTokenAddress = process.env.NEXT_PUBLIC_ETH_TOKEN_ADDRESS || '';
   const polygonTokenAddress = process.env.NEXT_PUBLIC_POLYGON_TOKEN_ADDRESS || '';
 
+  // Guard against undefined or empty burnAddresses
+  if (!stats || !Array.isArray(stats.burnAddresses) || stats.burnAddresses.length === 0) {
+    return (
+      <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700">
+        <p>No burn statistics available yet</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Total Burned Card */}

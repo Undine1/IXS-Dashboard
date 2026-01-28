@@ -18,46 +18,57 @@ export async function fetchTokenBurnStats(): Promise<TokenBurnStats> {
     }
 
     const data = await response.json();
-    console.log('[tokenBurnService] API response received');
+    console.log('[tokenBurnService] Raw API response:', data);
 
     const allBurnAddresses: any[] = [];
     let totalBurned = BigInt(0);
 
     // Process Ethereum balances
-    if (data.ethereum && data.ethereum.balances) {
+    if (data.ethereum && typeof data.ethereum.balances === 'object') {
+      console.log('[tokenBurnService] Processing Ethereum balances:', data.ethereum.balances);
       for (const [address, balance] of Object.entries(data.ethereum.balances)) {
-        const balanceStr = String(balance);
-        const balanceBigInt = BigInt(balanceStr);
-        totalBurned += balanceBigInt;
+        try {
+          const balanceStr = String(balance);
+          const balanceBigInt = BigInt(balanceStr);
+          totalBurned += balanceBigInt;
 
-        allBurnAddresses.push({
-          address,
-          balance: balanceStr,
-          label: BURN_ADDRESS_LABELS[address.toLowerCase()] || formatAddress(address),
-          network: 'ethereum',
-        });
+          allBurnAddresses.push({
+            address,
+            balance: balanceStr,
+            label: BURN_ADDRESS_LABELS[address.toLowerCase()] || formatAddress(address),
+            network: 'ethereum',
+          });
+        } catch (err) {
+          console.error('[tokenBurnService] Error processing Ethereum address:', address, err);
+        }
       }
     }
 
     // Process Polygon balances
-    if (data.polygon && data.polygon.balances) {
+    if (data.polygon && typeof data.polygon.balances === 'object') {
+      console.log('[tokenBurnService] Processing Polygon balances:', data.polygon.balances);
       for (const [address, balance] of Object.entries(data.polygon.balances)) {
-        const balanceStr = String(balance);
-        const balanceBigInt = BigInt(balanceStr);
-        totalBurned += balanceBigInt;
+        try {
+          const balanceStr = String(balance);
+          const balanceBigInt = BigInt(balanceStr);
+          totalBurned += balanceBigInt;
 
-        allBurnAddresses.push({
-          address,
-          balance: balanceStr,
-          label: BURN_ADDRESS_LABELS[address.toLowerCase()] || formatAddress(address),
-          network: 'polygon',
-        });
+          allBurnAddresses.push({
+            address,
+            balance: balanceStr,
+            label: BURN_ADDRESS_LABELS[address.toLowerCase()] || formatAddress(address),
+            network: 'polygon',
+          });
+        } catch (err) {
+          console.error('[tokenBurnService] Error processing Polygon address:', address, err);
+        }
       }
     }
 
     console.log('[tokenBurnService] Final result:', {
       totalBurned: totalBurned.toString(),
       addressCount: allBurnAddresses.length,
+      addresses: allBurnAddresses,
     });
 
     return {
