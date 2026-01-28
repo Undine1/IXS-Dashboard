@@ -24,6 +24,9 @@ console.log('[burnStats API] Configuration loaded');
 function isValidAddress(address: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function fetchBalancesForNetwork(
   tokenAddress: string,
@@ -101,6 +104,7 @@ async function fetchBalancesForNetwork(
       // Don't expose API error details to client
       balances[trimmedAddress] = '0';
     }
+    await sleep(400); // Add a 400ms delay between requests
   }
 
   return balances;
