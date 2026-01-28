@@ -32,9 +32,6 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
         <p className="text-4xl font-bold text-red-700 dark:text-red-300">
           {formatValue(stats.totalBurned)}
         </p>
-        <p className="text-red-600 dark:text-red-400 mt-1">
-          {tokenSymbol} Tokens Permanently Removed
-        </p>
       </div>
 
       {/* Burn Addresses Table */}
@@ -50,7 +47,6 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
             <thead>
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  Label
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">
                   Network
@@ -89,7 +85,6 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
                 return (
                   <tr key={`${burn.network}-${burn.address}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {burn.label}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${badgeClass}`}>
