@@ -116,28 +116,47 @@ export async function GET() {
     }
 
     console.log('[burnStats API] Processing request...');
+    console.log('[burnStats API] Configuration:', {
+      ETH_TOKEN_ADDRESS: ETH_TOKEN_ADDRESS ? 'SET' : 'MISSING',
+      ETH_BURN_ADDRESSES_COUNT: ETH_BURN_ADDRESSES.length,
+      POLYGON_TOKEN_ADDRESS: POLYGON_TOKEN_ADDRESS ? 'SET' : 'MISSING',
+      POLYGON_BURN_ADDRESSES_COUNT: POLYGON_BURN_ADDRESSES.length,
+      POLYGON_BURN_ADDRESSES: POLYGON_BURN_ADDRESSES,
+    });
 
     let ethereumBalances: Record<string, string> = {};
     let polygonBalances: Record<string, string> = {};
 
     // Fetch Ethereum balances
     if (ETH_TOKEN_ADDRESS && ETH_BURN_ADDRESSES.length > 0) {
+      console.log('[burnStats API] Fetching Ethereum balances...');
       ethereumBalances = await fetchBalancesForNetwork(
         ETH_TOKEN_ADDRESS,
         ETH_BURN_ADDRESSES,
         '1',
         'ethereum'
       );
+      console.log('[burnStats API] Ethereum result:', Object.keys(ethereumBalances).length, 'addresses');
+    } else {
+      console.warn('[burnStats API] Skipping Ethereum: TOKEN_ADDRESS or addresses not configured');
     }
 
     // Fetch Polygon balances
     if (POLYGON_TOKEN_ADDRESS && POLYGON_BURN_ADDRESSES.length > 0) {
+      console.log('[burnStats API] Fetching Polygon balances...');
       polygonBalances = await fetchBalancesForNetwork(
         POLYGON_TOKEN_ADDRESS,
         POLYGON_BURN_ADDRESSES,
         '137',
         'polygon'
       );
+      console.log('[burnStats API] Polygon result:', Object.keys(polygonBalances).length, 'addresses');
+    } else {
+      console.warn('[burnStats API] Skipping Polygon: TOKEN_ADDRESS or addresses not configured');
+      console.warn('[burnStats API] Polygon config check:', {
+        TOKEN_ADDRESS: POLYGON_TOKEN_ADDRESS,
+        ADDRESSES: POLYGON_BURN_ADDRESSES,
+      });
     }
 
     console.log('[burnStats API] Returning results');
