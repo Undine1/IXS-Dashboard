@@ -27,7 +27,7 @@ export interface BurnAddress {
   address: string;
   balance: string;
   label: string;
-  network: 'ethereum' | 'polygon';
+  network: 'ethereum' | 'polygon' | 'base';
 }
 
 export interface TokenBurnStats {

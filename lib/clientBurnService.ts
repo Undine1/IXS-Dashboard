@@ -79,6 +79,27 @@ export async function fetchTokenBurnStatsFromAPI(): Promise<TokenBurnStats> {
       }
     }
 
+    // Process Base balances
+    if (data.base && typeof data.base.balances === 'object') {
+      console.log('[Client] Processing Base balances:', data.base.balances);
+      for (const [address, balance] of Object.entries(data.base.balances)) {
+        try {
+          const balanceStr = String(balance);
+          const balanceBigInt = BigInt(balanceStr);
+          totalBurned += balanceBigInt;
+
+          allBurnAddresses.push({
+            address,
+            balance: balanceStr,
+            label: BURN_ADDRESS_LABELS[address.toLowerCase()] || formatAddress(address),
+            network: 'base',
+          });
+        } catch (err) {
+          console.error('[Client] Error processing Base address:', address, err);
+        }
+      }
+    }
+
     const result: TokenBurnStats = {
       totalBurned: totalBurned.toString(),
       burnAddresses: allBurnAddresses,

@@ -19,6 +19,13 @@ const POLYGON_BURN_ADDRESSES = POLYGON_BURN_ADDRESSES_STRING.split(',')
   .map((addr: string) => addr.trim())
   .filter((addr: string) => addr.length > 0);
 
+// Base Configuration
+const BASE_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_BASE_TOKEN_ADDRESS || '').trim();
+const BASE_BURN_ADDRESSES_STRING = process.env.NEXT_PUBLIC_BASE_BURN_ADDRESSES || '';
+const BASE_BURN_ADDRESSES = BASE_BURN_ADDRESSES_STRING.split(',')
+  .map((addr: string) => addr.trim())
+  .filter((addr: string) => addr.length > 0);
+
 console.log('[burnStats API] Configuration loaded');
 
 function isValidAddress(address: string): boolean {
@@ -32,7 +39,7 @@ async function fetchBalancesForNetwork(
   tokenAddress: string,
   burnAddresses: string[],
   chainId: string,
-  network: 'ethereum' | 'polygon'
+  network: 'ethereum' | 'polygon' | 'base'
 ): Promise<Record<string, string>> {
   const balances: Record<string, string> = {};
 
@@ -128,10 +135,13 @@ export async function GET() {
       POLYGON_TOKEN_ADDRESS: POLYGON_TOKEN_ADDRESS ? 'SET' : 'MISSING',
       POLYGON_BURN_ADDRESSES_COUNT: POLYGON_BURN_ADDRESSES.length,
       POLYGON_BURN_ADDRESSES: POLYGON_BURN_ADDRESSES,
+      BASE_TOKEN_ADDRESS: BASE_TOKEN_ADDRESS ? 'SET' : 'MISSING',
+      BASE_BURN_ADDRESSES_COUNT: BASE_BURN_ADDRESSES.length,
     });
 
     let ethereumBalances: Record<string, string> = {};
     let polygonBalances: Record<string, string> = {};
+    let baseBalances: Record<string, string> = {};
 
     // Fetch Ethereum balances
     if (ETH_TOKEN_ADDRESS && ETH_BURN_ADDRESSES.length > 0) {
@@ -165,6 +175,20 @@ export async function GET() {
       });
     }
 
+    // Fetch Base balances
+    if (BASE_TOKEN_ADDRESS && BASE_BURN_ADDRESSES.length > 0) {
+      console.log('[burnStats API] Fetching Base balances...');
+      baseBalances = await fetchBalancesForNetwork(
+        BASE_TOKEN_ADDRESS,
+        BASE_BURN_ADDRESSES,
+        '8453',
+        'base' as any // pass as any to avoid TS error
+      );
+      console.log('[burnStats API] Base result:', Object.keys(baseBalances).length, 'addresses');
+    } else {
+      console.warn('[burnStats API] Skipping Base: TOKEN_ADDRESS or addresses not configured');
+    }
+
     console.log('[burnStats API] Returning results');
 
     return NextResponse.json(
@@ -174,6 +198,9 @@ export async function GET() {
         },
         polygon: {
           balances: polygonBalances,
+        },
+        base: {
+          balances: baseBalances,
         },
       },
       {
