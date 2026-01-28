@@ -160,13 +160,17 @@ function TVLDropMenu() {
       </button>
       {open && (
         <div className="p-6 pt-0">
-          {/* Empty tabs for future TVL content */}
-          <div className="flex space-x-4 mb-4">
-            <button className="px-4 py-2 rounded bg-blue-100 dark:bg-blue-800 text-blue-900 dark:text-blue-100 font-semibold">Tab 1</button>
-            <button className="px-4 py-2 rounded bg-blue-100 dark:bg-blue-800 text-blue-900 dark:text-blue-100 font-semibold">Tab 2</button>
-            <button className="px-4 py-2 rounded bg-blue-100 dark:bg-blue-800 text-blue-900 dark:text-blue-100 font-semibold">Tab 3</button>
+          <div className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+            $88.45m - Verified by{' '}
+            <a
+              href="https://app.rwa.io/project/ixs-finance?tab=Project-Token"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
+            >
+              RWA.IO
+            </a>
           </div>
-          <div className="text-gray-500 dark:text-gray-400">TVL content coming soon...</div>
         </div>
       )}
     </div>
