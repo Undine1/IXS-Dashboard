@@ -6,14 +6,14 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const API_TIMEOUT = 10000; // 10 seconds
 
 // Ethereum Configuration
-const ETH_TOKEN_ADDRESS = process.env.NEXT_PUBLIC_ETH_TOKEN_ADDRESS || '';
+const ETH_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_ETH_TOKEN_ADDRESS || '').trim();
 const ETH_BURN_ADDRESSES_STRING = process.env.NEXT_PUBLIC_ETH_BURN_ADDRESSES || '';
 const ETH_BURN_ADDRESSES = ETH_BURN_ADDRESSES_STRING.split(',')
   .map((addr: string) => addr.trim())
   .filter((addr: string) => addr.length > 0);
 
 // Polygon Configuration
-const POLYGON_TOKEN_ADDRESS = process.env.NEXT_PUBLIC_POLYGON_TOKEN_ADDRESS || '';
+const POLYGON_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_POLYGON_TOKEN_ADDRESS || '').trim();
 const POLYGON_BURN_ADDRESSES_STRING = process.env.NEXT_PUBLIC_POLYGON_BURN_ADDRESSES || '';
 const POLYGON_BURN_ADDRESSES = POLYGON_BURN_ADDRESSES_STRING.split(',')
   .map((addr: string) => addr.trim())
