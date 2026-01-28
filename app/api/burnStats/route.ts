@@ -1,9 +1,20 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 
-const API_BASE_URL = 'https://api.etherscan.io/v2/api';
-const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
-const API_TIMEOUT = 15000; // 15 seconds (increased from 10s to handle slower API responses)
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
+const API_TIMEOUT = 15000; // 15 seconds
+
+// Cache configuration
+let cachedData: any = null;
+let lastFetchTime: number = 0;
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
+
+// Network to Alchemy network mapping
+const networkToAlchemy: Record<string, string> = {
+  ethereum: 'eth-mainnet',
+  polygon: 'polygon-mainnet',
+  base: 'base-mainnet'
+};
 
 // Ethereum Configuration
 const ETH_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_ETH_TOKEN_ADDRESS || '').trim();
@@ -38,7 +49,6 @@ function sleep(ms: number) {
 async function fetchBalancesForNetwork(
   tokenAddress: string,
   burnAddresses: string[],
-  chainId: string,
   network: 'ethereum' | 'polygon' | 'base'
 ): Promise<Record<string, string>> {
   const balances: Record<string, string> = {};
@@ -60,44 +70,38 @@ async function fetchBalancesForNetwork(
     }
 
     try {
-      console.log(`[burnStats API] Fetching ${network} balance for ${trimmedAddress} with chainid ${chainId}`);
+      console.log(`[burnStats API] Fetching ${network} balance for ${trimmedAddress}`);
 
-      const response = await axios.get(API_BASE_URL, {
-        params: {
-          chainid: chainId,
-          module: 'account',
-          action: 'tokenbalance',
-          contractaddress: tokenAddress,
-          address: trimmedAddress,
-          tag: 'latest',
-          apikey: ETHERSCAN_API_KEY,
-        },
+      const alchemyNetwork = networkToAlchemy[network];
+      const alchemyUrl = `https://${alchemyNetwork}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
+
+      const payload = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_call",
+        params: [
+          {
+            to: tokenAddress,
+            data: `0x70a08231000000000000000000000000${trimmedAddress.slice(2)}`
+          },
+          "latest"
+        ]
+      };
+
+      const response = await axios.post(alchemyUrl, payload, {
+        headers: { 'Content-Type': 'application/json' },
         timeout: API_TIMEOUT,
       });
 
-      console.log(`[burnStats API] ${network} response for ${trimmedAddress}:`, {
-        status: response.data.status,
-        message: response.data.message,
-        resultLength: response.data.result ? response.data.result.length : 0,
-        fullResponse: response.data, // Log full response for debugging
-      });
+      console.log(`[burnStats API] ${network} response for ${trimmedAddress}:`, response.data);
 
-      if (response.data.status !== '1' || response.data.message !== 'OK') {
-        console.warn(
-          `[burnStats API] API returned non-OK status for ${trimmedAddress} on ${network}: ${response.data.message}`,
-          { fullResponse: response.data }
-        );
+      if (!response.data.result) {
+        console.warn(`[burnStats API] No result for ${trimmedAddress} on ${network}`);
         balances[trimmedAddress] = '0';
         continue;
       }
 
-      let balance = response.data.result || '0';
-
-      if (typeof balance !== 'string') {
-        balance = String(balance);
-      }
-
-      balance = balance.trim();
+      let balance = BigInt(response.data.result).toString();
 
       if (!balance || !/^\d+$/.test(balance)) {
         console.warn(`[burnStats API] Invalid balance format for ${trimmedAddress}`);
@@ -120,12 +124,18 @@ async function fetchBalancesForNetwork(
 export async function GET() {
   try {
     // Validate API key exists (on server side only)
-    if (!ETHERSCAN_API_KEY) {
-      console.error('[burnStats API] ETHERSCAN_API_KEY not configured');
+    if (!ALCHEMY_API_KEY) {
+      console.error('[burnStats API] ALCHEMY_API_KEY not configured');
       return NextResponse.json(
         { error: 'Service misconfiguration' },
         { status: 500 }
       );
+    }
+
+    const now = Date.now();
+    if (cachedData && (now - lastFetchTime) < CACHE_DURATION) {
+      console.log('[burnStats API] Returning cached data');
+      return NextResponse.json(cachedData);
     }
 
     console.log('[burnStats API] Processing request...');
@@ -149,7 +159,6 @@ export async function GET() {
       ethereumBalances = await fetchBalancesForNetwork(
         ETH_TOKEN_ADDRESS,
         ETH_BURN_ADDRESSES,
-        '1',
         'ethereum'
       );
       console.log('[burnStats API] Ethereum result:', Object.keys(ethereumBalances).length, 'addresses');
@@ -163,7 +172,6 @@ export async function GET() {
       polygonBalances = await fetchBalancesForNetwork(
         POLYGON_TOKEN_ADDRESS,
         POLYGON_BURN_ADDRESSES,
-        '137',
         'polygon'
       );
       console.log('[burnStats API] Polygon result:', Object.keys(polygonBalances).length, 'addresses');
@@ -181,8 +189,7 @@ export async function GET() {
       baseBalances = await fetchBalancesForNetwork(
         BASE_TOKEN_ADDRESS,
         BASE_BURN_ADDRESSES,
-        '8453',
-        'base' as any // pass as any to avoid TS error
+        'base'
       );
       console.log('[burnStats API] Base result:', Object.keys(baseBalances).length, 'addresses');
     } else {
@@ -190,6 +197,13 @@ export async function GET() {
     }
 
     console.log('[burnStats API] Returning results');
+
+    cachedData = {
+      ethereum: { balances: ethereumBalances },
+      polygon: { balances: polygonBalances },
+      base: { balances: baseBalances }
+    };
+    lastFetchTime = now;
 
     return NextResponse.json(
       {
