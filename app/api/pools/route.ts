@@ -4,6 +4,10 @@ import axios from 'axios';
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const API_TIMEOUT = 15000;
 const WAIT_BETWEEN_POOLS_MS = 600;
+// Server-side hourly cache to avoid repeated RPCs from serverless cold starts
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+let cachedBody: any = null;
+let cachedAt = 0;
 
 // Network to Alchemy network mapping
 const networkToAlchemy: Record<string, string> = {
@@ -239,6 +243,10 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
 
 export async function GET(req: Request) {
   try {
+    // Parse URL early so we can respect debug bypass of cache
+    const url = new URL(req.url);
+    const debugMode = url.searchParams.get('debug') === '1' || url.searchParams.get('debug') === 'true';
+
     // Validate API key exists
     if (!ALCHEMY_API_KEY) {
       console.error('[pools API] ALCHEMY_API_KEY not configured');
@@ -246,6 +254,16 @@ export async function GET(req: Request) {
         { error: 'Service misconfiguration' },
         { status: 500 }
       );
+    }
+
+    // If we have a recent cached body and debug is not requested, return it
+    if (!debugMode && cachedBody && Date.now() - cachedAt < CACHE_TTL_MS) {
+      return NextResponse.json(cachedBody, {
+        status: 200,
+        headers: {
+          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
+        },
+      });
     }
 
     console.log('[pools API] Processing request...');
