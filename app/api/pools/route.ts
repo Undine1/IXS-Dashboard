@@ -279,7 +279,7 @@ export async function GET(req: Request) {
       if (result.derivedIxsPrice && result.derivedIxsPrice > 0) {
         prices['ixs'] = { usd: result.derivedIxsPrice };
       }
-      poolsData.push({ ...pool, value: result.usdValue });
+      poolsData.push({ ...pool, value: result.usdValue, debug: result.debug });
       poolsDebug.push({ name: pool.name, address: pool.address, network: pool.network, debug: result.debug, derivedIxsPrice: result.derivedIxsPrice });
     }
 
