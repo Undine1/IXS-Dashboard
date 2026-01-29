@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const API_TIMEOUT = 15000;
-const WAIT_BETWEEN_POOLS_MS = 300;
+const WAIT_BETWEEN_POOLS_MS = 600;
 
 // Network to Alchemy network mapping
 const networkToAlchemy: Record<string, string> = {
@@ -101,9 +101,9 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
   const alchemyUrl = `https://${alchemyNetwork}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
 
   // Helper: call Alchemy with retries + exponential backoff for transient errors
-  async function alchemyCall(payload: any, maxRetries = 5) {
+  async function alchemyCall(payload: any, maxRetries = 7) {
     let attempt = 0;
-    let delay = 500;
+    let delay = 700;
     while (attempt <= maxRetries) {
       try {
         const resp = await axios.post(alchemyUrl, payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
@@ -287,16 +287,9 @@ export async function GET(req: Request) {
 
     const body: any = { pools: poolsData };
     if (warnings.length > 0) body.warnings = warnings;
-    // If debug query param present, include derived prices and per-pool debug
-    try {
-      const url = new URL(req.url);
-      const debugMode = url.searchParams.get('debug') === '1' || url.searchParams.get('debug') === 'true';
-      if (debugMode) {
-        body.debug = { prices, pools: poolsDebug };
-      }
-    } catch (e) {
-      // ignore URL parsing errors
-    }
+    // Always include per-pool debug output so deployed failures surface RPC
+    // errors and timeouts for easier diagnosis.
+    body.debug = { prices, pools: poolsDebug };
 
     return NextResponse.json(
       body,
