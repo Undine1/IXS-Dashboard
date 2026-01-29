@@ -3,6 +3,7 @@ import axios from 'axios';
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const API_TIMEOUT = 15000;
+const WAIT_BETWEEN_POOLS_MS = 300;
 
 // Network to Alchemy network mapping
 const networkToAlchemy: Record<string, string> = {
@@ -98,127 +99,94 @@ const POOLS = [
 async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usdValue: number; derivedIxsPrice: number | null; debug?: any }> {
   const alchemyNetwork = networkToAlchemy[pool.network];
   const alchemyUrl = `https://${alchemyNetwork}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
-  try {
 
+  // Helper: call Alchemy with retries + exponential backoff for transient errors
+  async function alchemyCall(payload: any, maxRetries = 5) {
+    let attempt = 0;
+    let delay = 500;
+    while (attempt <= maxRetries) {
+      try {
+        const resp = await axios.post(alchemyUrl, payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
+        if (resp.data && resp.data.error) {
+          const errMsg = resp.data.error.message || JSON.stringify(resp.data.error);
+          if (/rate limit|429|timeout|throttle/i.test(errMsg) && attempt < maxRetries) {
+            await new Promise((r) => setTimeout(r, delay));
+            attempt++;
+            delay *= 2;
+            continue;
+          }
+          throw new Error(errMsg);
+        }
+        return resp;
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        if (attempt < maxRetries && /timeout|ECONNRESET|ENOTFOUND|rate limit|429|throttle/i.test(msg)) {
+          await new Promise((r) => setTimeout(r, delay));
+          attempt++;
+          delay *= 2;
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error('alchemyCall: exceeded retries');
+  }
+
+  try {
     // Get token0
     const token0Payload = {
-      // Helper: call Alchemy with retries + exponential backoff for transient errors
-      async function alchemyCall(payload: any, maxRetries = 3) {
-        let attempt = 0;
-        let delay = 300;
-        while (attempt <= maxRetries) {
-          try {
-            const resp = await axios.post(alchemyUrl, payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
-            if (resp.data && resp.data.error) {
-              // Treat Alchemy returned error as retryable for certain codes
-              const errMsg = resp.data.error.message || JSON.stringify(resp.data.error);
-              // If it's a rate-limit or temporary, retry; otherwise throw
-              if (/rate limit|429|timeout|throttle/i.test(errMsg) && attempt < maxRetries) {
-                await new Promise((r) => setTimeout(r, delay));
-                attempt++;
-                delay *= 2;
-                continue;
-              }
-              throw new Error(errMsg);
-            }
-            return resp;
-          } catch (err: any) {
-            // Network or timeout errors -> retry
-            const msg = err?.message || String(err);
-            if (attempt < maxRetries && /timeout|ECONNRESET|ENOTFOUND|rate limit|429|throttle/i.test(msg)) {
-              await new Promise((r) => setTimeout(r, delay));
-              attempt++;
-              delay *= 2;
-              continue;
-            }
-            throw err;
-          }
-        }
-        throw new Error('alchemyCall: exceeded retries');
-      }
-
-      try {
+      jsonrpc: '2.0',
       id: 1,
-      method: "eth_call",
-      params: [
-        {
-          to: pool.address,
-          data: "0x0dfe1681"
-        },
-        "latest"
-      ]
+      method: 'eth_call',
+      params: [{ to: pool.address, data: '0x0dfe1681' }, 'latest'],
     };
-    const token0Response = await axios.post(alchemyUrl, token0Payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
-    const token0 = '0x' + token0Response.data.result.slice(-40);
+    const token0Response = await alchemyCall(token0Payload);
+    const token0 = '0x' + (token0Response.data.result || '').slice(-40);
 
-        const token0Response = await alchemyCall(token0Payload);
+    // Get token1
     const token1Payload = {
-      jsonrpc: "2.0",
+      jsonrpc: '2.0',
       id: 2,
-      method: "eth_call",
-      params: [
-        {
-          to: pool.address,
-          data: "0xd21220a7"
-        },
-        "latest"
-      ]
+      method: 'eth_call',
+      params: [{ to: pool.address, data: '0xd21220a7' }, 'latest'],
     };
-    const token1Response = await axios.post(alchemyUrl, token1Payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
-    const token1 = '0x' + token1Response.data.result.slice(-40);
+    const token1Response = await alchemyCall(token1Payload);
+    const token1 = '0x' + (token1Response.data.result || '').slice(-40);
 
-        const token1Response = await alchemyCall(token1Payload);
+    // Get decimals for token0
     const decimals0Payload = {
-      jsonrpc: "2.0",
+      jsonrpc: '2.0',
       id: 3,
-      method: "eth_call",
-      params: [
-        {
-          to: token0,
-          data: "0x313ce567"
-        },
-        "latest"
-      ]
+      method: 'eth_call',
+      params: [{ to: token0, data: '0x313ce567' }, 'latest'],
     };
-    const decimals0Response = await axios.post(alchemyUrl, decimals0Payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
+    const decimals0Response = await alchemyCall(decimals0Payload);
     const decimals0 = parseInt(decimals0Response.data.result, 16);
 
-        const decimals0Response = await alchemyCall(decimals0Payload);
+    // Get decimals for token1
     const decimals1Payload = {
-      jsonrpc: "2.0",
+      jsonrpc: '2.0',
       id: 4,
-      method: "eth_call",
-      params: [
-        {
-          to: token1,
-          data: "0x313ce567"
-        },
-        "latest"
-      ]
+      method: 'eth_call',
+      params: [{ to: token1, data: '0x313ce567' }, 'latest'],
     };
-    const decimals1Response = await axios.post(alchemyUrl, decimals1Payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
+    const decimals1Response = await alchemyCall(decimals1Payload);
     const decimals1 = parseInt(decimals1Response.data.result, 16);
 
-        const decimals1Response = await alchemyCall(decimals1Payload);
+    // Get reserves
     const reservesPayload = {
-      jsonrpc: "2.0",
+      jsonrpc: '2.0',
       id: 5,
-      method: "eth_call",
-      params: [
-        {
-          to: pool.address,
-          data: "0x0902f1ac"
-        },
-        "latest"
-      ]
+      method: 'eth_call',
+      params: [{ to: pool.address, data: '0x0902f1ac' }, 'latest'],
     };
-    const reservesResponse = await axios.post(alchemyUrl, reservesPayload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
+    const reservesResponse = await alchemyCall(reservesPayload);
     const result = reservesResponse.data.result;
     const reserve0 = BigInt('0x' + result.slice(2, 66));
-        const reservesResponse = await alchemyCall(reservesPayload);
+    const reserve1 = BigInt('0x' + result.slice(66, 130));
 
-    const reserve0Float = Number(reserve0) / (10 ** decimals0);
-    const reserve1Float = Number(reserve1) / (10 ** decimals1);
+    const reserve0Float = Number(reserve0) / 10 ** decimals0;
+    const reserve1Float = Number(reserve1) / 10 ** decimals1;
 
     // Get prices
     const ixAddress = pool.network === 'polygon' ? (process.env.NEXT_PUBLIC_POLYGON_TOKEN_ADDRESS || '').toLowerCase() : (process.env.NEXT_PUBLIC_BASE_TOKEN_ADDRESS || '').toLowerCase();
@@ -232,15 +200,11 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
     if (token1.toLowerCase() === ixAddress) price1 = prices.ixs?.usd || 0;
     else if (token1.toLowerCase() === usdcPolygon) price1 = 1;
 
-    // If this pool is explicitly marked as a price-source, assume the
-    // non-IXS side is a USD stable token (price = 1). This allows price
-    // derivation on networks where the stable-token address isn't listed.
     if ((pool as any).priceSource) {
       if (token0.toLowerCase() === ixAddress && price1 === 0) price1 = 1;
       if (token1.toLowerCase() === ixAddress && price0 === 0) price0 = 1;
     }
 
-    // Derive price for unknown tokens using pool ratio
     if (price0 > 0 && price1 === 0 && reserve1Float > 0) {
       price1 = (reserve0Float * price0) / reserve1Float;
     } else if (price1 > 0 && price0 === 0 && reserve0Float > 0) {
@@ -248,35 +212,19 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
     }
 
     const usdValue = reserve0Float * price0 + reserve1Float * price1;
-    // If we derived a price for IXS (ixAddress) return it alongside USD value
     let derivedIxsPrice: number | null = null;
     if (token0.toLowerCase() === ixAddress && price0 > 0) derivedIxsPrice = price0;
     if (token1.toLowerCase() === ixAddress && price1 > 0) derivedIxsPrice = price1;
 
-    const debug = {
-      token0,
-      token1,
-      decimals0,
-      decimals1,
-      reserve0Float,
-      reserve1Float,
-      price0,
-      price1,
-      usdValue,
-    };
-
+    const debug = { token0, token1, decimals0, decimals1, reserve0Float, reserve1Float, price0, price1, usdValue };
     return { usdValue, derivedIxsPrice, debug };
   } catch (error) {
-    console.error(`[pools API] Error fetching ${pool.name} pool value:`, error);
-        return { usdValue, derivedIxsPrice, debug };
-      } catch (error) {
-        const errMsg = (error && (error.message || JSON.stringify(error))) || 'unknown error';
-        console.error(`[pools API] Error fetching ${pool.name} pool value:`, errMsg);
-        const debug = { error: errMsg };
-        // Return zero value and include debug info so callers can report which RPC failed
-        return { usdValue: 0, derivedIxsPrice: null, debug };
-      }
+    const errMsg = (error && (error.message || JSON.stringify(error))) || 'unknown error';
+    console.error(`[pools API] Error fetching ${pool.name} pool value:`, errMsg);
+    const debug = { error: errMsg };
+    return { usdValue: 0, derivedIxsPrice: null, debug };
   }
+}
 }
 
 // Debug helper removed
@@ -322,8 +270,11 @@ export async function GET(req: Request) {
 
     const poolsData: any[] = [];
     const poolsDebug: any[] = [];
-    // Process pools sequentially so derived prices can be propagated
+    const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+    // Process pools sequentially so derived prices can be propagated. Add a
+    // short delay between pools to avoid firing many RPCs in a burst.
     for (const pool of POOLS) {
+      if (poolsData.length > 0) await sleep(WAIT_BETWEEN_POOLS_MS);
       const result = await fetchPoolValue(pool, prices);
       if (result.derivedIxsPrice && result.derivedIxsPrice > 0) {
         prices['ixs'] = { usd: result.derivedIxsPrice };
