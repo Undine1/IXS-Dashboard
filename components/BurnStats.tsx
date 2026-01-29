@@ -252,12 +252,20 @@ function TVLDropMenu({ pools, warnings }: { pools: any[]; warnings?: string[] })
                 </tr>
 
                 {/* Public Deals entries (single source of truth) */}
-                {publicDeals.map((d) => (
-                  <tr key={d.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{d.name}</td>
-                    <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">{formatUsd(d.value, d.decimals)}</td>
-                  </tr>
-                ))}
+                {publicDeals.map((d) => {
+                  const slug = (d.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                  return (
+                    <tr key={d.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                        <div className="flex items-center">
+                          <img src={`/images/logos/${slug}.svg`} alt={d.name} className="w-6 h-6 mr-2 object-contain" />
+                          <span>{d.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">{formatUsd(d.value, d.decimals)}</td>
+                    </tr>
+                  );
+                })}
 
                 {/* Render pools grouped by their `type` field in POOLS */}
                 {Array.from(
