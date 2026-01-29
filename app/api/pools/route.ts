@@ -95,14 +95,49 @@ const POOLS = [
 
 // Pools API configuration
 
-async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usdValue: number; derivedIxsPrice: number | null }> {
+async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usdValue: number; derivedIxsPrice: number | null; debug?: any }> {
   const alchemyNetwork = networkToAlchemy[pool.network];
   const alchemyUrl = `https://${alchemyNetwork}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
   try {
 
     // Get token0
     const token0Payload = {
-      jsonrpc: "2.0",
+      // Helper: call Alchemy with retries + exponential backoff for transient errors
+      async function alchemyCall(payload: any, maxRetries = 3) {
+        let attempt = 0;
+        let delay = 300;
+        while (attempt <= maxRetries) {
+          try {
+            const resp = await axios.post(alchemyUrl, payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
+            if (resp.data && resp.data.error) {
+              // Treat Alchemy returned error as retryable for certain codes
+              const errMsg = resp.data.error.message || JSON.stringify(resp.data.error);
+              // If it's a rate-limit or temporary, retry; otherwise throw
+              if (/rate limit|429|timeout|throttle/i.test(errMsg) && attempt < maxRetries) {
+                await new Promise((r) => setTimeout(r, delay));
+                attempt++;
+                delay *= 2;
+                continue;
+              }
+              throw new Error(errMsg);
+            }
+            return resp;
+          } catch (err: any) {
+            // Network or timeout errors -> retry
+            const msg = err?.message || String(err);
+            if (attempt < maxRetries && /timeout|ECONNRESET|ENOTFOUND|rate limit|429|throttle/i.test(msg)) {
+              await new Promise((r) => setTimeout(r, delay));
+              attempt++;
+              delay *= 2;
+              continue;
+            }
+            throw err;
+          }
+        }
+        throw new Error('alchemyCall: exceeded retries');
+      }
+
+      try {
       id: 1,
       method: "eth_call",
       params: [
@@ -116,7 +151,7 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
     const token0Response = await axios.post(alchemyUrl, token0Payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
     const token0 = '0x' + token0Response.data.result.slice(-40);
 
-    // Get token1
+        const token0Response = await alchemyCall(token0Payload);
     const token1Payload = {
       jsonrpc: "2.0",
       id: 2,
@@ -132,7 +167,7 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
     const token1Response = await axios.post(alchemyUrl, token1Payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
     const token1 = '0x' + token1Response.data.result.slice(-40);
 
-    // Get decimals for token0
+        const token1Response = await alchemyCall(token1Payload);
     const decimals0Payload = {
       jsonrpc: "2.0",
       id: 3,
@@ -148,7 +183,7 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
     const decimals0Response = await axios.post(alchemyUrl, decimals0Payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
     const decimals0 = parseInt(decimals0Response.data.result, 16);
 
-    // Get decimals for token1
+        const decimals0Response = await alchemyCall(decimals0Payload);
     const decimals1Payload = {
       jsonrpc: "2.0",
       id: 4,
@@ -164,7 +199,7 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
     const decimals1Response = await axios.post(alchemyUrl, decimals1Payload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
     const decimals1 = parseInt(decimals1Response.data.result, 16);
 
-    // Get reserves
+        const decimals1Response = await alchemyCall(decimals1Payload);
     const reservesPayload = {
       jsonrpc: "2.0",
       id: 5,
@@ -180,7 +215,7 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
     const reservesResponse = await axios.post(alchemyUrl, reservesPayload, { headers: { 'Content-Type': 'application/json' }, timeout: API_TIMEOUT });
     const result = reservesResponse.data.result;
     const reserve0 = BigInt('0x' + result.slice(2, 66));
-    const reserve1 = BigInt('0x' + result.slice(66, 130));
+        const reservesResponse = await alchemyCall(reservesPayload);
 
     const reserve0Float = Number(reserve0) / (10 ** decimals0);
     const reserve1Float = Number(reserve1) / (10 ** decimals1);
@@ -218,10 +253,29 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
     if (token0.toLowerCase() === ixAddress && price0 > 0) derivedIxsPrice = price0;
     if (token1.toLowerCase() === ixAddress && price1 > 0) derivedIxsPrice = price1;
 
-    return { usdValue, derivedIxsPrice };
+    const debug = {
+      token0,
+      token1,
+      decimals0,
+      decimals1,
+      reserve0Float,
+      reserve1Float,
+      price0,
+      price1,
+      usdValue,
+    };
+
+    return { usdValue, derivedIxsPrice, debug };
   } catch (error) {
     console.error(`[pools API] Error fetching ${pool.name} pool value:`, error);
-    throw error;
+        return { usdValue, derivedIxsPrice, debug };
+      } catch (error) {
+        const errMsg = (error && (error.message || JSON.stringify(error))) || 'unknown error';
+        console.error(`[pools API] Error fetching ${pool.name} pool value:`, errMsg);
+        const debug = { error: errMsg };
+        // Return zero value and include debug info so callers can report which RPC failed
+        return { usdValue: 0, derivedIxsPrice: null, debug };
+      }
   }
 }
 
@@ -267,6 +321,7 @@ export async function GET(req: Request) {
     }
 
     const poolsData: any[] = [];
+    const poolsDebug: any[] = [];
     // Process pools sequentially so derived prices can be propagated
     for (const pool of POOLS) {
       const result = await fetchPoolValue(pool, prices);
@@ -274,12 +329,23 @@ export async function GET(req: Request) {
         prices['ixs'] = { usd: result.derivedIxsPrice };
       }
       poolsData.push({ ...pool, value: result.usdValue });
+      poolsDebug.push({ name: pool.name, address: pool.address, network: pool.network, debug: result.debug, derivedIxsPrice: result.derivedIxsPrice });
     }
 
     console.log('[pools API] Returning pools data');
 
     const body: any = { pools: poolsData };
     if (warnings.length > 0) body.warnings = warnings;
+    // If debug query param present, include derived prices and per-pool debug
+    try {
+      const url = new URL(req.url);
+      const debugMode = url.searchParams.get('debug') === '1' || url.searchParams.get('debug') === 'true';
+      if (debugMode) {
+        body.debug = { prices, pools: poolsDebug };
+      }
+    } catch (e) {
+      // ignore URL parsing errors
+    }
 
     return NextResponse.json(
       body,
