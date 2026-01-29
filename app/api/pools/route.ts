@@ -225,7 +225,6 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
     return { usdValue: 0, derivedIxsPrice: null, debug };
   }
 }
-}
 
 // Debug helper removed
 
