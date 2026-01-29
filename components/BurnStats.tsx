@@ -70,9 +70,9 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                 <table className="w-full">
                   <thead>
                     <tr>
-                      <th className="px-2 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Network</th>
-                      <th className="px-3 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Address</th>
-                      <th className="px-3 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Balance ({tokenSymbol})</th>
+                      <th className="px-2 sm:px-4 py-3 text-center sm:text-left text-sm font-semibold text-gray-900 dark:text-gray-100">Network</th>
+                      <th className="px-3 sm:px-6 py-3 text-center sm:text-left text-sm font-semibold text-gray-900 dark:text-gray-100">Address</th>
+                      <th className="px-3 sm:px-6 py-3 text-center sm:text-right text-sm font-semibold text-gray-900 dark:text-gray-100">Balance ({tokenSymbol})</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
@@ -100,17 +100,17 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
 
                       return (
                         <tr key={`${burn.network}-${burn.address}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-2 py-4 text-sm text-gray-700 dark:text-gray-300">
-                            <div className="flex items-center justify-center">
+                          <td className="px-2 sm:px-4 py-4 text-sm text-gray-700 dark:text-gray-300">
+                            <div className="flex items-center justify-center sm:justify-start">
                               <img
                                 src={`/images/chains/${burn.network}.png`}
                                 alt={networkLabel}
                                 title={networkLabel}
-                                className="w-6 h-6 object-contain"
+                                className="w-5 h-5 sm:w-6 sm:h-6 object-contain"
                               />
                             </div>
                           </td>
-                          <td className="px-3 py-4 text-sm font-mono text-center">
+                          <td className="px-3 sm:px-6 py-4 text-sm font-mono text-center sm:text-left break-all">
                             <a
                               href={explorerUrl}
                               target="_blank"
@@ -120,7 +120,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                               {formatAddress(burn.address)}
                             </a>
                           </td>
-                          <td className="px-3 py-4 text-sm text-center font-semibold text-red-600 dark:text-red-400">
+                          <td className="px-3 sm:px-6 py-4 text-sm text-center sm:text-right font-semibold text-red-600 dark:text-red-400">
                             {formatValue(burn.balance)}
                           </td>
                         </tr>
@@ -261,8 +261,8 @@ function TVLDropMenu({ pools, warnings }: { pools: any[]; warnings?: string[] })
                     <tr key={d.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                         <div className="flex items-center">
-                          <img src={logoSrc} alt={d.name} className="w-6 h-6 mr-2 object-contain" />
-                          <span>{d.name}</span>
+                          <img src={logoSrc} alt={d.name} className="w-5 h-5 sm:w-6 sm:h-6 mr-2 object-contain" />
+                          <span className="text-sm sm:text-base">{d.name}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">{formatUsd(d.value, d.decimals)}</td>
