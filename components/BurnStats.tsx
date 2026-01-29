@@ -70,7 +70,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                 <table className="w-full">
                   <thead>
                     <tr>
-                      <th className="px-2 sm:px-4 py-3 text-center sm:text-left text-sm font-semibold text-gray-900 dark:text-gray-100">Network</th>
+                      <th className="px-3 sm:px-6 py-3 text-center sm:text-left text-sm font-semibold text-gray-900 dark:text-gray-100">Network</th>
                       <th className="px-3 sm:px-6 py-3 text-center sm:text-left text-sm font-semibold text-gray-900 dark:text-gray-100">Address</th>
                       <th className="px-3 sm:px-6 py-3 text-center sm:text-right text-sm font-semibold text-gray-900 dark:text-gray-100">Balance ({tokenSymbol})</th>
                     </tr>
@@ -100,14 +100,15 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
 
                       return (
                         <tr key={`${burn.network}-${burn.address}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-2 sm:px-4 py-4 text-sm text-gray-700 dark:text-gray-300">
+                          <td className="px-3 sm:px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
                             <div className="flex items-center justify-center sm:justify-start">
                               <img
                                 src={`/images/chains/${burn.network}.png`}
                                 alt={networkLabel}
                                 title={networkLabel}
-                                className="w-5 h-5 sm:w-6 sm:h-6 object-contain"
+                                className="w-5 h-5 sm:w-6 sm:h-6 object-contain mr-2"
                               />
+                              <span className="sr-only sm:not-sr-only">{networkLabel}</span>
                             </div>
                           </td>
                           <td className="px-3 sm:px-6 py-4 text-sm font-mono text-center sm:text-left break-all">
