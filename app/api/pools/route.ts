@@ -305,17 +305,22 @@ export async function GET(req: Request) {
       if (result.derivedIxsPrice && result.derivedIxsPrice > 0) {
         prices['ixs'] = { usd: result.derivedIxsPrice };
       }
-      poolsData.push({ ...pool, value: result.usdValue, debug: result.debug });
-      poolsDebug.push({ name: pool.name, address: pool.address, network: pool.network, debug: result.debug, derivedIxsPrice: result.derivedIxsPrice });
+      // Only include per-pool debug in responses when debugMode is enabled
+      if (debugMode) {
+        poolsData.push({ ...pool, value: result.usdValue, debug: result.debug });
+        poolsDebug.push({ name: pool.name, address: pool.address, network: pool.network, debug: result.debug, derivedIxsPrice: result.derivedIxsPrice });
+      } else {
+        poolsData.push({ ...pool, value: result.usdValue });
+      }
     }
 
     console.log('[pools API] Returning pools data');
 
     const body: any = { pools: poolsData };
     if (warnings.length > 0) body.warnings = warnings;
-    // Always include per-pool debug output so deployed failures surface RPC
-    // errors and timeouts for easier diagnosis.
-    body.debug = { prices, pools: poolsDebug };
+    if (debugMode) {
+      body.debug = { prices, pools: poolsDebug };
+    }
 
     return NextResponse.json(
       body,
