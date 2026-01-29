@@ -13,6 +13,16 @@ export function formatValue(value: string | bigint, decimals: number = 2): strin
   }
 }
 
+export function formatUsd(value: number | string, decimals: number = 2): string {
+  try {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (Number.isNaN(num) || !isFinite(num)) return '$0.00';
+    return `$${num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+  } catch {
+    return '$0.00';
+  }
+}
+
 export function formatDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleString();
 }

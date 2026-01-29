@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment, useMemo } from 'react';
 import { TokenBurnStats, BurnAddress } from '@/types';
-import { formatValue, formatAddress } from '@/lib/utils';
+import { formatValue, formatAddress, formatUsd } from '@/lib/utils';
+import { PRIVATE_ENTRY as DEFAULT_PRIVATE_ENTRY, PUBLIC_DEALS as DEFAULT_PUBLIC_DEALS, TYPE_LABELS } from '@/lib/tvlConfig';
 
 
 
@@ -30,6 +30,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
 
   const [open, setOpen] = useState(false);
   const [pools, setPools] = useState([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchPools = async () => {
@@ -38,6 +39,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
         if (response.ok) {
           const data = await response.json();
           setPools(data.pools || []);
+          setWarnings(data.warnings || []);
         }
       } catch (error) {
         console.error('Error fetching pools:', error);
@@ -142,7 +144,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
         )}
       </div>
       {/* TVL Dropdown */}
-      <TVLDropMenu pools={pools} />
+      <TVLDropMenu pools={pools} warnings={warnings} />
       {/* Last Updated */}
       <p className="text-xs text-gray-500 dark:text-gray-400 text-right">
         Last updated: {new Date(stats.lastUpdated).toLocaleString()}
@@ -152,8 +154,32 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
 
 }
 
-function TVLDropMenu({ pools }: { pools: any[] }) {
+function TVLDropMenu({ pools, warnings }: { pools: any[]; warnings?: string[] }) {
   const [open, setOpen] = useState(false);
+  const [privateEntry, setPrivateEntry] = useState(DEFAULT_PRIVATE_ENTRY);
+  const [publicDeals, setPublicDeals] = useState(DEFAULT_PUBLIC_DEALS);
+
+  useEffect(() => {
+    const fetchTvlConfig = async () => {
+      try {
+        const res = await fetch('/data/tvlConfig.json');
+        if (res.ok) {
+          const cfg = await res.json();
+          if (cfg.privateEntry) setPrivateEntry(cfg.privateEntry);
+          if (Array.isArray(cfg.publicDeals)) setPublicDeals(cfg.publicDeals);
+        }
+      } catch (e) {
+        // ignore and keep defaults
+      }
+    };
+    fetchTvlConfig();
+  }, []);
+
+  const totalTvl = useMemo(() => {
+    const poolSum = (pools || []).reduce((s: number, p: any) => s + (Number(p.value) || 0), 0);
+    const publicSum = (publicDeals || []).reduce((s, p) => s + (Number(p.value) || 0), 0);
+    return poolSum + Number(privateEntry.value) + publicSum;
+  }, [pools, publicDeals, privateEntry]);
   return (
     <div className="rounded-lg shadow-lg border border-blue-200 dark:border-blue-700 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900 dark:to-cyan-900 mb-4">
       <button
@@ -163,6 +189,7 @@ function TVLDropMenu({ pools }: { pools: any[] }) {
       >
         <span>
           <h2 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">TVL</h2>
+          <p className="text-4xl font-bold text-blue-700 dark:text-blue-300">{formatUsd(totalTvl, 0)}</p>
         </span>
         <svg
           className={`w-6 h-6 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
@@ -174,6 +201,14 @@ function TVLDropMenu({ pools }: { pools: any[] }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+      {warnings && warnings.length > 0 && (
+        <div className="p-4 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded m-4">
+          {warnings.map((w, i) => (
+            <div key={i} className="text-sm">{w}</div>
+          ))}
+        </div>
+      )}
+
       {open && (
         <div className="p-6 pt-0">
           <div className="overflow-x-auto">
@@ -189,39 +224,89 @@ function TVLDropMenu({ pools }: { pools: any[] }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                {/* Top summary row for Private deals (label only) */}
                 <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Back-end
-                  </td>
-                  <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">
-                    $88.45m - Verified by{' '}
+                  <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-gray-100">Private deals</td>
+                  <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">&nbsp;</td>
+                </tr>
+
+                {/* Private summary row */}
+                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{privateEntry.label}</td>
+                  <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">{formatUsd(privateEntry.value, 0)} - Verified by{' '}
                     <a
-                      href="https://app.rwa.io/project/ixs-finance?tab=Project-Token"
+                      href={privateEntry.verifiedBy.href}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
                     >
-                      RWA.IO
+                      {privateEntry.verifiedBy.label}
                     </a>
                   </td>
                 </tr>
-                {pools.map((pool: any) => (
-                  <tr key={pool.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {pool.type}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">
-                      {formatValue(pool.value)} IXS - {pool.name}{' '}
-                      <a
-                        href={`https://etherscan.io/address/${pool.address}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
-                      >
-                        (View)
-                      </a>
-                    </td>
+
+                {/* Public Deals summary row */}
+                <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-gray-100">Public Deals</td>
+                  <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">&nbsp;</td>
+                </tr>
+
+                {/* Public Deals entries (single source of truth) */}
+                {publicDeals.map((d) => (
+                  <tr key={d.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{d.name}</td>
+                    <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">{formatUsd(d.value, d.decimals)}</td>
                   </tr>
+                ))}
+
+                {/* Render pools grouped by their `type` field in POOLS */}
+                {Array.from(
+                  pools.reduce((map: Map<string, any[]>, p: any) => {
+                    const key = p.type || 'Other';
+                    if (!map.has(key)) map.set(key, []);
+                    map.get(key)!.push(p);
+                    return map;
+                  }, new Map())
+                ).map(([type, items]: any, idx) => (
+                  <Fragment key={`group-${type}-${idx}`}>
+                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-gray-100">{TYPE_LABELS[type] || type}</td>
+                      <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300"></td>
+                    </tr>
+                    {items.map((p: any) => (
+                      <tr key={p.address || p.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                          <div className="flex items-center">
+                            <img
+                              src={`/images/chains/${p.network}.svg`}
+                              alt={p.network}
+                              className="w-5 h-5 mr-2 object-contain"
+                              data-attempt="0"
+                              onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement;
+                                const attempt = parseInt(img.getAttribute('data-attempt') || '0', 10);
+                                const candidates = [
+                                  `/images/chains/${p.network}.svg`,
+                                  `/images/chains/${p.network}.png`,
+                                  `/images/${p.network}.svg`,
+                                  `/images/${p.network}.png`,
+                                ];
+                                const next = attempt + 1;
+                                if (next < candidates.length) {
+                                  img.setAttribute('data-attempt', String(next));
+                                  img.src = candidates[next];
+                                } else {
+                                  img.style.display = 'none';
+                                }
+                              }}
+                            />
+                            <span>{p.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-blue-700 dark:text-blue-300">{formatUsd(p.value || 0)}</td>
+                      </tr>
+                    ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
