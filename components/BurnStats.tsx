@@ -70,10 +70,10 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                 <table className="w-full">
                   <thead>
                     <tr>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100"></th>
-                      <th className="px-3 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Network</th>
-                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Address</th>
-                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Balance ({tokenSymbol})</th>
+                      <th className="px-2 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100"></th>
+                      <th className="px-2 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Network</th>
+                      <th className="px-3 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Address</th>
+                      <th className="px-3 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Balance ({tokenSymbol})</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
@@ -101,18 +101,18 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
 
                       return (
                         <tr key={`${burn.network}-${burn.address}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100"></td>
-                              <td className="px-3 py-4 text-sm text-gray-700 dark:text-gray-300">
-                                <div className="flex items-center justify-center">
-                                  <img
-                                    src={`/images/chains/${burn.network}.png`}
-                                    alt={networkLabel}
-                                    title={networkLabel}
-                                    className="w-6 h-6 object-contain"
-                                  />
-                                </div>
-                              </td>
-                          <td className="px-6 py-4 text-sm font-mono text-center">
+                          <td className="px-2 py-4 text-sm font-medium text-gray-900 dark:text-gray-100"></td>
+                          <td className="px-2 py-4 text-sm text-gray-700 dark:text-gray-300">
+                            <div className="flex items-center justify-center">
+                              <img
+                                src={`/images/chains/${burn.network}.png`}
+                                alt={networkLabel}
+                                title={networkLabel}
+                                className="w-6 h-6 object-contain"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-3 py-4 text-sm font-mono text-center">
                             <a
                               href={explorerUrl}
                               target="_blank"
@@ -122,7 +122,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                               {formatAddress(burn.address)}
                             </a>
                           </td>
-                          <td className="px-6 py-4 text-sm text-center font-semibold text-red-600 dark:text-red-400">
+                          <td className="px-3 py-4 text-sm text-center font-semibold text-red-600 dark:text-red-400">
                             {formatValue(burn.balance)}
                           </td>
                         </tr>
