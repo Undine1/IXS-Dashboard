@@ -219,7 +219,16 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
     const debug = { token0, token1, decimals0, decimals1, reserve0Float, reserve1Float, price0, price1, usdValue };
     return { usdValue, derivedIxsPrice, debug };
   } catch (error) {
-    const errMsg = (error && (error.message || JSON.stringify(error))) || 'unknown error';
+    let errMsg = 'unknown error';
+    if (error instanceof Error && error.message) {
+      errMsg = error.message;
+    } else {
+      try {
+        errMsg = JSON.stringify(error);
+      } catch (e) {
+        errMsg = String(error);
+      }
+    }
     console.error(`[pools API] Error fetching ${pool.name} pool value:`, errMsg);
     const debug = { error: errMsg };
     return { usdValue: 0, derivedIxsPrice: null, debug };
