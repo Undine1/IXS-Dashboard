@@ -8,17 +8,35 @@ import { TokenBurnStats } from '@/types';
 export default function Dashboard() {
   const [burnStats, setBurnStats] = useState<TokenBurnStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pools, setPools] = useState<any[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        // Fetch token burn stats via secure server-side API
-        const burns = await fetchTokenBurnStatsFromAPI();
-        console.log('[Dashboard] Burn stats loaded:', burns);
-        setBurnStats(burns);
+        // Fetch burn stats and pools in parallel so the page stays in
+        // "Loading statistics..." until both are available.
+        const burnsPromise = fetchTokenBurnStatsFromAPI();
+        const poolsPromise = fetch('/api/pools').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+
+        const [burnsResult, poolsResult]: any = await Promise.all([burnsPromise, poolsPromise]);
+
+        if (burnsResult) {
+          setBurnStats(burnsResult);
+        }
+
+        if (poolsResult && poolsResult.pools) {
+          setPools(poolsResult.pools || []);
+          setWarnings(poolsResult.warnings || []);
+        } else {
+          setPools([]);
+          setWarnings([]);
+        }
       } catch (error) {
         console.error('[Dashboard] Failed to load data:', error);
+        setPools([]);
+        setWarnings([]);
       } finally {
         setLoading(false);
       }
@@ -45,7 +63,7 @@ export default function Dashboard() {
             <p className="text-gray-600 dark:text-gray-400">Loading statistics...</p>
           </div>
         ) : burnStats && burnStats.burnAddresses.length > 0 ? (
-          <BurnStats stats={burnStats} tokenSymbol={process.env.NEXT_PUBLIC_TOKEN_SYMBOL} />
+          <BurnStats stats={burnStats} tokenSymbol={process.env.NEXT_PUBLIC_TOKEN_SYMBOL} pools={pools} warnings={warnings} />
         ) : (
           <div className="p-8 bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 rounded-lg">
             <p className="text-yellow-800 dark:text-yellow-200">No burn statistics available</p>

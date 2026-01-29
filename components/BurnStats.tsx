@@ -12,9 +12,11 @@ import { PRIVATE_ENTRY as DEFAULT_PRIVATE_ENTRY, PUBLIC_DEALS as DEFAULT_PUBLIC_
 interface BurnStatsProps {
   stats: TokenBurnStats;
   tokenSymbol?: string;
+  pools?: any[];
+  warnings?: string[];
 }
 
-export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps) {
+export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warnings = [] }: BurnStatsProps) {
   const ethTokenAddress = process.env.NEXT_PUBLIC_ETH_TOKEN_ADDRESS || '';
   const polygonTokenAddress = process.env.NEXT_PUBLIC_POLYGON_TOKEN_ADDRESS || '';
   const baseTokenAddress = process.env.NEXT_PUBLIC_BASE_TOKEN_ADDRESS || '';
@@ -29,24 +31,10 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS' }: BurnStatsProps
   }
 
   const [open, setOpen] = useState(false);
-  const [pools, setPools] = useState([]);
-  const [warnings, setWarnings] = useState<string[]>([]);
-
-  useEffect(() => {
-    const fetchPools = async () => {
-      try {
-        const response = await fetch('/api/pools');
-        if (response.ok) {
-          const data = await response.json();
-          setPools(data.pools || []);
-          setWarnings(data.warnings || []);
-        }
-      } catch (error) {
-        console.error('Error fetching pools:', error);
-      }
-    };
-    fetchPools();
-  }, []);
+  // `pools` and `warnings` are provided by parent `Dashboard` so the
+  // overall page can remain in the loading state until pools finish
+  // loading. This avoids rendering the TVL section partially while the
+  // page already appears loaded.
 
   return (
     <div className="space-y-6">
