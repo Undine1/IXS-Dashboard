@@ -70,7 +70,6 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                 <table className="w-full">
                   <thead>
                     <tr>
-                      <th className="px-2 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100"></th>
                       <th className="px-2 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Network</th>
                       <th className="px-3 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Address</th>
                       <th className="px-3 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Balance ({tokenSymbol})</th>
@@ -101,7 +100,6 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
 
                       return (
                         <tr key={`${burn.network}-${burn.address}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-2 py-4 text-sm font-medium text-gray-900 dark:text-gray-100"></td>
                           <td className="px-2 py-4 text-sm text-gray-700 dark:text-gray-300">
                             <div className="flex items-center justify-center">
                               <img
