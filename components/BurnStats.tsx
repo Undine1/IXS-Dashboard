@@ -102,13 +102,15 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                       return (
                         <tr key={`${burn.network}-${burn.address}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                           <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100"></td>
-                              <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
-                                <img
-                                  src={`/images/chains/${burn.network}.png`}
-                                  alt={networkLabel}
-                                  title={networkLabel}
-                                  className="w-6 h-6 object-contain"
-                                />
+                              <td className="px-3 py-4 text-sm text-gray-700 dark:text-gray-300">
+                                <div className="flex items-center justify-center">
+                                  <img
+                                    src={`/images/chains/${burn.network}.png`}
+                                    alt={networkLabel}
+                                    title={networkLabel}
+                                    className="w-6 h-6 object-contain"
+                                  />
+                                </div>
                               </td>
                           <td className="px-6 py-4 text-sm font-mono text-center">
                             <a
