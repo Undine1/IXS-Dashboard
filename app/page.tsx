@@ -42,7 +42,7 @@ export default function Dashboard() {
 
         {loading ? (
           <div className="p-8 bg-white dark:bg-gray-800 rounded-lg shadow text-center">
-            <p className="text-gray-600 dark:text-gray-400">Loading burn statistics...</p>
+            <p className="text-gray-600 dark:text-gray-400">Loading statistics...</p>
           </div>
         ) : burnStats && burnStats.burnAddresses.length > 0 ? (
           <BurnStats stats={burnStats} tokenSymbol={process.env.NEXT_PUBLIC_TOKEN_SYMBOL} />
