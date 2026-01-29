@@ -71,9 +71,9 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                   <thead>
                     <tr>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100"></th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">Network</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">Address</th>
-                      <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">Balance ({tokenSymbol})</th>
+                      <th className="px-3 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Network</th>
+                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Address</th>
+                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">Balance ({tokenSymbol})</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
@@ -110,7 +110,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                                   className="w-6 h-6 object-contain"
                                 />
                               </td>
-                          <td className="px-6 py-4 text-sm font-mono">
+                          <td className="px-6 py-4 text-sm font-mono text-center">
                             <a
                               href={explorerUrl}
                               target="_blank"
@@ -120,7 +120,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                               {formatAddress(burn.address)}
                             </a>
                           </td>
-                          <td className="px-6 py-4 text-sm text-right font-semibold text-red-600 dark:text-red-400">
+                          <td className="px-6 py-4 text-sm text-center font-semibold text-red-600 dark:text-red-400">
                             {formatValue(burn.balance)}
                           </td>
                         </tr>
