@@ -254,11 +254,21 @@ function TVLDropMenu({ pools, warnings }: { pools: any[]; warnings?: string[] })
                 {/* Public Deals entries (single source of truth) */}
                 {publicDeals.map((d) => {
                   const slug = (d.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                  // Preferred mapping to existing chain logos when applicable
+                  const dealChainLogoMap: Record<string, string> = {
+                    'tempo fund': '/images/chains/base.png',
+                    'ckgp': '/images/chains/polygon.png',
+                    'sea solar series 1': '/images/chains/polygon.png',
+                    'tau digital': '/images/chains/polygon.png',
+                    'sea solar': '/images/chains/polygon.png'
+                  };
+                  const keyName = (d.name || '').toLowerCase();
+                  const logoSrc = dealChainLogoMap[keyName] || `/images/logos/${slug}.svg`;
                   return (
                     <tr key={d.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                         <div className="flex items-center">
-                          <img src={`/images/logos/${slug}.svg`} alt={d.name} className="w-6 h-6 mr-2 object-contain" />
+                          <img src={logoSrc} alt={d.name} className="w-6 h-6 mr-2 object-contain" />
                           <span>{d.name}</span>
                         </div>
                       </td>
