@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import BurnStats from '@/components/BurnStats';
+import ThemeToggle from '@/components/ThemeToggle';
 import { fetchTokenBurnStatsFromAPI } from '@/lib/clientBurnService';
 import { TokenBurnStats } from '@/types';
 
@@ -49,13 +50,15 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4 md:p-8">
+    <main className="min-h-screen bg-slate-50 dark:bg-[#0B1120] p-4 md:p-8 transition-colors duration-300">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-            IXS Dashboard
-          </h1>
-          {/* Removed burn tracking subtitle as requested */}
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-teal-500 to-cyan-500 dark:from-teal-400 dark:to-cyan-400">
+              IXS Dashboard
+            </h1>
+          </div>
+          <ThemeToggle />
         </div>
 
         {loading ? (
