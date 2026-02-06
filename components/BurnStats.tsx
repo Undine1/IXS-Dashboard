@@ -83,68 +83,59 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
     <div className="space-y-8 animate-in fade-in duration-500">
       
       {/* --- Top Metrics Grid --- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
         
         {/* Metric 1: Burned */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-red-500 p-6 flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Tokens Burned</p>
-            <div className="mt-2 flex items-baseline gap-2">
-               <span className="text-3xl font-bold text-gray-900 dark:text-white">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#ff3b30] p-6 flex flex-col justify-between relative overflow-hidden z-10">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 text-center">Total Tokens Burned</p>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="flex flex-nowrap items-center gap-2">
+               <span className="text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
                  {formatValue(String(stats.totalBurned), 2)}
                </span>
-               <span className="text-sm font-medium text-red-600 bg-red-100 dark:bg-red-900/30 px-2 py-0.5 rounded-full">
+               <span className="text-sm font-medium text-red-600 dark:text-[#ff3b30] bg-red-100 dark:bg-red-950/40 px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(255,59,48,0.3)] border border-red-200 dark:border-red-900/50 whitespace-nowrap">
                  {burnedPct.toFixed(2)}%
                </span>
             </div>
-            <p className="mt-1 text-xs text-gray-400">of Original 180M Supply</p>
           </div>
-          <div className="mt-4" />
+        </div>
+
+        {/* Pointer between cards */}
+        <div className="hidden md:flex absolute left-[calc(33.333%-12px)] top-1/2 -translate-y-1/2 z-20 text-gray-400 dark:text-gray-500 text-2xl font-bold">
+          &gt;
         </div>
 
         {/* Metric 2: Supply */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-teal-500 p-6 flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/5 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Current Token Supply</p>
-            <div className="mt-2">
-               <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                 {newMaxSupply.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-               </span>
-               <span className="ml-2 text-sm text-gray-500">IXS</span>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#ff3b30] p-6 flex flex-col justify-between relative overflow-visible">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 text-center">Max Token Supply</p>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="flex flex-nowrap items-baseline gap-2">
+              <span className="text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                {newMaxSupply.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </span>
+              <span className="text-sm text-gray-500 whitespace-nowrap">IXS</span>
             </div>
-            <div className="mt-2 flex items-center text-teal-700 dark:text-teal-400 text-xs font-semibold bg-teal-50 dark:bg-teal-900/20 w-fit px-2 py-1 rounded">
-                <svg className="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0l-3.182-3.182a1 1 0 011.414-1.414L9 11.586l6.293-6.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-                Supply = Fully Circulating
-            </div>
-         </div>
-          <p className="mt-4 text-xs text-gray-400">Original: {MAX_SUPPLY.toLocaleString()}</p>
+          </div>
         </div>
 
         {/* Metric 3: TVL */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-cyan-500 p-6 flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Value Locked</p>
-            <div className="mt-2">
-               <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                 {formatUsd(totalTvl, 0)}
-               </span>
-            </div>
-            <p className="mt-1 text-xs text-gray-400">Across Ecosystem</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-cyan-500 p-6 flex flex-col justify-between relative overflow-visible">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 text-center">Total Value Locked</p>
+          <div className="flex-1 flex items-center justify-center">
+            <span className="text-3xl font-bold text-gray-900 dark:text-white">
+              {formatUsd(totalTvl, 0)}
+            </span>
           </div>
-          <div className="mt-4" />
         </div>
       </div>
 
       {/* --- Details Section --- */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
         
         {/* Left Col: Burn Details List */}
-        <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col h-full">
+        <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#ff3b30] overflow-hidden flex flex-col h-full relative z-10">
           <div className="p-6 border-b border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Burn Addresses</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center">Burn Addresses</h3>
           </div>
           <div className="flex-1 divide-y divide-gray-100 dark:divide-gray-700">
             {stats.burnAddresses.map((burn) => {
@@ -190,7 +181,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                     </div>
                     <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-900/50 rounded p-2">
                        <span className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Burned</span>
-                       <span className="text-sm font-bold text-red-600 dark:text-red-400 font-mono">
+                       <span className="text-sm font-bold text-red-600 dark:text-[#ff3b30] drop-shadow-[0_0_5px_rgba(255,59,48,0.6)] font-mono">
                          {formatValue(burn.balance)}
                        </span>
                     </div>
@@ -201,11 +192,11 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
         </div>
 
         {/* Right Col: TVL Details Table (Takes 2 cols) */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col h-full">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800 sticky top-0 z-10">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">IXS Platform Numbers</h3>
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-cyan-500 overflow-hidden flex flex-col h-full relative z-10">
+          <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-center items-center bg-white dark:bg-gray-800 sticky top-0 z-10 relative">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center">IXS Platform Numbers</h3>
             {warnings && warnings.length > 0 && (
-               <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
+               <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200 absolute right-6">
                  {warnings.length} warning(s)
                </div>
             )}
@@ -230,7 +221,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                        </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                       <span className="px-2 py-1 text-xs rounded-full bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200">Private</span>
+                       <span className="px-2 py-1 text-xs rounded-full bg-cyan-100 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-400 dark:border dark:border-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.1)]">Private</span>
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-bold text-gray-700 dark:text-gray-300">
                        {formatUsd(privateEntry.value, 0)}
@@ -256,13 +247,13 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                                <img 
                                  src={logoSrc} 
                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                 alt="" className="w-8 h-8 mr-3 object-contain rounded-full bg-gray-50 p-1 border border-gray-100 dark:border-gray-700" 
+                                 alt="" className="w-8 h-8 mr-3 object-contain" 
                                />
                                <span className="text-sm font-medium text-gray-900 dark:text-white">{d.name}</span>
                             </div>
                          </td>
                          <td className="px-6 py-4 text-center">
-                            <span className="px-2 py-1 text-xs rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">Launchpad</span>
+                            <span className="px-2 py-1 text-xs rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border dark:border-indigo-500/20 shadow-[0_0_10px_rgba(129,140,248,0.1)]">Launchpad</span>
                          </td>
                          <td className="px-6 py-4 text-right text-sm font-mono text-gray-700 dark:text-gray-300">
                             {formatUsd(d.value, d.decimals)}
@@ -293,16 +284,15 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                                    src={`/images/chains/${p.network}.png`}
                                    onError={(e) => { e.currentTarget.src = `/images/chains/${p.network}.svg`}}
                                    alt={p.network}
-                                   className="w-6 h-6 mr-3 object-contain"
+                                   className="w-8 h-8 mr-3 object-contain"
                                  />
                                  <div>
                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{p.name}</div>
-                                   <div className="text-xs text-gray-500 capitalize">{p.network}</div>
                                  </div>
                                </div>
                              </td>
                              <td className="px-6 py-4 text-center">
-                               <span className="px-2 py-1 text-xs rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">Liquidity</span>
+                               <span className="px-2 py-1 text-xs rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border dark:border-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.1)]">Liquidity</span>
                              </td>
                              <td className="px-6 py-4 text-right text-sm font-mono text-gray-700 dark:text-gray-300">
                                {formatUsd(p.value || 0)}

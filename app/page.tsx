@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import BurnStats from '@/components/BurnStats';
-import ThemeToggle from '@/components/ThemeToggle';
 import { fetchTokenBurnStatsFromAPI } from '@/lib/clientBurnService';
 import { TokenBurnStats } from '@/types';
 
@@ -58,7 +57,16 @@ export default function Dashboard() {
               IXS Dashboard
             </h1>
           </div>
-          <ThemeToggle />
+          <div className="flex flex-col items-start text-teal-700 dark:text-teal-400 text-[10px] font-semibold bg-teal-50 dark:bg-teal-900/20 px-1.5 py-0.5 rounded gap-0.5">
+            <div className="flex items-center">
+              <svg className="w-2.5 h-2.5 mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0l-3.182-3.182a1 1 0 011.414-1.414L9 11.586l6.293-6.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+              Original max supply: 180m
+            </div>
+            <div className="flex items-center">
+              <svg className="w-2.5 h-2.5 mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0l-3.182-3.182a1 1 0 011.414-1.414L9 11.586l6.293-6.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+              Fully circulating
+            </div>
+          </div>
         </div>
 
         {loading ? (
