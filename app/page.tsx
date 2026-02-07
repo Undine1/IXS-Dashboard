@@ -52,9 +52,8 @@ export default function Dashboard() {
     <main className="min-h-screen bg-slate-50 dark:bg-[#0B1120] p-4 md:p-8 transition-colors duration-300">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 flex justify-center">
-          <h1 className="text-5xl md:text-6xl font-extrabold text-center bg-clip-text text-transparent bg-gradient-to-r from-teal-600 via-cyan-500 to-teal-400 dark:from-teal-300 dark:via-cyan-400 dark:to-teal-500" style={{ textShadow: '0 0 40px rgba(20, 184, 166, 0.5), 0 0 80px rgba(6, 182, 212, 0.3)' }}>
-            IXS Dashboard
-          </h1>
+          <img src="/images/banner.svg" alt="IXS Dashboard" className="w-full max-w-4xl" />
+          <h1 className="sr-only">IXS Dashboard</h1>
         </div>
 
         {loading ? (
