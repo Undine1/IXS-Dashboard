@@ -1,36 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="220" viewBox="0 0 1600 220" preserveAspectRatio="xMidYMid meet">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="240" viewBox="0 0 1600 240" preserveAspectRatio="xMidYMid meet">
   <defs>
-    <linearGradient id="g1" x1="0%" x2="100%" y1="0%" y2="0%">
-      <stop offset="0%" stop-color="#0ee6c9" />
-      <stop offset="50%" stop-color="#00d4ff" />
+    <linearGradient id="neonGrad" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="45%" stop-color="#00f0ff" />
       <stop offset="100%" stop-color="#06b6d4" />
     </linearGradient>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="12" result="coloredBlur" />
-      <feMerge>
-        <feMergeNode in="coloredBlur" />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
-    </filter>
   </defs>
 
-  <!-- Top outline connecting to the top edge -->
-  <path d="M40,20 Q200,0 800,0 Q1400,0 1560,20" fill="none" stroke="#07b3ad" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
-
-  <!-- Subtle background rounded plaque under the text -->
-  <rect x="60" y="40" rx="18" ry="18" width="1480" height="140" fill="#071022" opacity="0.7" />
-
-  <!-- Gradient stroked outline around the plaque connecting to the top -->
-  <path d="M40,20 Q200,0 800,0 Q1400,0 1560,20 L1560,160 Q1400,200 800,200 Q200,200 40,160 Z" fill="none" stroke="url(#g1)" stroke-width="3" opacity="0.35" />
-
-  <!-- Main title text with gradient fill and glow -->
-  <g filter="url(#glow)">
-    <text x="50%" y="130" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial" font-weight="800" font-size="96" fill="url(#g1)">
-      IXS Dashboard
-    </text>
-  </g>
-
-  <!-- Small highlight underline -->
-  <rect x="620" y="140" width="360" height="6" rx="3" fill="#00e0d1" opacity="0.35" />
+  <!-- Title text with strong neon gradient (no background plaque) -->
+  <text x="50%" y="120" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial" font-weight="800" font-size="72" fill="url(#neonGrad)" style="letter-spacing:-1px">
+    IXS Dashboard
+  </text>
 </svg>
