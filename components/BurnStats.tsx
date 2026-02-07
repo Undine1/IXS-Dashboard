@@ -215,7 +215,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                             src={`/images/chains/${burn.network}.png`} 
                             onError={(e) => { e.currentTarget.src = `/images/chains/${burn.network}.svg`}}
                             alt={networkLabel} 
-                            className="w-8 h-8 object-contain" 
+                            className="w-6 h-6 object-contain" 
                           />
                           <div>
                             <p className="text-sm font-medium text-gray-900 dark:text-white">{networkLabel}</p>
@@ -272,7 +272,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                                <img 
                                  src={logoSrc} 
                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                 alt="" className="w-8 h-8 mr-3 object-contain" 
+                                 alt="" className="w-6 h-6 mr-2 object-contain" 
                                />
                                <span className="text-sm font-medium text-gray-900 dark:text-white">{d.name}</span>
                             </div>
@@ -316,7 +316,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                           <img 
                             src="/images/chains/blockchain.svg" 
                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            alt="" className="w-8 h-8 mr-3 object-contain" 
+                            alt="" className="w-6 h-6 mr-2 object-contain" 
                           />
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{privateEntry.label}</div>
@@ -354,9 +354,9 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                                <div className="flex items-center">
                                  <img
                                    src={`/images/chains/${p.network}.png`}
-                                   onError={(e) => { e.currentTarget.src = `/images/chains/${p.network}.svg`}}
-                                   alt={p.network}
-                                   className="w-8 h-8 mr-3 object-contain"
+                                     onError={(e) => { e.currentTarget.src = `/images/chains/${p.network}.svg`}}
+                                     alt={p.network}
+                                     className="w-6 h-6 mr-2 object-contain"
                                  />
                                  <div>
                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{p.name}</div>
