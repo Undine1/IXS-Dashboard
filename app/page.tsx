@@ -51,22 +51,10 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen bg-slate-50 dark:bg-[#0B1120] p-4 md:p-8 transition-colors duration-300">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-teal-500 to-cyan-500 dark:from-teal-400 dark:to-cyan-400">
-              IXS Dashboard
-            </h1>
-          </div>
-          <div className="flex flex-col items-start text-teal-700 dark:text-teal-400 text-[10px] font-semibold bg-teal-50 dark:bg-teal-900/20 px-1.5 py-0.5 rounded gap-0.5">
-            <div className="flex items-center">
-              <svg className="w-2.5 h-2.5 mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0l-3.182-3.182a1 1 0 011.414-1.414L9 11.586l6.293-6.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-              Original max supply: 180m
-            </div>
-            <div className="flex items-center">
-              <svg className="w-2.5 h-2.5 mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0l-3.182-3.182a1 1 0 011.414-1.414L9 11.586l6.293-6.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-              Fully circulating
-            </div>
-          </div>
+        <div className="mb-8 flex justify-center">
+          <h1 className="text-5xl md:text-6xl font-extrabold text-center bg-clip-text text-transparent bg-gradient-to-r from-teal-600 via-cyan-500 to-teal-400 dark:from-teal-300 dark:via-cyan-400 dark:to-teal-500" style={{ textShadow: '0 0 40px rgba(20, 184, 166, 0.5), 0 0 80px rgba(6, 182, 212, 0.3)' }}>
+            IXS Dashboard
+          </h1>
         </div>
 
         {loading ? (
