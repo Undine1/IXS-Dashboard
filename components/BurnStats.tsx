@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Fragment } from 'react';
+import React, { useState, useEffect, useMemo, Fragment, useRef, useLayoutEffect } from 'react';
 import { TokenBurnStats } from '@/types';
 import { formatValue, formatAddress, formatUsd } from '@/lib/utils';
 import { PRIVATE_ENTRY as DEFAULT_PRIVATE_ENTRY, PUBLIC_DEALS as DEFAULT_PUBLIC_DEALS, TYPE_LABELS } from '@/lib/tvlConfig';
@@ -55,7 +55,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   const tvlPrivateVal = Number(privateEntry.value) || 0;
   const tvlLaunchpadVal = (publicDeals || []).reduce((s, p) => s + (Number(p.value) || 0), 0);
   const tvlPoolsVal = (pools || []).reduce((s: number, p: any) => s + (Number(p.value) || 0), 0);
-  const totalTvl = tvlPrivateVal + tvlLaunchpadVal + tvlPoolsVal;
+  const totalTvl = tvlPrivateVal + tvlPoolsVal; // Excluded launchpad from TVL
 
   // 3. Chart Data
   const burnChartData = [
@@ -69,6 +69,49 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
     { name: 'Launchpad', value: tvlLaunchpadVal },
     { name: 'Liquidity Pools', value: tvlPoolsVal },
   ].filter(d => d.value > 0);
+
+  // Refs and state to align suffixes precisely next to centered numbers
+  const burnedCardRef = useRef<HTMLDivElement | null>(null);
+  const burnedNumberRef = useRef<HTMLSpanElement | null>(null);
+  const [burnedSuffixLeft, setBurnedSuffixLeft] = useState<string | null>(null);
+
+  const supplyCardRef = useRef<HTMLDivElement | null>(null);
+  const supplyNumberRef = useRef<HTMLSpanElement | null>(null);
+  const [supplySuffixLeft, setSupplySuffixLeft] = useState<string | null>(null);
+  // Title centering refs for the supply card (center text, position checkmark separately)
+  const supplyTitleRef = useRef<HTMLParagraphElement | null>(null);
+  const supplyTitleTextRef = useRef<HTMLSpanElement | null>(null);
+  const [supplyCheckLeft, setSupplyCheckLeft] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    function positionSuffixes() {
+      // Defer to the next paint to ensure fonts/layout have settled
+      window.requestAnimationFrame(() => {
+        // Burned percentage: use same centered-calc approach as the supply checkmark
+        if (burnedCardRef.current && burnedNumberRef.current) {
+          const numRect = burnedNumberRef.current.getBoundingClientRect();
+          const half = Math.round(numRect.width / 2);
+          setBurnedSuffixLeft(`calc(50% + ${half + 4}px)`);
+        }
+        // Supply IXS suffix: match checkmark positioning method
+        if (supplyCardRef.current && supplyNumberRef.current) {
+          const numRect = supplyNumberRef.current.getBoundingClientRect();
+          const half = Math.round(numRect.width / 2);
+          setSupplySuffixLeft(`calc(50% + ${half + 4}px)`);
+        }
+        // Compute checkmark position for the supply title so the text can be centered independently
+        if (supplyTitleRef.current && supplyTitleTextRef.current) {
+          const textRect = supplyTitleTextRef.current.getBoundingClientRect();
+          const half = Math.round(textRect.width / 2);
+          setSupplyCheckLeft(`calc(50% + ${half + 4}px)`);
+        }
+      });
+    }
+
+    positionSuffixes();
+    window.addEventListener('resize', positionSuffixes);
+    return () => window.removeEventListener('resize', positionSuffixes);
+  }, [stats?.totalBurned, newMaxSupply]);
 
 
   if (!stats || !Array.isArray(stats.burnAddresses) || stats.burnAddresses.length === 0) {
@@ -86,33 +129,39 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
         
         {/* Metric 1: Burned */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#ff3b30] p-6 flex flex-col justify-between relative overflow-hidden z-10">
+        <div ref={burnedCardRef} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#ff3b30] p-6 flex flex-col justify-between relative overflow-hidden z-10">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400 text-center">Total Tokens Burned</p>
-          <div className="flex-1 flex items-center justify-center">
-            <div className="flex flex-nowrap items-center gap-2">
-               <span className="text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                 {formatValue(String(stats.totalBurned), 2)}
-               </span>
-               <span className="text-sm font-medium text-red-600 dark:text-[#ff3b30] bg-red-100 dark:bg-red-950/40 px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(255,59,48,0.3)] border border-red-200 dark:border-red-900/50 whitespace-nowrap">
-                 {burnedPct.toFixed(2)}%
-               </span>
+          <div className="flex-1 relative">
+            {/* Number centered absolutely so surrounding badges don't affect centering */}
+            <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }} className="pointer-events-none">
+              <span ref={burnedNumberRef} className="text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                {formatValue(String(stats.totalBurned), 2)}
+              </span>
+            </div>
+            {/* Percentage positioned to the right of the centered number without affecting layout */}
+            <div style={{ position: 'absolute', top: '50%', left: burnedSuffixLeft ?? '50%', transform: burnedSuffixLeft !== null ? 'translate(0, -50%)' : 'translate(4px, -50%)' }}>
+              <span className="text-sm font-medium text-red-600 dark:text-[#ff3b30] bg-red-100 dark:bg-red-950/40 px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(255,59,48,0.3)] border border-red-200 dark:border-red-900/50 whitespace-nowrap">
+                {burnedPct.toFixed(2)}%
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Pointer between cards */}
-        <div className="hidden md:flex absolute left-[calc(33.333%-12px)] top-1/2 -translate-y-1/2 z-20 text-gray-400 dark:text-gray-500 text-2xl font-bold">
-          &gt;
-        </div>
+        {/* Pointer removed per UI cleanup request */}
 
         {/* Metric 2: Supply */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#ff3b30] p-6 flex flex-col justify-between relative overflow-visible">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 text-center">Max Token Supply</p>
-          <div className="flex-1 flex items-center justify-center">
-            <div className="flex flex-nowrap items-baseline gap-2">
-              <span className="text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
+        <div ref={supplyCardRef} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#ff3b30] p-6 flex flex-col justify-between relative overflow-visible">
+          <p ref={supplyTitleRef} className="text-sm font-medium text-gray-500 dark:text-gray-400 text-center relative">
+            <span ref={supplyTitleTextRef} className="inline-block">Max Supply - Fully Circulating</span>
+            <svg style={{ position: 'absolute', top: '50%', left: supplyCheckLeft !== null ? supplyCheckLeft : '50%', transform: supplyCheckLeft !== null ? 'translate(0, -50%)' : 'translate(4px, -50%)' }} className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0l-3.182-3.182a1 1 0 011.414-1.414L9 11.586l6.293-6.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+          </p>
+          <div className="flex-1 relative">
+            <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }} className="pointer-events-none">
+              <span ref={supplyNumberRef} className="text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
                 {newMaxSupply.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </span>
+            </div>
+            <div style={{ position: 'absolute', top: '50%', left: supplySuffixLeft ?? '50%', transform: supplySuffixLeft !== null ? 'translate(0, -50%)' : 'translate(4px, -50%)' }}>
               <span className="text-sm text-gray-500 whitespace-nowrap">IXS</span>
             </div>
           </div>
@@ -132,7 +181,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
       {/* --- Details Section --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
         
-        {/* Left Col: Burn Details List */}
+        {/* Col 1: Burn Details List */}
         <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#ff3b30] overflow-hidden flex flex-col h-full relative z-10">
           <div className="p-6 border-b border-gray-100 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center">Burn Addresses</h3>
@@ -191,44 +240,20 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
           </div>
         </div>
 
-        {/* Right Col: TVL Details Table (Takes 2 cols) */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-cyan-500 overflow-hidden flex flex-col h-full relative z-10">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-center items-center bg-white dark:bg-gray-800 sticky top-0 z-10 relative">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center">IXS Platform Numbers</h3>
-            {warnings && warnings.length > 0 && (
-               <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200 absolute right-6">
-                 {warnings.length} warning(s)
-               </div>
-            )}
+        {/* Col 2: Launchpad Deals */}
+        <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-indigo-500 overflow-hidden flex flex-col h-full relative z-10">
+          <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center">Successful Launchpad Deals</h3>
           </div>
-          
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset / Deal</th>
-                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deal</th>
                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value (USD)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                 {/* 1. Private Entry */}
-                 <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <td className="px-6 py-4">
-                       <div className="text-sm font-medium text-gray-900 dark:text-white">{privateEntry.label}</div>
-                       <div className="text-xs text-gray-500 mt-1">
-                         Verified by <a href={privateEntry.verifiedBy.href} target="_blank" className="text-cyan-600 hover:underline dark:text-cyan-400">{privateEntry.verifiedBy.label}</a>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                       <span className="px-2 py-1 text-xs rounded-full bg-cyan-100 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-400 dark:border dark:border-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.1)]">Private</span>
-                    </td>
-                    <td className="px-6 py-4 text-right text-sm font-bold text-gray-700 dark:text-gray-300">
-                       {formatUsd(privateEntry.value, 0)}
-                    </td>
-                 </tr>
-
-                 {/* 2. Public Deals */}
                  {publicDeals.map((d) => {
                     const slug = (d.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
                     const dealChainLogoMap: Record<string, string> = {
@@ -252,17 +277,64 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                                <span className="text-sm font-medium text-gray-900 dark:text-white">{d.name}</span>
                             </div>
                          </td>
-                         <td className="px-6 py-4 text-center">
-                            <span className="px-2 py-1 text-xs rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border dark:border-indigo-500/20 shadow-[0_0_10px_rgba(129,140,248,0.1)]">Launchpad</span>
-                         </td>
                          <td className="px-6 py-4 text-right text-sm font-mono text-gray-700 dark:text-gray-300">
                             {formatUsd(d.value, d.decimals)}
                          </td>
                       </tr>
                     );
                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-                 {/* 3. Pools Breakdown */}
+        {/* Col 3: IXS Platform Numbers */}
+        <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-cyan-500 overflow-hidden flex flex-col h-full relative z-10">
+          <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-center items-center bg-white dark:bg-gray-800 sticky top-0 z-10 relative">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center">IXS Platform Numbers</h3>
+            {warnings && warnings.length > 0 && (
+               <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200 absolute right-6">
+                 {warnings.length} warning(s)
+               </div>
+            )}
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900/50">
+                <tr>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset / Deal</th>
+                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value (USD)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                 {/* 1. Private Entry */}
+                 <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <td className="px-6 py-4">
+                       <div className="flex items-center">
+                          <img 
+                            src="/images/chains/blockchain.svg" 
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            alt="" className="w-8 h-8 mr-3 object-contain" 
+                          />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{privateEntry.label}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              Verified by <a href={privateEntry.verifiedBy.href} target="_blank" className="text-cyan-600 hover:underline dark:text-cyan-400">{privateEntry.verifiedBy.label}</a>
+                            </div>
+                          </div>
+                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                       <span className="px-2 py-1 text-xs rounded-full bg-cyan-100 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-400 dark:border dark:border-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.1)]">Private</span>
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm font-bold text-gray-700 dark:text-gray-300">
+                       {formatUsd(privateEntry.value, 0)}
+                    </td>
+                 </tr>
+
+                 {/* 2. Pools Breakdown */}
                  {Array.from(pools.reduce((map: Map<string, any[]>, p: any) => {
                     const key = p.type || 'Other';
                     if (!map.has(key)) map.set(key, []);
