@@ -7,7 +7,7 @@ export function formatValue(value: string | bigint, decimals: number = 2): strin
   try {
     const bigValue = typeof value === 'string' ? BigInt(value) : value;
     const numberValue = Number(bigValue) / 1e18;
-    return numberValue.toFixed(decimals);
+    return numberValue.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   } catch {
     return '0';
   }

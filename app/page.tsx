@@ -52,7 +52,9 @@ export default function Dashboard() {
     <main className="min-h-screen bg-slate-50 dark:bg-[#0B1120] p-4 md:p-8 transition-colors duration-300">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 flex justify-center">
-          <img src="/images/banner.svg" alt="IXS Dashboard" className="w-full max-w-4xl" />
+          <picture className="w-full max-w-4xl">
+            <img src="/images/banner.svg" alt="IXS Dashboard" className="w-full h-auto" />
+          </picture>
           <h1 className="sr-only">IXS Dashboard</h1>
         </div>
 
