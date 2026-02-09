@@ -73,7 +73,6 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   // Refs and state to align suffixes precisely next to centered numbers
   const burnedCardRef = useRef<HTMLDivElement | null>(null);
   const burnedNumberRef = useRef<HTMLSpanElement | null>(null);
-  const [burnedSuffixLeft, setBurnedSuffixLeft] = useState<string | null>(null);
 
   const supplyCardRef = useRef<HTMLDivElement | null>(null);
   const supplyNumberRef = useRef<HTMLSpanElement | null>(null);
@@ -84,22 +83,8 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   const [supplyCheckLeft, setSupplyCheckLeft] = useState<string | null>(null);
 
   useLayoutEffect(() => {
-    function positionSuffixes() {
-      // Defer to the next paint to ensure fonts/layout have settled
+    function positionCheck() {
       window.requestAnimationFrame(() => {
-        // Burned percentage: use same centered-calc approach as the supply checkmark
-        if (burnedCardRef.current && burnedNumberRef.current) {
-          const numRect = burnedNumberRef.current.getBoundingClientRect();
-          const half = Math.round(numRect.width / 2);
-          setBurnedSuffixLeft(`calc(50% + ${half + 4}px)`);
-        }
-        // Supply IXS suffix: match checkmark positioning method
-        if (supplyCardRef.current && supplyNumberRef.current) {
-          const numRect = supplyNumberRef.current.getBoundingClientRect();
-          const half = Math.round(numRect.width / 2);
-          setSupplySuffixLeft(`calc(50% + ${half + 4}px)`);
-        }
-        // Compute checkmark position for the supply title so the text can be centered independently
         if (supplyTitleRef.current && supplyTitleTextRef.current) {
           const textRect = supplyTitleTextRef.current.getBoundingClientRect();
           const half = Math.round(textRect.width / 2);
@@ -108,9 +93,9 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
       });
     }
 
-    positionSuffixes();
-    window.addEventListener('resize', positionSuffixes);
-    return () => window.removeEventListener('resize', positionSuffixes);
+    positionCheck();
+    window.addEventListener('resize', positionCheck);
+    return () => window.removeEventListener('resize', positionCheck);
   }, [stats?.totalBurned, newMaxSupply]);
 
 
@@ -131,17 +116,15 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
         {/* Metric 1: Burned */}
         <div ref={burnedCardRef} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#ff3b30] p-6 flex flex-col justify-between relative overflow-hidden z-10">
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400 text-center">Total Tokens Burned</p>
-          <div className="flex-1 relative">
-            {/* Number centered absolutely so surrounding badges don't affect centering */}
-            <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }} className="pointer-events-none">
+          <div className="flex-1 flex items-center justify-center">
+            <div className="relative inline-block pointer-events-none">
               <span ref={burnedNumberRef} className="text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
                 {formatValue(String(stats.totalBurned), 2)}
               </span>
-            </div>
-            {/* Percentage positioned to the right of the centered number without affecting layout */}
-            <div style={{ position: 'absolute', top: '50%', left: burnedSuffixLeft ?? '50%', transform: burnedSuffixLeft !== null ? 'translate(0, -50%)' : 'translate(4px, -50%)' }}>
-              <span className="text-sm font-medium text-red-600 dark:text-[#ff3b30] bg-red-100 dark:bg-red-950/40 px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(255,59,48,0.3)] border border-red-200 dark:border-red-900/50 whitespace-nowrap">
-                {burnedPct.toFixed(2)}%
+              <span className="absolute left-full top-1/2 transform -translate-y-1/2 ml-1">
+                <span className="text-sm font-medium text-red-600 dark:text-[#ff3b30] bg-red-100 dark:bg-red-950/40 px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(255,59,48,0.3)] border border-red-200 dark:border-red-900/50 whitespace-nowrap">
+                  {burnedPct.toFixed(2)}%
+                </span>
               </span>
             </div>
           </div>
@@ -155,14 +138,14 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
             <span ref={supplyTitleTextRef} className="inline-block">Max Supply - Fully Circulating</span>
             <svg style={{ position: 'absolute', top: '50%', left: supplyCheckLeft !== null ? supplyCheckLeft : '50%', transform: supplyCheckLeft !== null ? 'translate(0, -50%)' : 'translate(4px, -50%)' }} className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0l-3.182-3.182a1 1 0 011.414-1.414L9 11.586l6.293-6.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
           </p>
-          <div className="flex-1 relative">
-            <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }} className="pointer-events-none">
+          <div className="flex-1 flex items-center justify-center">
+            <div className="relative inline-block pointer-events-none">
               <span ref={supplyNumberRef} className="text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
                 {newMaxSupply.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </span>
-            </div>
-            <div style={{ position: 'absolute', top: '50%', left: supplySuffixLeft ?? '50%', transform: supplySuffixLeft !== null ? 'translate(0, -50%)' : 'translate(4px, -50%)' }}>
-              <span className="text-sm text-gray-500 whitespace-nowrap">IXS</span>
+              <span className="absolute left-full top-1/2 transform -translate-y-1/2 ml-1">
+                <span className="text-sm text-gray-500 whitespace-nowrap">IXS</span>
+              </span>
             </div>
           </div>
         </div>
