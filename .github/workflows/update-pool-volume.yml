@@ -1,0 +1,44 @@
+name: Update WIXS Pool Volume
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # daily at 00:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  update:
+    name: Run updater and commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run WIXS pool updater
+        env:
+          POLYGON_RPC: ${{ secrets.POLYGON_RPC }}
+          POLYGON_USDC: ${{ secrets.POLYGON_USDC }}
+          BLOCKS_PER_DAY: ${{ env.BLOCKS_PER_DAY }}
+          LOG_CHUNK: '10'
+        run: node ./scripts/update_wixs_pool_volume.js
+
+      - name: Deploy to Vercel (no commit)
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-args: '--prod --confirm'
+          working-directory: .
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
