@@ -340,3 +340,37 @@ This project is open source and available under the MIT License.
 
 For issues or questions, please open an issue in the repository.
 
+---
+
+**Recent changes / developer notes**
+
+- Fix: `components/BurnStats.tsx`
+  - Reworked how centered numeric values and their suffixes are positioned to avoid overlap on small screens.
+  - Replaced fragile pixel-based math with an inline `relative` wrapper and an absolutely-positioned suffix anchored to the right of the number. This prevents the percentage / `IXS` suffix from overlapping the centered numbers on mobile.
+  - Also reduced several chain/logo image sizes (`w-8 h-8` -> `w-6 h-6`) for tighter layout.
+
+- Fix: `components/ThemeProvider.tsx`
+  - Added a lightweight `ThemeContext` and exported `useTheme()` to maintain compatibility with `components/ThemeToggle.tsx`.
+  - The app remains dark-only; `toggleTheme()` is a no-op to preserve the public API without enabling a light theme.
+
+- Fix: `public/images/banner.svg` and `app/page.tsx`
+  - Introduced a refined SVG banner matching the dashboard neon/cyan aesthetic, and wired it into the main page. The banner was iteratively refined (semicircle outline removed, plaque removed, neon title retained) to match the look-and-feel.
+
+- Build: Resolved a TypeScript compile error caused by `ThemeToggle` importing a missing `useTheme` export; local `npm run build` now succeeds.
+
+How to verify locally
+
+- Start dev server: `npm run dev` and visit the dashboard on a mobile viewport (Chrome devtools device toolbar) to confirm the `Total Tokens Burned` and `Max Supply` cards no longer overlap.
+- Run production build test: `npm run build` — verify the build completes without TypeScript errors.
+- API sanity checks: `curl http://localhost:3000/api/burnStats` and `curl http://localhost:3000/api/pools`.
+
+Files touched (recent commits)
+
+- `components/BurnStats.tsx` — layout, mobile fixes, logo sizes
+- `components/ThemeProvider.tsx` — ThemeContext + `useTheme`
+- `components/ThemeToggle.tsx` — unchanged but now works with `useTheme`
+- `public/images/banner.svg` — refined neon title banner
+- `app/page.tsx` — uses `banner.svg` (accessible hidden H1 retained)
+
+If you'd like, I can open a short PR with the above changes and a small visual regression checklist (screenshots for desktop / mobile) for review.
+
