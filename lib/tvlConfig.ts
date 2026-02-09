@@ -5,10 +5,10 @@ export const PRIVATE_ENTRY = {
 };
 
 export const PUBLIC_DEALS = [
-  { name: 'Tempo Fund', value: 500058, decimals: 0 },
-  { name: 'CKGP', value: 515004.5, decimals: 2 },
-  { name: 'Sea Solar Series 1', value: 50000, decimals: 0 },
-  { name: 'Tau Digital', value: 41052.26, decimals: 2 },
+  { name: 'Tempo Fund', value: 500058, decimals: 0, network: 'base' },
+  { name: 'CKGP', value: 515004.5, decimals: 2, network: 'polygon' },
+  { name: 'Sea Solar Series 1', value: 50000, decimals: 0, network: 'polygon' },
+  { name: 'Tau Digital', value: 41052.26, decimals: 2, network: 'polygon' },
 ];
 
 export const TYPE_LABELS: Record<string, string> = {

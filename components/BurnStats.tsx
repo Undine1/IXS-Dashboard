@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, Fragment, useRef, useLayoutEffect 
 import { TokenBurnStats } from '@/types';
 import { formatValue, formatAddress, formatUsd } from '@/lib/utils';
 import { PRIVATE_ENTRY as DEFAULT_PRIVATE_ENTRY, PUBLIC_DEALS as DEFAULT_PUBLIC_DEALS, TYPE_LABELS } from '@/lib/tvlConfig';
+import LAYOUT from '@/lib/layoutConfig';
 // Removed circle chart dependency (recharts) per request — keep visual summaries
 
 interface BurnStatsProps {
@@ -164,17 +165,30 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
             </button>
             {showLaunchpadDeals && (
               <div className="bg-white dark:bg-gray-800 rounded-b-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-0 overflow-hidden flex flex-col z-0 mt-0">
-                <div className="flex-1 divide-y divide-gray-100 dark:divide-gray-700">
-                  {(publicDeals || []).map((d: any, i: number) => (
-                    <div key={`${d.name}-${i}`} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <img src={`/images/chains/${d.network}.png`} onError={(e) => { e.currentTarget.src = `/images/chains/${d.network}.svg` }} alt={d.network} className="w-6 h-6 object-contain" />
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">{d.name}</div>
-                        <div className="text-xs text-gray-500">{d.description || d.network}</div>
-                      </div>
-                      <div className="text-sm font-mono font-bold text-gray-700 dark:text-gray-300">{formatUsd(d.value || 0)}</div>
-                    </div>
-                  ))}
+                <div className={LAYOUT.outerP}>
+                  <div className={LAYOUT.listSpaceY}>
+                    {(publicDeals || []).map((d: any, i: number) => {
+                      // fallback inference for network in case JSON/config is missing it
+                      const inferNetwork = (name: string) => {
+                        const n = (name || '').toLowerCase();
+                        if (n.includes('tempo')) return 'base';
+                        if (n.includes('ckgp') || n.includes('sea') || n.includes('tau')) return 'polygon';
+                        return 'ethereum';
+                      };
+                      const network = d.network || inferNetwork(d.name);
+                      const imgSrcPng = `/images/chains/${network}.png`;
+                      const imgSrcSvg = `/images/chains/${network}.svg`;
+                      return (
+                        <div key={`${d.name}-${i}`} className={`${LAYOUT.itemPy} flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}>
+                          <div className={`flex items-center ${LAYOUT.itemGap}`}>
+                            <img src={imgSrcPng} onError={(e) => { (e.currentTarget as HTMLImageElement).src = imgSrcSvg; }} alt={network} className="w-5 h-5 object-contain" />
+                            <div className="text-base font-medium text-gray-900 dark:text-white">{d.name}</div>
+                          </div>
+                          <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]">{formatUsd(d.value || 0)}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
@@ -205,8 +219,9 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
             </button>
             {showBurnAddresses && (
               <div className="bg-white dark:bg-gray-800 rounded-b-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-0 overflow-hidden flex flex-col z-0 mt-0">
-                <div className="flex-1 divide-y divide-gray-100 dark:divide-gray-700">
-                  {stats.burnAddresses.map((burn) => {
+                <div className={LAYOUT.outerP}>
+                  <div className={LAYOUT.listSpaceY}>
+                    {(stats.burnAddresses || []).map((burn) => {
                     let networkLabel = 'Unknown';
                     let explorerUrl = '#';
                     let tokenAddress = '';
@@ -224,29 +239,25 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                       explorerUrl = `https://basescan.org/token/${tokenAddress}?a=${burn.address}`;
                     }
                     return (
-                      <div key={`${burn.network}-${burn.address}`} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
+                      <div key={`${burn.network}-${burn.address}`} className={`${LAYOUT.itemPy} hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}> 
+                        <div className={`flex items-center justify-between ${LAYOUT.itemGap}`}>
+                          <div className={`flex items-center ${LAYOUT.itemGap}`}>
                             <img
                               src={`/images/chains/${burn.network}.png`}
                               onError={(e) => { e.currentTarget.src = `/images/chains/${burn.network}.svg` }}
                               alt={networkLabel}
-                              className="w-6 h-6 object-contain"
+                              className="w-5 h-5 object-contain"
                             />
-                            <div>
-                              <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300 font-mono">
-                                {formatAddress(burn.address)}
-                              </a>
-                            </div>
+                            <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="text-base text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300 font-mono">
+                              {formatAddress(burn.address)}
+                            </a>
                           </div>
-                        </div>
-                        <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-900/50 rounded p-2">
-                          <span className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Burned</span>
-                          <span className="text-sm font-bold text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)] font-mono">{formatValue(burn.balance)}</span>
+                          <div className="w-20 sm:w-28 text-right text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]">{formatValue(burn.balance)}</div>
                         </div>
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               </div>
             )}
@@ -267,19 +278,19 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
             </button>
             {showPlatformVolume && (
               <div className="bg-white dark:bg-gray-800 rounded-b-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-0 overflow-hidden flex flex-col z-0 mt-0">
-                <div className="p-4">
+                <div className={LAYOUT.outerP}>
                   <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Platform pools</div>
-                  <div className="space-y-2">
+                  <div className={LAYOUT.listSpaceY}>
                     {(pools || []).length === 0 ? (
                       <div className="text-sm text-gray-500 dark:text-gray-400">No platform pools configured</div>
                     ) : (
                       (pools || []).map((p: any, i: number) => (
-                        <div key={`${p.network}-${p.name}-${i}`} className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
+                        <div key={`${p.network}-${p.name}-${i}`} className={`${LAYOUT.itemPy} flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}>
+                          <div className={`flex items-center ${LAYOUT.itemGap}`}>
                             <img src={`/images/chains/${p.network}.png`} onError={(e) => { e.currentTarget.src = `/images/chains/${p.network}.svg` }} alt={p.network} className="w-5 h-5 object-contain" />
-                            <div className="text-sm text-gray-900 dark:text-white">{p.name}</div>
+                            <div className="text-base font-medium text-gray-900 dark:text-white">{p.name}</div>
                           </div>
-                          <div className="text-sm font-mono text-gray-700 dark:text-gray-300">{formatUsd(p.value || 0)}</div>
+                          <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]">{formatUsd(p.value || 0)}</div>
                         </div>
                       ))
                     )}
@@ -310,44 +321,39 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                 {warnings && warnings.length > 0 && (
                   <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200 text-right mb-2">{warnings.length} warning(s)</div>
                 )}
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-900/50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset / Deal</th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value (USD)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center">
-                            <img src="/images/chains/blockchain.svg" onError={(e) => { e.currentTarget.style.display = 'none'; }} alt="" className="w-6 h-6 mr-2 object-contain" />
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">{privateEntry.label}</div>
-                              <div className="text-xs text-gray-500 mt-1">Verified by <a href={privateEntry.verifiedBy.href} target="_blank" className="text-cyan-600 hover:underline dark:text-cyan-400">{privateEntry.verifiedBy.label}</a></div>
+                <div className="p-4">
+                  {warnings && warnings.length > 0 && (
+                    <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200 text-right mb-2">{warnings.length} warning(s)</div>
+                  )}
+
+                  <div className={LAYOUT.listSpaceY}>
+                    <div className={`${LAYOUT.sectionHeader} text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest text-center w-full`}>Private</div>
+                    <div className={`${LAYOUT.itemPy} flex items-center justify-between`}>
+                        <div className={`flex items-center ${LAYOUT.itemGap}`}>
+                          <img src="/images/chains/blockchain.svg" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} alt="" className="w-5 h-5 object-contain" />
+                          <div className={`${LAYOUT.verifiedText} text-gray-900 dark:text-white`}>Verified by <a href={privateEntry.verifiedBy.href} target="_blank" className="text-cyan-600 hover:underline dark:text-cyan-400">{privateEntry.verifiedBy.label}</a></div>
+                        </div>
+                        <div className={`${LAYOUT.valueText} font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]`}>{formatUsd(privateEntry.value, 0)}</div>
+                      </div>
+
+                    {Array.from(pools.reduce((map: Map<string, any[]>, p: any) => {
+                      const key = p.type || 'Other'; if (!map.has(key)) map.set(key, []); map.get(key)!.push(p); return map; }, new Map())).map(([type, items]: any) => (
+                        <div key={type}>
+                          <div className={`${LAYOUT.sectionHeader} text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest text-center w-full`}>{TYPE_LABELS[type] || type}</div>
+                            <div className={LAYOUT.listSpaceY}>
+                              {items.map((p: any, i: number) => (
+                                <div key={`${p.network}-${p.name}-${i}`} className={`${LAYOUT.itemPy} flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}>
+                                  <div className={`flex items-center ${LAYOUT.itemGap}`}>
+                                    <img src={`/images/chains/${p.network}.png`} onError={(e) => { const t = e.currentTarget as HTMLImageElement; if (!t.src.endsWith('.svg')) t.src = `/images/chains/${p.network}.svg`; else t.style.display = 'none'; }} alt={p.network} className="w-5 h-5 object-contain" />
+                                    <div className="text-base font-medium text-gray-900 dark:text-white">{p.name}</div>
+                                  </div>
+                                  <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]">{formatUsd(p.value || 0)}</div>
+                                </div>
+                              ))}
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center"><span className="px-2 py-1 text-xs rounded-full bg-cyan-100 text-cyan-800 dark:bg-cyan-500/10 dark:text-cyan-400 dark:border dark:border-cyan-500/20">Private</span></td>
-                        <td className="px-6 py-4 text-right text-sm font-bold text-gray-700 dark:text-gray-300">{formatUsd(privateEntry.value, 0)}</td>
-                      </tr>
-                      {Array.from(pools.reduce((map: Map<string, any[]>, p: any) => {
-                        const key = p.type || 'Other'; if (!map.has(key)) map.set(key, []); map.get(key)!.push(p); return map; }, new Map())).map(([type, items]: any) => (
-                        <Fragment key={type}>
-                          <tr className="bg-gray-50/50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700"><td colSpan={3} className="px-6 py-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest pl-4">{TYPE_LABELS[type] || type}</td></tr>
-                          {items.map((p: any, i: number) => (
-                            <tr key={`${p.network}-${p.name}-${i}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                              <td className="px-6 py-4"><div className="flex items-center"><img src={`/images/chains/${p.network}.png`} onError={(e) => { e.currentTarget.src = `/images/chains/${p.network}.svg` }} alt={p.network} className="w-6 h-6 mr-2 object-contain" /><div><div className="text-sm font-medium text-gray-900 dark:text-white">{p.name}</div></div></div></td>
-                              <td className="px-6 py-4 text-center"><span className="px-2 py-1 text-xs rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border dark:border-emerald-500/20">Liquidity</span></td>
-                              <td className="px-6 py-4 text-right text-sm font-mono text-gray-700 dark:text-gray-300">{formatUsd(p.value || 0)}</td>
-                            </tr>
-                          ))}
-                        </Fragment>
-                      ))}
-                    </tbody>
-                  </table>
+                        </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
