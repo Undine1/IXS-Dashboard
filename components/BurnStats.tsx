@@ -192,43 +192,45 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
           </div>
 
           <div className="flex flex-col relative">
-            <button onClick={() => setShowLaunchpadDeals(s => !s)} aria-expanded={showLaunchpadDeals} className="text-left bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#f472b6] p-6 flex flex-col justify-between relative overflow-visible z-20 hover:shadow-md transition-shadow pb-8 min-h-[140px]">
-              <p className="text-sm font-semibold text-teal-500 dark:text-teal-400 text-center">Launchpad Funds Raised</p>
-              <div className="flex-1 flex items-center justify-center">
-                <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {formatUsd(tvlLaunchpadVal, 0)}
-                </span>
-              </div>
+            <button onClick={() => setShowPlatformVolume(s => !s)} aria-expanded={showPlatformVolume} className="text-left bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-indigo-500 p-6 flex flex-col justify-between relative overflow-visible z-20 hover:shadow-md transition-shadow pb-8 min-h-[140px]">
+              <p className="text-sm font-semibold text-teal-500 dark:text-teal-400 text-center">Platform Volume</p>
+                <div className="flex-1 flex items-center justify-center">
+                  <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                    {poolVolumeTotal === null ? (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">N/A</span>
+                    ) : (
+                      <span>{formatUsd(poolVolumeTotal, 0)}</span>
+                    )}
+                  </span>
+                </div>
 
-              <span className={`absolute left-1/2 transform -translate-x-1/2 bottom-0 ${showLaunchpadDeals ? 'rotate-180' : ''} translate-y-1/2`} aria-hidden>
+              <span className={`absolute left-1/2 transform -translate-x-1/2 bottom-0 ${showPlatformVolume ? 'rotate-180' : ''} translate-y-1/2`} aria-hidden>
                 <svg className="w-4 h-4 text-gray-400 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor"><path d="M5.23 7.21a.75.75 0 011.06-.02L10 10.88l3.71-3.69a.75.75 0 111.06 1.06l-4.24 4.22a.75.75 0 01-1.06 0L5.25 8.25a.75.75 0 01-.02-1.04z"/></svg>
               </span>
             </button>
-            {showLaunchpadDeals && (
+            {showPlatformVolume && (
               <div className="bg-white dark:bg-gray-800 rounded-b-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-0 overflow-hidden flex flex-col z-0 mt-0">
                 <div className={LAYOUT.outerP}>
                   <div className={LAYOUT.listSpaceY}>
-                    {(publicDeals || []).map((d: any, i: number) => {
-                      // fallback inference for network in case JSON/config is missing it
-                      const inferNetwork = (name: string) => {
-                        const n = (name || '').toLowerCase();
-                        if (n.includes('tempo')) return 'base';
-                        if (n.includes('ckgp') || n.includes('sea') || n.includes('tau')) return 'polygon';
-                        return 'ethereum';
-                      };
-                      const network = d.network || inferNetwork(d.name);
-                      const imgSrcPng = `/images/chains/${network}.png`;
-                      const imgSrcSvg = `/images/chains/${network}.svg`;
-                      return (
-                        <div key={`${d.name}-${i}`} className={`${LAYOUT.itemPy} flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}>
-                          <div className={`flex items-center ${LAYOUT.itemGap}`}>
-                            <img src={imgSrcPng} onError={(e) => { (e.currentTarget as HTMLImageElement).src = imgSrcSvg; }} alt={network} className="w-5 h-5 object-contain" />
-                            <div className="text-base font-medium text-gray-900 dark:text-white">{d.name}</div>
+                    {cryptoPools.length === 0 ? (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">No platform pools configured</div>
+                    ) : (
+                      cryptoPools.map((p: any, i: number) => {
+                        const addr = (p.address || '').toLowerCase();
+                        // prefer per-pool value when available, otherwise fall back to aggregate total
+                        const perPoolVal = poolVolumeMap ? (addr in poolVolumeMap ? poolVolumeMap[addr] : undefined) : poolVolumeTotal;
+                        const display = typeof perPoolVal === 'number' ? formatUsd(perPoolVal, 0) : 'N/A';
+                        return (
+                          <div key={`${p.network}-${p.name}-${i}`} className={`${LAYOUT.itemPy} flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}>
+                            <div className={`flex items-center ${LAYOUT.itemGap}`}>
+                              <img src={`/images/chains/${p.network}.png`} onError={(e) => { e.currentTarget.src = `/images/chains/${p.network}.svg` }} alt={p.network} className="w-5 h-5 object-contain" />
+                              <div className="text-base font-medium text-gray-900 dark:text-white">{p.name}</div>
+                            </div>
+                            <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]"><span className="text-sm text-gray-900 dark:text-white">{display}</span></div>
                           </div>
-                          <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]">{formatUsd(d.value || 0)}</div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </div>
@@ -305,45 +307,43 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
           </div>
 
           <div className="flex flex-col relative">
-            <button onClick={() => setShowPlatformVolume(s => !s)} aria-expanded={showPlatformVolume} className="text-left bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-indigo-500 p-6 flex flex-col justify-between relative overflow-visible z-20 hover:shadow-md transition-shadow pb-8 min-h-[140px]">
-              <p className="text-sm font-semibold text-teal-500 dark:text-teal-400 text-center">Platform Volume</p>
-                <div className="flex-1 flex items-center justify-center">
-                  <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {poolVolumeTotal === null ? (
-                      <span className="text-sm text-gray-500 dark:text-gray-400">N/A</span>
-                    ) : (
-                      <span>{formatUsd(poolVolumeTotal, 0)}</span>
-                    )}
-                  </span>
-                </div>
+            <button onClick={() => setShowLaunchpadDeals(s => !s)} aria-expanded={showLaunchpadDeals} className="text-left bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#f472b6] p-6 flex flex-col justify-between relative overflow-visible z-20 hover:shadow-md transition-shadow pb-8 min-h-[140px]">
+              <p className="text-sm font-semibold text-teal-500 dark:text-teal-400 text-center">Launchpad Funds Raised</p>
+              <div className="flex-1 flex items-center justify-center">
+                <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {formatUsd(tvlLaunchpadVal, 0)}
+                </span>
+              </div>
 
-              <span className={`absolute left-1/2 transform -translate-x-1/2 bottom-0 ${showPlatformVolume ? 'rotate-180' : ''} translate-y-1/2`} aria-hidden>
+              <span className={`absolute left-1/2 transform -translate-x-1/2 bottom-0 ${showLaunchpadDeals ? 'rotate-180' : ''} translate-y-1/2`} aria-hidden>
                 <svg className="w-4 h-4 text-gray-400 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor"><path d="M5.23 7.21a.75.75 0 011.06-.02L10 10.88l3.71-3.69a.75.75 0 111.06 1.06l-4.24 4.22a.75.75 0 01-1.06 0L5.25 8.25a.75.75 0 01-.02-1.04z"/></svg>
               </span>
             </button>
-            {showPlatformVolume && (
+            {showLaunchpadDeals && (
               <div className="bg-white dark:bg-gray-800 rounded-b-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-0 overflow-hidden flex flex-col z-0 mt-0">
                 <div className={LAYOUT.outerP}>
                   <div className={LAYOUT.listSpaceY}>
-                    {cryptoPools.length === 0 ? (
-                      <div className="text-sm text-gray-500 dark:text-gray-400">No platform pools configured</div>
-                    ) : (
-                      cryptoPools.map((p: any, i: number) => {
-                        const addr = (p.address || '').toLowerCase();
-                        // prefer per-pool value when available, otherwise fall back to aggregate total
-                        const perPoolVal = poolVolumeMap ? (addr in poolVolumeMap ? poolVolumeMap[addr] : undefined) : poolVolumeTotal;
-                        const display = typeof perPoolVal === 'number' ? formatUsd(perPoolVal, 0) : 'N/A';
-                        return (
-                          <div key={`${p.network}-${p.name}-${i}`} className={`${LAYOUT.itemPy} flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}>
-                            <div className={`flex items-center ${LAYOUT.itemGap}`}>
-                              <img src={`/images/chains/${p.network}.png`} onError={(e) => { e.currentTarget.src = `/images/chains/${p.network}.svg` }} alt={p.network} className="w-5 h-5 object-contain" />
-                              <div className="text-base font-medium text-gray-900 dark:text-white">{p.name}</div>
-                            </div>
-                            <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]"><span className="text-sm text-gray-900 dark:text-white">{display}</span></div>
+                    {(publicDeals || []).map((d: any, i: number) => {
+                      // fallback inference for network in case JSON/config is missing it
+                      const inferNetwork = (name: string) => {
+                        const n = (name || '').toLowerCase();
+                        if (n.includes('tempo')) return 'base';
+                        if (n.includes('ckgp') || n.includes('sea') || n.includes('tau')) return 'polygon';
+                        return 'ethereum';
+                      };
+                      const network = d.network || inferNetwork(d.name);
+                      const imgSrcPng = `/images/chains/${network}.png`;
+                      const imgSrcSvg = `/images/chains/${network}.svg`;
+                      return (
+                        <div key={`${d.name}-${i}`} className={`${LAYOUT.itemPy} flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}>
+                          <div className={`flex items-center ${LAYOUT.itemGap}`}>
+                            <img src={imgSrcPng} onError={(e) => { (e.currentTarget as HTMLImageElement).src = imgSrcSvg; }} alt={network} className="w-5 h-5 object-contain" />
+                            <div className="text-base font-medium text-gray-900 dark:text-white">{d.name}</div>
                           </div>
-                        );
-                      })
-                    )}
+                          <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]">{formatUsd(d.value || 0)}</div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
