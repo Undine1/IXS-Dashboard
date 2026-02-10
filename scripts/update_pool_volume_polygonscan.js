@@ -5,10 +5,12 @@ const path = require('path');
 
 // Prefer ETHERSCAN_API_KEY (Etherscan v2); fall back to legacy Polygonscan key
 const API_KEY = process.env.ETHERSCAN_API_KEY || process.env.POLYGONSCAN_KEY || process.env.POLYGONSCAN_API_KEY;
-// Etherscan V2 base endpoint; use chainid=137 for Polygon
-const ETHERSCAN_V2_BASE = 'https://api.etherscan.io/v2/api?chainid=137';
-const USDC = (process.env.POLYGON_USDC || '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174').toLowerCase();
-const PAIR = (process.env.PAIR_ADDRESS || '0xd093a031df30f186976a1e2936b16d95ca7919d6').toLowerCase();
+// chain id defaults and utilities
+const CHAIN_IDS = { ethereum: 1, polygon: 137, base: 8453 };
+const DEFAULT_CHAIN = 'polygon';
+
+const GLOBAL_USDC = (process.env.POLYGON_USDC || '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174').toLowerCase();
+const GLOBAL_PAIR = (process.env.PAIR_ADDRESS || '0xd093a031df30f186976a1e2936b16d95ca7919d6').toLowerCase();
 
 const CHECKPOINT = path.join(__dirname, '..', 'public', 'data', 'pool_volume_checkpoint.json');
 const POOL_FILE = path.join(__dirname, '..', 'public', 'data', 'pool_volume.json');
@@ -25,8 +27,9 @@ async function fetchJson(url) {
   return res.json();
 }
 
-async function getBlockByTimestamp(ts) {
-  const url = `${ETHERSCAN_V2_BASE}&module=block&action=getblocknobytime&timestamp=${ts}&closest=before&apikey=${API_KEY}`;
+async function getBlockByTimestamp(ts, chainid = CHAIN_IDS.polygon) {
+  const base = `https://api.etherscan.io/v2/api?chainid=${chainid}`;
+  const url = `${base}&module=block&action=getblocknobytime&timestamp=${ts}&closest=before&apikey=${API_KEY}`;
   const j = await fetchJson(url);
   if (j.status !== '1' && !j.result) {
     throw new Error('Failed to get block by time: ' + JSON.stringify(j));
@@ -34,8 +37,9 @@ async function getBlockByTimestamp(ts) {
   return Number(j.result.blockNumber || j.result);
 }
 
-async function fetchTokenTxs(startBlock, endBlock, page = 1, offset = 1000) {
-  const url = `${ETHERSCAN_V2_BASE}&module=account&action=tokentx&contractaddress=${USDC}&address=${PAIR}&startblock=${startBlock}&endblock=${endBlock}&page=${page}&offset=${offset}&sort=asc&apikey=${API_KEY}`;
+async function fetchTokenTxs(startBlock, endBlock, pairAddr, usdcAddr, chainid = CHAIN_IDS.polygon, page = 1, offset = 1000) {
+  const base = `https://api.etherscan.io/v2/api?chainid=${chainid}`;
+  const url = `${base}&module=account&action=tokentx&contractaddress=${usdcAddr}&address=${pairAddr}&startblock=${startBlock}&endblock=${endBlock}&page=${page}&offset=${offset}&sort=asc&apikey=${API_KEY}`;
   const j = await fetchJson(url);
   if (j.status === '0' && j.message === 'No transactions found') return [];
   if (j.status !== '1') throw new Error('tokentx error: ' + JSON.stringify(j));
@@ -81,15 +85,22 @@ async function main() {
 
       console.log('Processing', addr, 'Start ts', startTs, 'end ts', endTs);
 
-      const startBlock = await getBlockByTimestamp(startTs);
-      const endBlock = await getBlockByTimestamp(endTs);
+      // determine chain and addresses for this pool
+      const pool = poolsMap[addr] || {};
+      const chain = (pool.chain || DEFAULT_CHAIN).toLowerCase();
+      const chainid = CHAIN_IDS[chain] || CHAIN_IDS[DEFAULT_CHAIN];
+      const usdcAddr = (pool.usdc || GLOBAL_USDC).toLowerCase();
+      const pairAddr = (pool.address || addr || GLOBAL_PAIR).toLowerCase();
+
+      const startBlock = await getBlockByTimestamp(startTs, chainid);
+      const endBlock = await getBlockByTimestamp(endTs, chainid);
       console.log('Block range', startBlock, endBlock);
 
       // fetch token transfers and sum values
       let page = 1;
       let totalUsdc = 0;
       while (true) {
-        const txs = await fetchTokenTxs(startBlock, endBlock, page, 1000);
+        const txs = await fetchTokenTxs(startBlock, endBlock, pairAddr, usdcAddr, chainid, page, 1000);
         if (!txs || txs.length === 0) break;
         for (const tx of txs) {
           const dec = Number(tx.tokenDecimal || 6);

@@ -2,11 +2,15 @@
   "pools": {
     "0xd093a031df30f186976a1e2936b16d95ca7919d6": {
       "total_usd": 3735418.13,
-      "lastUpdated": 1770678655390
+      "lastUpdated": 1770678655390,
+      "chain": "polygon",
+      "usdc": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
     },
     "0xd22a820dc52f1cacea7a5c86da16757f434f43c6": {
       "total_usd": 2727673.66,
-      "lastUpdated": 1770680000000
+      "lastUpdated": 1770680000000,
+      "chain": "polygon",
+      "usdc": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
     }
   },
   "lastUpdated": 1770688935815,
@@ -14,5 +18,12 @@
     "address": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
     "total_usd": 153.525779,
     "lastUpdated": "2026-02-10T17:26:46.302Z"
+  },
+  "0xd093a031df30f186976a1e2936b16d95ca7919d6-base": {
+    "address": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
+    "total_usd": 3735418.13,
+    "lastUpdated": "2026-02-10T17:26:46.302Z",
+    "chain": "base",
+    "usdc": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
   }
 }
