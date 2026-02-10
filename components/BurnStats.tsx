@@ -193,7 +193,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
 
           <div className="flex flex-col relative">
             <button onClick={() => setShowLaunchpadDeals(s => !s)} aria-expanded={showLaunchpadDeals} className="text-left bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-[#f472b6] p-6 flex flex-col justify-between relative overflow-visible z-20 hover:shadow-md transition-shadow pb-8 min-h-[140px]">
-              <p className="text-sm font-semibold text-teal-500 dark:text-teal-400 text-center">Launchpad Deals</p>
+              <p className="text-sm font-semibold text-teal-500 dark:text-teal-400 text-center">Launchpad Funds Raised</p>
               <div className="flex-1 flex items-center justify-center">
                 <span className="text-3xl font-bold text-gray-900 dark:text-white">
                   {formatUsd(tvlLaunchpadVal, 0)}
