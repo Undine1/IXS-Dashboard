@@ -119,7 +119,7 @@ async function providerGetLogs(provider, filter) {
       // If provider is returning internal errors, try polygonscan fallback (if API key present)
       const msg = String(e && (e.message || e));
       const isInternal = (e && (e.code === -32000 || /Internal error|-32000|could not coalesce error/.test(msg)));
-      if (isInternal && process.env.POLYGONSCAN_KEY) {
+      if (isInternal && process.env.ETHERSCAN_API_KEY) {
         try {
           const fallback = await polygonscanGetLogs(filter);
           // polygonscan may return [] (no logs) which is a valid result — return it.
@@ -137,8 +137,8 @@ async function providerGetLogs(provider, filter) {
 }
 
 async function polygonscanGetLogs(filter) {
-  const key = process.env.POLYGONSCAN_KEY;
-  if (!key) throw new Error('POLYGONSCAN_KEY not set');
+  const key = process.env.ETHERSCAN_API_KEY;
+  if (!key) throw new Error('ETHERSCAN_API_KEY not set');
   const base = 'https://api.polygonscan.com/api';
   const params = new URLSearchParams({
     module: 'logs',

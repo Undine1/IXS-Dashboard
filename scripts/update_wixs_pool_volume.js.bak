@@ -457,8 +457,8 @@ async function fetchLogsAdaptive(fromBlock, toBlock, poolTopicEncoded, topicInde
 }
 
 async function etherscanTokentxSum(pool, startBlock, endBlock) {
-  const key = process.env.POLYGONSCAN_KEY || process.env.ETHERSCAN_API_KEY || '';
-  if (!key) throw new Error('No Etherscan/Polygonscan API key in POLYGONSCAN_KEY or ETHERSCAN_API_KEY');
+  const key = process.env.ETHERSCAN_API_KEY || '';
+  if (!key) throw new Error('No ETHERSCAN_API_KEY set');
   // Use Polygonscan for chain=137 to avoid cross-chain issues
   const base = 'https://api.polygonscan.com/api';
   const offset = 1000; // page size (smaller to be safe)
