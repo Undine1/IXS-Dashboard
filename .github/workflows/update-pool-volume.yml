@@ -1,4 +1,4 @@
-name: Update WIXS Pool Volume
+name: Update Pool Volume
 
 on:
   schedule:
@@ -12,6 +12,10 @@ jobs:
   update:
     name: Run updater and commit
     runs-on: ubuntu-latest
+    concurrency:
+      group: pool-volume-update
+      cancel-in-progress: true
+    timeout-minutes: 60
     steps:
       - name: Checkout repository (use PAT for push)
         uses: actions/checkout@v4
@@ -35,7 +39,7 @@ jobs:
             npm install
           fi
 
-      - name: Run WIXS pool updater
+      - name: Run pool updater
         env:
           POLYGON_RPC: ${{ secrets.POLYGON_RPC }}
           POLYGON_RPC_LIST: ${{ secrets.POLYGON_RPC_LIST }}
@@ -47,7 +51,7 @@ jobs:
           MAX_FETCH_PASSES: '2'
           MAX_CHUNK_TIME_MS: '5000'
           WINDOW_SECONDS: '3600'
-        run: node ./scripts/update_pool_volume_polygonscan.js
+        run: node ./scripts/update_pool_volume_indexer.js
 
       - name: Commit updated data files
         run: |
@@ -55,7 +59,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if git status --porcelain | grep -q "public/data/pool_volume.json\|public/data/pool_volume_runs.json\|public/data/pool_volume_checkpoint.json"; then
             git add public/data/pool_volume.json public/data/pool_volume_runs.json public/data/pool_volume_checkpoint.json || true
-            git commit -m "data: update pool volume from polygonscan updater [skip ci]" || echo "No changes to commit"
+            git commit -m "data: update pool volume from indexer updater [skip ci]" || echo "No changes to commit"
             git push
           else
             echo "No data changes"
@@ -70,7 +74,7 @@ jobs:
 
       - name: Check run alerts and fail if thresholds exceeded
         env:
-          ALERT_POLYGONSCAN_CALLS: ${{ env.ALERT_POLYGONSCAN_CALLS || '50' }}
+          ALERT_INDEXER_CALLS: ${{ env.ALERT_INDEXER_CALLS || '50' }}
           ALERT_PROVIDER_BANS: ${{ env.ALERT_PROVIDER_BANS || '1' }}
         run: |
           node -e "const fs=require('fs'); const p='public/data/pool_volume_alert.json'; if(!fs.existsSync(p)){console.log('No alert file, continuing'); process.exit(0);} const a=JSON.parse(fs.readFileSync(p)); if(a.alert){ console.error('Run alert triggered:', a.reasons); process.exit(1);} console.log('No alerts')"

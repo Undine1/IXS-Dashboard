@@ -1,9 +1,10 @@
-// Polygonscan-based updater: sums USDC transfers to/from a pair address
+// Indexer-based updater: sums USDC transfers to/from a pair address
+// Uses blockchain indexer APIs (Etherscan/Polygonscan-compatible v2) to avoid heavy eth_getLogs
 // Writes increments into public/data/pool_volume.json and updates a checkpoint.
 const fs = require('fs');
 const path = require('path');
 
-// Prefer ETHERSCAN_API_KEY (Etherscan v2); fall back to legacy Polygonscan key
+// Prefer ETHERSCAN_API_KEY (Etherscan v2); fall back to legacy POLYGONSCAN key
 const API_KEY = process.env.ETHERSCAN_API_KEY || process.env.POLYGONSCAN_KEY || process.env.POLYGONSCAN_API_KEY;
 // chain id defaults and utilities
 const CHAIN_IDS = { ethereum: 1, polygon: 137, base: 8453 };
@@ -22,7 +23,7 @@ let apiCallCount = 0;
 let retryCount = 0;
 
 if (!API_KEY) {
-  console.error('POLYGONSCAN_KEY is required in environment');
+  console.error('ETHERSCAN_API_KEY or POLYGONSCAN_KEY is required in environment');
   process.exit(2);
 }
 
