@@ -1,0 +1,17 @@
+type Pool @entity {
+  id: ID!
+  address: Bytes!
+  lifetimeVolume: BigDecimal!
+  lastUpdated: BigInt!
+}
+
+type TransferEntity @entity {
+  id: ID!
+  txHash: Bytes!
+  from: Bytes!
+  to: Bytes!
+  amount: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  pool: Pool
+}
