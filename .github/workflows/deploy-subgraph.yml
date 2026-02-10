@@ -1,0 +1,49 @@
+name: Deploy Subgraph
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy subgraph to The Graph Hosted Service
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        working-directory: ./subgraph
+        run: npm ci
+
+      - name: Install graph-cli
+        run: npm install -g @graphprotocol/graph-cli
+
+      - name: Codegen
+        working-directory: ./subgraph
+        run: npm run codegen
+
+      - name: Build subgraph
+        working-directory: ./subgraph
+        run: npm run build
+
+      - name: Authenticate with The Graph
+        env:
+          GRAPH_API_KEY: ${{ secrets.GRAPH_API_KEY }}
+        run: |
+          graph auth --product hosted-service ${GRAPH_API_KEY}
+
+      - name: Deploy subgraph
+        env:
+          GRAPH_API_KEY: ${{ secrets.GRAPH_API_KEY }}
+          GITHUB_USER: ${{ secrets.GITHUB_USER }}
+          SUBGRAPH_NAME: ${{ secrets.SUBGRAPH_NAME }}
+        working-directory: ./subgraph
+        run: |
+          graph deploy --product hosted-service ${GITHUB_USER}/${SUBGRAPH_NAME}
