@@ -15,6 +15,11 @@ const GLOBAL_PAIR = (process.env.PAIR_ADDRESS || '0xd093a031df30f186976a1e2936b1
 const CHECKPOINT = path.join(__dirname, '..', 'public', 'data', 'pool_volume_checkpoint.json');
 const POOL_FILE = path.join(__dirname, '..', 'public', 'data', 'pool_volume.json');
 const RUNS_FILE = path.join(__dirname, '..', 'public', 'data', 'pool_volume_runs.json');
+const ALERT_FILE = path.join(__dirname, '..', 'public', 'data', 'pool_volume_alert.json');
+
+// global counters used by requestWithRetries and persisted to alert file
+let apiCallCount = 0;
+let retryCount = 0;
 
 if (!API_KEY) {
   console.error('POLYGONSCAN_KEY is required in environment');
@@ -22,9 +27,64 @@ if (!API_KEY) {
 }
 
 async function fetchJson(url) {
-  const res = await fetch(url);
+  const res = await requestWithRetries(url);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
+}
+
+async function requestWithRetries(url, opts = {}) {
+  const maxAttempts = Number(process.env.API_MAX_ATTEMPTS || 5);
+  const baseDelay = Number(process.env.API_BASE_DELAY_MS || 500); // ms
+  const maxDelay = Number(process.env.API_MAX_DELAY_MS || 30000); // ms
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      apiCallCount += 1;
+      const res = await fetch(url, opts);
+
+      // Retry on 429 or 5xx
+      if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
+        const ra = res.headers.get('retry-after');
+        let waitMs = 0;
+        if (ra) {
+          const n = Number(ra);
+          if (!Number.isNaN(n)) waitMs = n * 1000;
+          else {
+            const date = Date.parse(ra);
+            if (!Number.isNaN(date)) waitMs = Math.max(0, date - Date.now());
+          }
+        }
+        if (waitMs <= 0) {
+          const exp = Math.min(maxDelay, baseDelay * Math.pow(2, attempt - 1));
+          // full jitter up to exp
+          waitMs = Math.floor(Math.random() * exp);
+        }
+        retryCount += 1;
+        console.warn(`Request ${url} returned ${res.status}; attempt ${attempt}/${maxAttempts}, retrying after ${waitMs}ms`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+
+      return res;
+    } catch (err) {
+      retryCount += 1;
+      if (attempt === maxAttempts) {
+        // write alert file before throwing so workflow can detect
+        try {
+          const a = { alert: true, reasons: [`request-failed: ${url}`, err && err.message], ts: new Date().toISOString(), apiCallCount, retryCount };
+          fs.writeFileSync(ALERT_FILE, JSON.stringify(a, null, 2));
+        } catch (e) {
+          console.error('Failed to write alert file', e && e.message);
+        }
+        throw err;
+      }
+      const exp = Math.min(maxDelay, baseDelay * Math.pow(2, attempt - 1));
+      const waitMs = Math.floor(Math.random() * exp);
+      console.warn(`Request error for ${url}; attempt ${attempt}/${maxAttempts}, retrying after ${waitMs}ms`, err && err.message);
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+  throw new Error('Unreachable: retries exhausted');
 }
 
 async function getBlockByTimestamp(ts, chainid = CHAIN_IDS.polygon) {
@@ -65,6 +125,13 @@ async function main() {
   const checkpoint = readJson(CHECKPOINT, {});
   const pools = readJson(POOL_FILE, {});
   const poolsMap = pools || {};
+
+  // initialize alert file
+  try {
+    fs.writeFileSync(ALERT_FILE, JSON.stringify({ alert: false, reasons: [], ts: new Date().toISOString(), apiCallCount: 0, retryCount: 0 }, null, 2));
+  } catch (e) {
+    console.warn('Unable to initialize alert file', e && e.message);
+  }
 
   const MAX_JITTER = Number(process.env.MAX_JITTER || 300); // seconds (default 5 minutes)
 
@@ -132,7 +199,18 @@ async function main() {
       fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
     } catch (e) {
       console.error('Error processing', rawAddr, e);
+      // if retries were exhausted earlier, the alert file should already exist.
     }
+  }
+
+  // finalize alert file with final counters if no alert triggered
+  try {
+    const existing = readJson(ALERT_FILE, { alert: false });
+    if (!existing || !existing.alert) {
+      fs.writeFileSync(ALERT_FILE, JSON.stringify({ alert: false, reasons: [], ts: new Date().toISOString(), apiCallCount, retryCount }, null, 2));
+    }
+  } catch (e) {
+    console.warn('Unable to finalize alert file', e && e.message);
   }
 
   console.log('Done — wrote', POOL_FILE);
