@@ -5,21 +5,25 @@ on:
     - cron: '0 * * * *' # hourly at minute 0 UTC
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   update:
     name: Run updater and commit
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout repository (use PAT for push)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: true
+          token: ${{ secrets.GH_PAT }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20.9.0'
           cache: 'npm'
 
       - name: Install dependencies
