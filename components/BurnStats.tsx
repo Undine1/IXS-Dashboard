@@ -57,7 +57,9 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
           setPoolVolume(Number(j.data.total_usd) || 0);
           return;
         }
-        const POOL_ADDR = '0xd093a031df30f186976a1e2936b16d95ca7919d6'.toLowerCase();
+        // Use IXS-USDC pool address for platform-volume lookup so it renders
+        // N/A when no seeded value exists for that pool.
+        const POOL_ADDR = '0xd22a820dc52f1cacea7a5c86da16757f434f43c6'.toLowerCase();
         if (j.data.pools && j.data.pools[POOL_ADDR] && typeof j.data.pools[POOL_ADDR].total_usd !== 'undefined') {
           setPoolVolume(Number(j.data.pools[POOL_ADDR].total_usd) || 0);
         }
