@@ -4,6 +4,7 @@ import axios from 'axios';
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const API_TIMEOUT = 15000;
 const WAIT_BETWEEN_POOLS_MS = 600;
+// (HTML scraping removed)
 // Server-side hourly cache to avoid repeated RPCs from serverless cold starts
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 let cachedBody: any = null;
@@ -241,71 +242,32 @@ async function fetchPoolValue(pool: typeof POOLS[0], prices: any): Promise<{ usd
 
 // Debug helper removed
 
+
+
+// Simple GET handler: compute pool values, scrape volumes, and return JSON
 export async function GET(req: Request) {
   try {
-    // Parse URL early so we can respect debug bypass of cache
     const url = new URL(req.url);
     const debugMode = url.searchParams.get('debug') === '1' || url.searchParams.get('debug') === 'true';
 
-    // Validate API key exists
+    // basic validation
     if (!ALCHEMY_API_KEY) {
-      console.error('[pools API] ALCHEMY_API_KEY not configured');
-      return NextResponse.json(
-        { error: 'Service misconfiguration' },
-        { status: 500 }
-      );
+      console.warn('[pools API] ALCHEMY_API_KEY not set; eth_calls may fail');
     }
 
-    // If we have a recent cached body and debug is not requested, return it
-    if (!debugMode && cachedBody && Date.now() - cachedAt < CACHE_TTL_MS) {
-      return NextResponse.json(cachedBody, {
-        status: 200,
-        headers: {
-          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
-        },
-      });
-    }
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-    console.log('[pools API] Processing request...');
-
-    // No external price fetching: start with empty prices and derive from pools
     let prices: any = {};
-
-    // Runtime validation: check each network that has pools to ensure there's
-    // at least one price-source pool (heuristic: pool name contains 'USDC'/'USDT'
-    // or the network has a stable-token mapping and the operator has added a
-    // price-source). Emit warnings in the API response to surface missing
-    // configuration for new chains.
     const warnings: string[] = [];
-    const networks = Array.from(new Set(POOLS.map((p) => p.network)));
-    for (const net of networks) {
-      const poolsOnNet = POOLS.filter((p) => p.network === net);
-      const hasNamePriceSource = poolsOnNet.some((p) => /USDC|USDT|USD/i.test(p.name) || (p as any).priceSource === true);
-      const knownStableTokens = STABLE_TOKENS_BY_NETWORK[net];
-      if (!hasNamePriceSource) {
-        if (knownStableTokens && knownStableTokens.length > 0) {
-          // If we know stable tokens for the network but no pool name indicates
-          // a price-source, warn so operator can add the correct pool.
-          warnings.push(`No explicit price-source pool found for network '${net}'. Add a pool that pairs your token with a USD stable token (e.g. USDC) and place it before dependent pools in the POOLS array.`);
-        } else {
-          // Unknown network mapping: advise operator to add a price-source pool
-          warnings.push(`Network '${net}' has pools configured but no known stable-token mapping. Add a USD price-source pool and/or add the network's stable token to STABLE_TOKENS_BY_NETWORK in app/api/pools/route.ts.`);
-        }
-      }
-    }
 
     const poolsData: any[] = [];
     const poolsDebug: any[] = [];
-    const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
-    // Process pools sequentially so derived prices can be propagated. Add a
-    // short delay between pools to avoid firing many RPCs in a burst.
+
     for (const pool of POOLS) {
+      // small pacing between pools
       if (poolsData.length > 0) await sleep(WAIT_BETWEEN_POOLS_MS);
       const result = await fetchPoolValue(pool, prices);
-      if (result.derivedIxsPrice && result.derivedIxsPrice > 0) {
-        prices['ixs'] = { usd: result.derivedIxsPrice };
-      }
-      // Only include per-pool debug in responses when debugMode is enabled
+      if (result.derivedIxsPrice && result.derivedIxsPrice > 0) prices['ixs'] = { usd: result.derivedIxsPrice };
       if (debugMode) {
         poolsData.push({ ...pool, value: result.usdValue, debug: result.debug });
         poolsDebug.push({ name: pool.name, address: pool.address, network: pool.network, debug: result.debug, derivedIxsPrice: result.derivedIxsPrice });
@@ -314,28 +276,15 @@ export async function GET(req: Request) {
       }
     }
 
-    console.log('[pools API] Returning pools data');
+    // HTML scraping removed by request — no external scraping performed here.
 
     const body: any = { pools: poolsData };
     if (warnings.length > 0) body.warnings = warnings;
-    if (debugMode) {
-      body.debug = { prices, pools: poolsDebug };
-    }
+    if (debugMode) body.debug = { prices, pools: poolsDebug };
 
-    return NextResponse.json(
-      body,
-      {
-        status: 200,
-        headers: {
-          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
-        },
-      }
-    );
+    return NextResponse.json(body, { status: 200, headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200' } });
   } catch (error) {
     console.error('[pools API] Unexpected error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

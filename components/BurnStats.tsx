@@ -30,6 +30,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   const [showPlatformNumbers, setShowPlatformNumbers] = useState<boolean>(false);
   const [showLaunchpadDeals, setShowLaunchpadDeals] = useState<boolean>(false);
   const [showPlatformVolume, setShowPlatformVolume] = useState<boolean>(false);
+  const [poolVolume, setPoolVolume] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchTvlConfig = async () => {
@@ -43,6 +44,26 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
       } catch (e) { /* ignore */ }
     };
     fetchTvlConfig();
+
+    // fetch persisted pool volume
+    const fetchPoolVolume = async () => {
+      try {
+        const res = await fetch('/api/poolVolume');
+        if (!res.ok) return;
+        const j = await res.json();
+        if (!j || !j.ok || !j.data) return;
+        // Backwards-compatible: support legacy single total_usd or new per-pool mapping
+        if (typeof j.data.total_usd !== 'undefined') {
+          setPoolVolume(Number(j.data.total_usd) || 0);
+          return;
+        }
+        const POOL_ADDR = '0xd093a031df30f186976a1e2936b16d95ca7919d6'.toLowerCase();
+        if (j.data.pools && j.data.pools[POOL_ADDR] && typeof j.data.pools[POOL_ADDR].total_usd !== 'undefined') {
+          setPoolVolume(Number(j.data.pools[POOL_ADDR].total_usd) || 0);
+        }
+      } catch (e) { /* ignore */ }
+    };
+    fetchPoolVolume();
   }, []);
 
   // --- Calculations ---
@@ -70,6 +91,10 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   const tvlLaunchpadVal = (publicDeals || []).reduce((s, p) => s + (Number(p.value) || 0), 0);
   const tvlPoolsVal = (pools || []).reduce((s: number, p: any) => s + (Number(p.value) || 0), 0);
   const totalTvl = tvlPrivateVal + tvlPoolsVal; // Excluded launchpad from TVL
+  // Platform Volume: sum of Crypto pools (treat pool.value as the pool's USD volume/liquidity)
+  const cryptoPools = (pools || []).filter((p: any) => p.type === 'Crypto');
+  // Platform volume: currently unavailable — show N/A
+  const cryptoPoolsVolume: number | null = null;
 
   // 3. Chart Data
   const burnChartData = [
@@ -265,12 +290,16 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
 
           <div className="flex flex-col relative">
             <button onClick={() => setShowPlatformVolume(s => !s)} aria-expanded={showPlatformVolume} className="text-left bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-4 border-t-indigo-500 p-6 flex flex-col justify-between relative overflow-visible z-20 hover:shadow-md transition-shadow pb-8 min-h-[140px]">
-              <p className="text-sm font-semibold text-teal-500 dark:text-teal-400 text-center">Platform Volume</p>
-              <div className="flex-1 flex items-center justify-center">
-                <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {formatUsd(tvlPoolsVal, 0)}
-                </span>
-              </div>
+              <p className="text-sm font-semibold text-teal-500 dark:text-teal-400 text-center">Platform Volume (approx)</p>
+                <div className="flex-1 flex items-center justify-center">
+                  <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                    {poolVolume === null ? (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">N/A</span>
+                    ) : (
+                      <span>{formatUsd(poolVolume, 0)}</span>
+                    )}
+                  </span>
+                </div>
 
               <span className={`absolute left-1/2 transform -translate-x-1/2 bottom-0 ${showPlatformVolume ? 'rotate-180' : ''} translate-y-1/2`} aria-hidden>
                 <svg className="w-4 h-4 text-gray-400 dark:text-gray-300" viewBox="0 0 20 20" fill="currentColor"><path d="M5.23 7.21a.75.75 0 011.06-.02L10 10.88l3.71-3.69a.75.75 0 111.06 1.06l-4.24 4.22a.75.75 0 01-1.06 0L5.25 8.25a.75.75 0 01-.02-1.04z"/></svg>
@@ -280,17 +309,18 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
               <div className="bg-white dark:bg-gray-800 rounded-b-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-0 overflow-hidden flex flex-col z-0 mt-0">
                 <div className={LAYOUT.outerP}>
                   <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Platform pools</div>
+                  <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Platform pools total: <span className="text-sm text-gray-500 dark:text-gray-400">{poolVolume === null ? 'N/A' : formatUsd(poolVolume, 0)}</span></div>
                   <div className={LAYOUT.listSpaceY}>
-                    {(pools || []).length === 0 ? (
+                    {cryptoPools.length === 0 ? (
                       <div className="text-sm text-gray-500 dark:text-gray-400">No platform pools configured</div>
                     ) : (
-                      (pools || []).map((p: any, i: number) => (
+                      cryptoPools.map((p: any, i: number) => (
                         <div key={`${p.network}-${p.name}-${i}`} className={`${LAYOUT.itemPy} flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}>
                           <div className={`flex items-center ${LAYOUT.itemGap}`}>
                             <img src={`/images/chains/${p.network}.png`} onError={(e) => { e.currentTarget.src = `/images/chains/${p.network}.svg` }} alt={p.network} className="w-5 h-5 object-contain" />
                             <div className="text-base font-medium text-gray-900 dark:text-white">{p.name}</div>
                           </div>
-                          <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]">{formatUsd(p.value || 0)}</div>
+                          <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]"><span className="text-sm text-gray-500 dark:text-gray-400">{poolVolume === null ? 'N/A' : formatUsd(poolVolume, 0)}</span></div>
                         </div>
                       ))
                     )}

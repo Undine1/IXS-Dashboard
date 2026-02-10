@@ -2,7 +2,7 @@ name: Update WIXS Pool Volume
 
 on:
   schedule:
-    - cron: '0 0 * * *' # daily at 00:00 UTC
+    - cron: '0 * * * *' # hourly at minute 0 UTC
   workflow_dispatch: {}
 
 jobs:
@@ -28,10 +28,30 @@ jobs:
       - name: Run WIXS pool updater
         env:
           POLYGON_RPC: ${{ secrets.POLYGON_RPC }}
+          POLYGON_RPC_LIST: ${{ secrets.POLYGON_RPC_LIST }}
           POLYGON_USDC: ${{ secrets.POLYGON_USDC }}
+          POLYGONSCAN_KEY: ${{ secrets.POLYGONSCAN_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.POLYGONSCAN_KEY }}
           BLOCKS_PER_DAY: ${{ env.BLOCKS_PER_DAY }}
-          LOG_CHUNK: '10'
+          LOG_CHUNK: '200'
+          MAX_FETCH_PASSES: '2'
+          MAX_CHUNK_TIME_MS: '5000'
+          WINDOW_SECONDS: '3600'
         run: node ./scripts/update_wixs_pool_volume.js
+      - name: Upload run artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pool-volume-artifacts
+          path: |
+            public/data/pool_volume_runs.json
+            public/data/pool_volume_alert.json
+
+      - name: Check run alerts and fail if thresholds exceeded
+        env:
+          ALERT_POLYGONSCAN_CALLS: ${{ env.ALERT_POLYGONSCAN_CALLS || '50' }}
+          ALERT_PROVIDER_BANS: ${{ env.ALERT_PROVIDER_BANS || '1' }}
+        run: |
+          node -e "const fs=require('fs'); const p='public/data/pool_volume_alert.json'; if(!fs.existsSync(p)){console.log('No alert file, continuing'); process.exit(0);} const a=JSON.parse(fs.readFileSync(p)); if(a.alert){ console.error('Run alert triggered:', a.reasons); process.exit(1);} console.log('No alerts')"
 
       - name: Deploy to Vercel (no commit)
         uses: amondnet/vercel-action@v20
