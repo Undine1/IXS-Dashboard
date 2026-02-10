@@ -4,7 +4,7 @@ Summary of the updater and automation added to this repo.
 
 What it does
 - Persists per-pool lifetime USD totals to `public/data/pool_volume.json`.
-- Runs a daily updater (`scripts/update_wixs_pool_volume.js`) that:
+- Runs a daily updater (`scripts/update_pool_volume_indexer.js`) that:
   - Binary-searches blocks to compute an exact 24h window.
   - Fetches USDC `Transfer` logs via RPC with chunking and retries.
   - Deduplicates and sums USDC transfers (6 decimals) to compute daily USD.
@@ -14,19 +14,19 @@ What it does
   - Appends a run summary to `public/data/pool_volume_runs.json` for audit/history.
 
 Configuration
-- Local (.env.local): set `POLYGONSCAN_KEY` or `ETHERSCAN_API_KEY` for Etherscan V2 fallback.
-- CI (GitHub Actions): set `POLYGON_RPC`, `POLYGONSCAN_KEY` as repository secrets. The workflow already reads `POLYGONSCAN_KEY`.
+- Local (.env.local): set `ETHERSCAN_API_KEY` or `POLYGONSCAN_KEY` (indexer API key) for indexer fallback.
+- CI (GitHub Actions): set `POLYGON_RPC` and an indexer API secret (e.g. `POLYGONSCAN_KEY` or `ETHERSCAN_API_KEY`). The workflow reads `ETHERSCAN_API_KEY` and will fall back to `POLYGONSCAN_KEY` if present.
 - Optional: `POLYGON_RPC_LIST` (comma-separated) to provide provider failover endpoints.
 
 Files of interest
-- `scripts/update_wixs_pool_volume.js` — updater script with fallback and failover logic.
+- `scripts/update_pool_volume_indexer.js` — indexer updater script with fallback and failover logic.
 - `public/data/pool_volume.json` — persisted totals written by the updater.
 - `public/data/pool_volume_runs.json` — run history (audit log) appended each run.
 - `.github/workflows/update-pool-volume.yml` — scheduled workflow that runs the updater and deploys to Vercel.
 
 Operational notes
 - RPC providers may rate-limit or reject large `eth_getLogs` ranges; the script uses chunking/sub-chunking and retries.
-- Etherscan V2 (`chain=137`) is used as a reliable fallback but has its own rate-limits; add `POLYGONSCAN_KEY` to improve quota.
+- Etherscan V2 (or chain-specific indexer endpoints) is used as a reliable fallback but has its own rate-limits; add an indexer API key (e.g. `ETHERSCAN_API_KEY` or `POLYGONSCAN_KEY`) to improve quota.
 - To reduce fallback frequency, add more RPC endpoints to `POLYGON_RPC_LIST` or use a paid provider.
 
 If you want, I can:

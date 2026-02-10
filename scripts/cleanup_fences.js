@@ -1,5 +1,5 @@
 const fs = require('fs');
-const p = 'c:/Users/Ins/Desktop/VSCode workspace/blockchain-dashboard/scripts/update_wixs_pool_volume.js';
+const p = 'c:/Users/Ins/Desktop/VSCode workspace/blockchain-dashboard/scripts/update_pool_volume_indexer.js';
 let s = fs.readFileSync(p,'utf8');
 let lines = s.split(/\r?\n/);
 lines = lines.filter(l => !/^\s*```(?:javascript)?\s*$/.test(l));
