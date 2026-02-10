@@ -3,7 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const API_KEY = process.env.POLYGONSCAN_KEY || process.env.POLYGONSCAN_API_KEY;
+// Prefer ETHERSCAN_API_KEY (Etherscan v2); fall back to legacy Polygonscan key
+const API_KEY = process.env.ETHERSCAN_API_KEY || process.env.POLYGONSCAN_KEY || process.env.POLYGONSCAN_API_KEY;
+// Etherscan V2 base endpoint; use chainid=137 for Polygon
+const ETHERSCAN_V2_BASE = 'https://api.etherscan.io/v2/api?chainid=137';
 const USDC = (process.env.POLYGON_USDC || '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174').toLowerCase();
 const PAIR = (process.env.PAIR_ADDRESS || '0xd093a031df30f186976a1e2936b16d95ca7919d6').toLowerCase();
 
@@ -23,7 +26,7 @@ async function fetchJson(url) {
 }
 
 async function getBlockByTimestamp(ts) {
-  const url = `https://api.polygonscan.com/api?module=block&action=getblocknobytime&timestamp=${ts}&closest=before&apikey=${API_KEY}`;
+  const url = `${ETHERSCAN_V2_BASE}&module=block&action=getblocknobytime&timestamp=${ts}&closest=before&apikey=${API_KEY}`;
   const j = await fetchJson(url);
   if (j.status !== '1' && !j.result) {
     throw new Error('Failed to get block by time: ' + JSON.stringify(j));
@@ -32,7 +35,7 @@ async function getBlockByTimestamp(ts) {
 }
 
 async function fetchTokenTxs(startBlock, endBlock, page = 1, offset = 1000) {
-  const url = `https://api.polygonscan.com/api?module=account&action=tokentx&contractaddress=${USDC}&address=${PAIR}&startblock=${startBlock}&endblock=${endBlock}&page=${page}&offset=${offset}&sort=asc&apikey=${API_KEY}`;
+  const url = `${ETHERSCAN_V2_BASE}&module=account&action=tokentx&contractaddress=${USDC}&address=${PAIR}&startblock=${startBlock}&endblock=${endBlock}&page=${page}&offset=${offset}&sort=asc&apikey=${API_KEY}`;
   const j = await fetchJson(url);
   if (j.status === '0' && j.message === 'No transactions found') return [];
   if (j.status !== '1') throw new Error('tokentx error: ' + JSON.stringify(j));
