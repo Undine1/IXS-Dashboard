@@ -42,26 +42,6 @@ async function fetchTokenTxs(startBlock, endBlock, page = 1, offset = 1000) {
   return j.result || [];
 }
 
-// Fetch logs for the pair address between blocks (etherscan v2 logs endpoint)
-async function fetchLogs(startBlock, endBlock, page = 1, offset = 1000) {
-  const url = `${ETHERSCAN_V2_BASE}&module=logs&action=getLogs&address=${PAIR}&fromBlock=${startBlock}&toBlock=${endBlock}&page=${page}&offset=${offset}&apikey=${API_KEY}`;
-  const j = await fetchJson(url);
-  if (j.status === '0' && j.message && j.message.includes('No records')) return [];
-  if (j.status !== '1') throw new Error('getLogs error: ' + JSON.stringify(j));
-  return j.result || [];
-}
-
-// Call token0() on the pair to determine which slot is USDC
-async function getPairToken0() {
-  const data = '0x0dfe1681'; // token0()
-  const url = `${ETHERSCAN_V2_BASE}&module=proxy&action=eth_call&to=${PAIR}&data=${data}&tag=latest&apikey=${API_KEY}`;
-  const j = await fetchJson(url);
-  if (!j.result) throw new Error('eth_call token0 failed: ' + JSON.stringify(j));
-  const res = j.result; // 0x...32 bytes
-  const addr = '0x' + res.slice(res.length - 40);
-  return addr.toLowerCase();
-}
-
 function readJson(p, fallback) {
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fallback; }
 }
@@ -77,37 +57,24 @@ async function main() {
   const startBlock = await getBlockByTimestamp(startTs);
   const endBlock = await getBlockByTimestamp(endTs);
   console.log('Block range', startBlock, endBlock);
-  // --- Swap-log based volume (preferred) ---
-  const token0Addr = await getPairToken0();
-  const usdcAddr = USDC.toLowerCase();
-  const usdcIsToken0 = token0Addr === usdcAddr;
 
+  // fetch token transfers in a single page (offset high) and sum values
   let page = 1;
-  let totalUsdcBig = 0n;
+  let totalUsdc = 0;
   while (true) {
-    const logs = await fetchLogs(startBlock, endBlock, page, 1000);
-    if (!logs || logs.length === 0) break;
-    for (const lg of logs) {
-      // Swap events in UniswapV2-style pairs have 4 uint256 in data (128 bytes)
-      if (!lg.data || lg.data.length !== 2 + 32 * 4 * 2) {
-        // data length not 0x + 256 hex chars (4*32 bytes)
-        continue;
-      }
-      const d = lg.data.slice(2); // remove 0x
-      const amount0In = BigInt('0x' + d.slice(0, 64));
-      const amount1In = BigInt('0x' + d.slice(64, 128));
-      const amount0Out = BigInt('0x' + d.slice(128, 192));
-      const amount1Out = BigInt('0x' + d.slice(192, 256));
-      const usdcAmount = usdcIsToken0 ? (amount0In + amount0Out) : (amount1In + amount1Out);
-      totalUsdcBig += usdcAmount;
+    const txs = await fetchTokenTxs(startBlock, endBlock, page, 1000);
+    if (!txs || txs.length === 0) break;
+    for (const tx of txs) {
+      // tokenDecimal may be provided; default to 6 for USDC
+      const dec = Number(tx.tokenDecimal || 6);
+      const val = Number(tx.value || '0') / Math.pow(10, dec);
+      totalUsdc += val;
     }
-    if (logs.length < 1000) break;
+    if (txs.length < 1000) break;
     page += 1;
   }
 
-  // USDC has 6 decimals
-  const totalUsdc = Number(totalUsdcBig) / 1e6;
-  console.log('Total USDC swapped in window:', totalUsdc);
+  console.log('Total USDC transfers in window:', totalUsdc);
 
   // Load pool volume file and increment the matching pool entry (by address)
   const pools = readJson(POOL_FILE, {});
