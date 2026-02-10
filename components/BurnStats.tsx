@@ -30,7 +30,10 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   const [showPlatformNumbers, setShowPlatformNumbers] = useState<boolean>(false);
   const [showLaunchpadDeals, setShowLaunchpadDeals] = useState<boolean>(false);
   const [showPlatformVolume, setShowPlatformVolume] = useState<boolean>(false);
-  const [poolVolume, setPoolVolume] = useState<number | null>(null);
+  // Map of per-pool volumes keyed by lowercased pool address (or null when explicitly N/A)
+  const [poolVolumeMap, setPoolVolumeMap] = useState<Record<string, number | null> | null>(null);
+  // Aggregate platform pools total (sum of numeric per-pool values) or null when unavailable
+  const [poolVolumeTotal, setPoolVolumeTotal] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchTvlConfig = async () => {
@@ -45,29 +48,34 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
     };
     fetchTvlConfig();
 
-    // fetch persisted pool volume
+    // fetch persisted pool volume (supports legacy total_usd or per-pool mapping)
     const fetchPoolVolume = async () => {
       try {
         const res = await fetch('/api/poolVolume');
         if (!res.ok) return;
         const j = await res.json();
         if (!j || !j.ok || !j.data) return;
-        // Backwards-compatible: support legacy single total_usd or new per-pool mapping
+
+        // Legacy single total_usd -> set total and clear per-pool map
         if (typeof j.data.total_usd !== 'undefined') {
-          setPoolVolume(Number(j.data.total_usd) || 0);
+          setPoolVolumeTotal(Number(j.data.total_usd) || 0);
+          setPoolVolumeMap(null);
           return;
         }
-        // Prefer WIXS-USDC pool (we store its seeded volume). If absent but
-        // IXS-USDC exists, intentionally show N/A (null) for IXS.
-        const WIXS_ADDR = '0xd093a031df30f186976a1e2936b16d95ca7919d6'.toLowerCase();
-        const IXS_ADDR = '0xd22a820dc52f1cacea7a5c86da16757f434f43c6'.toLowerCase();
+
+        // New format: per-pool mapping
         if (j.data.pools) {
-          if (j.data.pools[WIXS_ADDR] && typeof j.data.pools[WIXS_ADDR].total_usd !== 'undefined') {
-            setPoolVolume(Number(j.data.pools[WIXS_ADDR].total_usd) || 0);
-          } else if (j.data.pools[IXS_ADDR]) {
-            // explicit N/A for IXS pool when no WIXS value present
-            setPoolVolume(null);
+          const map: Record<string, number | null> = {};
+          for (const k of Object.keys(j.data.pools)) {
+            const entry = j.data.pools[k];
+            if (entry && typeof entry.total_usd !== 'undefined') map[k.toLowerCase()] = Number(entry.total_usd) || 0;
+            else map[k.toLowerCase()] = null; // explicit N/A for this pool
           }
+          setPoolVolumeMap(map);
+          const numericSum = Object.values(map).filter((v) => typeof v === 'number') as number[];
+          const total = numericSum.length ? numericSum.reduce((s, v) => s + v, 0) : null;
+          setPoolVolumeTotal(total);
+          return;
         }
       } catch (e) { /* ignore */ }
     };
@@ -317,20 +325,26 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
               <div className="bg-white dark:bg-gray-800 rounded-b-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-0 overflow-hidden flex flex-col z-0 mt-0">
                 <div className={LAYOUT.outerP}>
                   <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Platform pools</div>
-                  <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Platform pools total: <span className="text-sm text-gray-500 dark:text-gray-400">{poolVolume === null ? 'N/A' : formatUsd(poolVolume, 0)}</span></div>
+                  <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Platform pools total: <span className="text-sm text-gray-500 dark:text-gray-400">{poolVolumeTotal === null ? 'N/A' : formatUsd(poolVolumeTotal, 0)}</span></div>
                   <div className={LAYOUT.listSpaceY}>
                     {cryptoPools.length === 0 ? (
                       <div className="text-sm text-gray-500 dark:text-gray-400">No platform pools configured</div>
                     ) : (
-                      cryptoPools.map((p: any, i: number) => (
-                        <div key={`${p.network}-${p.name}-${i}`} className={`${LAYOUT.itemPy} flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}>
-                          <div className={`flex items-center ${LAYOUT.itemGap}`}>
-                            <img src={`/images/chains/${p.network}.png`} onError={(e) => { e.currentTarget.src = `/images/chains/${p.network}.svg` }} alt={p.network} className="w-5 h-5 object-contain" />
-                            <div className="text-base font-medium text-gray-900 dark:text-white">{p.name}</div>
+                      cryptoPools.map((p: any, i: number) => {
+                        const addr = (p.address || '').toLowerCase();
+                        // prefer per-pool value when available, otherwise fall back to aggregate total
+                        const perPoolVal = poolVolumeMap ? (addr in poolVolumeMap ? poolVolumeMap[addr] : undefined) : poolVolumeTotal;
+                        const display = typeof perPoolVal === 'number' ? formatUsd(perPoolVal, 0) : 'N/A';
+                        return (
+                          <div key={`${p.network}-${p.name}-${i}`} className={`${LAYOUT.itemPy} flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}>
+                            <div className={`flex items-center ${LAYOUT.itemGap}`}>
+                              <img src={`/images/chains/${p.network}.png`} onError={(e) => { e.currentTarget.src = `/images/chains/${p.network}.svg` }} alt={p.network} className="w-5 h-5 object-contain" />
+                              <div className="text-base font-medium text-gray-900 dark:text-white">{p.name}</div>
+                            </div>
+                            <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]"><span className="text-sm text-gray-500 dark:text-gray-400">{display}</span></div>
                           </div>
-                          <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]"><span className="text-sm text-gray-500 dark:text-gray-400">{poolVolume === null ? 'N/A' : formatUsd(poolVolume, 0)}</span></div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
