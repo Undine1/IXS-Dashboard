@@ -324,8 +324,6 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
             {showPlatformVolume && (
               <div className="bg-white dark:bg-gray-800 rounded-b-xl shadow-sm border border-gray-100 dark:border-gray-700 border-t-0 overflow-hidden flex flex-col z-0 mt-0">
                 <div className={LAYOUT.outerP}>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Platform pools</div>
-                  <div className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Platform pools total: <span className="text-sm text-gray-500 dark:text-gray-400">{poolVolumeTotal === null ? 'N/A' : formatUsd(poolVolumeTotal, 0)}</span></div>
                   <div className={LAYOUT.listSpaceY}>
                     {cryptoPools.length === 0 ? (
                       <div className="text-sm text-gray-500 dark:text-gray-400">No platform pools configured</div>
