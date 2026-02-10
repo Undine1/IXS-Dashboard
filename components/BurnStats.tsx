@@ -339,7 +339,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                               <img src={`/images/chains/${p.network}.png`} onError={(e) => { e.currentTarget.src = `/images/chains/${p.network}.svg` }} alt={p.network} className="w-5 h-5 object-contain" />
                               <div className="text-base font-medium text-gray-900 dark:text-white">{p.name}</div>
                             </div>
-                            <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]"><span className="text-sm text-gray-500 dark:text-gray-400">{display}</span></div>
+                            <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]"><span className="text-sm text-gray-900 dark:text-white">{display}</span></div>
                           </div>
                         );
                       })
