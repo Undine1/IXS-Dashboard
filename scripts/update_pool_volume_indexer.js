@@ -4,8 +4,8 @@
 const fs = require('fs');
 const path = require('path');
 
-// Prefer INDEXER_API_KEY (recommended). Fall back to ETHERSCAN/POLYGONSCAN legacy vars
-const API_KEY = process.env.INDEXER_API_KEY || process.env.ETHERSCAN_API_KEY || process.env.POLYGONSCAN_KEY || process.env.POLYGONSCAN_API_KEY;
+// Use ETHERSCAN_API_KEY (required).
+const API_KEY = process.env.ETHERSCAN_API_KEY;
 // chain id defaults and utilities
 const CHAIN_IDS = { ethereum: 1, polygon: 137, base: 8453 };
 const DEFAULT_CHAIN = 'polygon';
@@ -23,7 +23,7 @@ let apiCallCount = 0;
 let retryCount = 0;
 
 if (!API_KEY) {
-  console.error('ETHERSCAN_API_KEY or POLYGONSCAN_KEY is required in environment');
+  console.error('ETHERSCAN_API_KEY is required in environment');
   process.exit(2);
 }
 
