@@ -309,10 +309,10 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
               <p className="text-sm font-semibold text-teal-500 dark:text-teal-400 text-center">Platform Volume (approx)</p>
                 <div className="flex-1 flex items-center justify-center">
                   <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {poolVolume === null ? (
+                    {poolVolumeTotal === null ? (
                       <span className="text-sm text-gray-500 dark:text-gray-400">N/A</span>
                     ) : (
-                      <span>{formatUsd(poolVolume, 0)}</span>
+                      <span>{formatUsd(poolVolumeTotal, 0)}</span>
                     )}
                   </span>
                 </div>
