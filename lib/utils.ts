@@ -1,4 +1,4 @@
-const LOCALE = process.env.NEXT_PUBLIC_LOCALE || 'en-US';
+const LOCALE = 'en-US';
 
 export function formatAddress(address: string): string {
   if (address.length <= 10) return address;
