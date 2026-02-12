@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, Fragment, useRef, useLayoutEffect } from 'react';
 import { TokenBurnStats } from '@/types';
-import { formatValue, formatAddress, formatUsd } from '@/lib/utils';
+import { formatValue, formatAddress, formatUsd, formatNumber, formatDate } from '@/lib/utils';
 import { PRIVATE_ENTRY as DEFAULT_PRIVATE_ENTRY, PUBLIC_DEALS as DEFAULT_PUBLIC_DEALS, TYPE_LABELS } from '@/lib/tvlConfig';
 import LAYOUT from '@/lib/layoutConfig';
 // Removed circle chart dependency (recharts) per request — keep visual summaries
@@ -182,7 +182,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
             <div className="flex-1 flex items-center justify-center">
               <div className="relative inline-block pointer-events-none">
                 <span ref={supplyNumberRef} className="text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                  {newMaxSupply.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  {formatNumber(newMaxSupply, 0)}
                 </span>
                 <span className="absolute left-full top-1/2 transform -translate-y-1/2 ml-1">
                   <span className="text-sm text-gray-500 whitespace-nowrap">IXS</span>
@@ -413,7 +413,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
 
       {/* Panels are rendered inline beneath each card so they stay attached and only push content in their column */}
 
-      <div className="text-right text-xs text-gray-400 pt-8 pb-4">Last updated: {new Date(stats.lastUpdated).toLocaleString()}</div>
+      <div className="text-right text-xs text-gray-400 pt-8 pb-4">Last updated: {formatDate(Math.floor(stats.lastUpdated / 1000))}</div>
     </div>
   );
 }

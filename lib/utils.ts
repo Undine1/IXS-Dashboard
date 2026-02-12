@@ -28,3 +28,13 @@ export function formatUsd(value: number | string, decimals: number = 2): string 
 export function formatDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleString(LOCALE);
 }
+
+export function formatNumber(value: number | string, decimals: number = 0): string {
+  try {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (Number.isNaN(num) || !isFinite(num)) return '0';
+    return num.toLocaleString(LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  } catch {
+    return '0';
+  }
+}
