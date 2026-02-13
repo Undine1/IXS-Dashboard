@@ -79,6 +79,12 @@ jobs:
         run: |
           node -e "const fs=require('fs'); const p='public/data/pool_volume_alert.json'; if(!fs.existsSync(p)){console.log('No alert file, continuing'); process.exit(0);} const a=JSON.parse(fs.readFileSync(p)); if(a.alert){ console.error('Run alert triggered:', a.reasons); process.exit(1);} console.log('No alerts')"
 
+      - name: Preinstall Vercel CLI (with legacy peer deps)
+        run: |
+          npm config set legacy-peer-deps true
+          npm i -g vercel@50.17.1 --legacy-peer-deps
+        shell: bash
+
       - name: Deploy to Vercel (no commit)
         uses: amondnet/vercel-action@v20
         with:
@@ -86,5 +92,8 @@ jobs:
           vercel-args: '--prod --confirm'
           working-directory: .
         env:
+          # Ensure npm resolves peer deps permissively when the action installs the vercel CLI
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
+          npm_config_legacy_peer_deps: 'true'
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
