@@ -94,6 +94,5 @@ jobs:
         env:
           # Ensure npm resolves peer deps permissively when the action installs the vercel CLI
           NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
-          npm_config_legacy_peer_deps: 'true'
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
