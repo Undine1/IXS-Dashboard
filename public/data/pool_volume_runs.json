@@ -887,5 +887,23 @@
     "endBlock": 82950244,
     "totalUsdc": 0,
     "ts": "2026-02-13T22:08:44.515Z"
+  },
+  {
+    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
+    "startTs": 1771020425,
+    "endTs": 1771024053,
+    "startBlock": 82950201,
+    "endBlock": 82952010,
+    "totalUsdc": 0,
+    "ts": "2026-02-13T23:07:34.442Z"
+  },
+  {
+    "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
+    "startTs": 1771020524,
+    "endTs": 1771024152,
+    "startBlock": 82950250,
+    "endBlock": 82952058,
+    "totalUsdc": 0,
+    "ts": "2026-02-13T23:09:12.808Z"
   }
 ]
