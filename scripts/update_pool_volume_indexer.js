@@ -117,6 +117,11 @@ function addrHashToInt(a) {
   return h;
 }
 
+function isValidAddress(a) {
+  if (!a || typeof a !== 'string') return false;
+  return /^0x[0-9a-fA-F]{40}$/.test(a);
+}
+
 async function sleepSeconds(s) {
   return new Promise((res) => setTimeout(res, s * 1000));
 }
@@ -159,6 +164,23 @@ async function main() {
       const chainid = CHAIN_IDS[chain] || CHAIN_IDS[DEFAULT_CHAIN];
       const usdcAddr = (pool.usdc || GLOBAL_USDC).toLowerCase();
       const pairAddr = (pool.address || addr || GLOBAL_PAIR).toLowerCase();
+
+      // validate addresses before making API calls
+      if (!isValidAddress(usdcAddr) || !isValidAddress(pairAddr)) {
+        console.warn(`Skipping ${addr}: invalid address format (usdc=${usdcAddr}, pair=${pairAddr})`);
+        // write an alert entry for visibility
+        try {
+          const a = readJson(ALERT_FILE, { alert: false, reasons: [] });
+          a.reasons = a.reasons || [];
+          a.reasons.push(`invalid-address: ${addr} usdc=${usdcAddr} pair=${pairAddr}`);
+          a.ts = new Date().toISOString();
+          fs.writeFileSync(ALERT_FILE, JSON.stringify(a, null, 2));
+        } catch (e) { /* ignore */ }
+        // save checkpoint to avoid reprocessing this bad entry repeatedly
+        checkpoint[addr] = { lastTimestamp: endTs || now, lastBlock: null };
+        fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+        continue;
+      }
 
       const startBlock = await getBlockByTimestamp(startTs, chainid);
       const endBlock = await getBlockByTimestamp(endTs, chainid);
