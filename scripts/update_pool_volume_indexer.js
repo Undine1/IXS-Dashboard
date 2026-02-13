@@ -129,8 +129,24 @@ async function sleepSeconds(s) {
 async function main() {
   const now = Math.floor(Date.now() / 1000);
   const checkpoint = readJson(CHECKPOINT, {});
-  const pools = readJson(POOL_FILE, {});
-  const poolsMap = pools || {};
+  const poolsRaw = readJson(POOL_FILE, {});
+  // Normalize pool file formats:
+  // - legacy: object where keys are pool addresses
+  // - modern: { pools: { <addr>: { ... } }, lastUpdated: ... }
+  // - array: [{ address, usdc, chain, ... }]
+  let poolsMap = {};
+  if (poolsRaw && typeof poolsRaw === 'object') {
+    if (poolsRaw.pools && typeof poolsRaw.pools === 'object') {
+      poolsMap = poolsRaw.pools;
+    } else if (Array.isArray(poolsRaw)) {
+      for (const item of poolsRaw) {
+        const a = (item.address || '').toLowerCase();
+        if (a) poolsMap[a] = item;
+      }
+    } else {
+      poolsMap = poolsRaw;
+    }
+  }
 
   // initialize alert file
   try {
