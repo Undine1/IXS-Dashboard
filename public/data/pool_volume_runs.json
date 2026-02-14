@@ -1211,5 +1211,23 @@
     "endBlock": 82991551,
     "totalUsdc": 0,
     "ts": "2026-02-14T21:05:36.945Z"
+  },
+  {
+    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
+    "startTs": 1771103038,
+    "endTs": 1771106545,
+    "startBlock": 82991507,
+    "endBlock": 82993255,
+    "totalUsdc": 0,
+    "ts": "2026-02-14T22:02:25.646Z"
+  },
+  {
+    "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
+    "startTs": 1771103136,
+    "endTs": 1771106643,
+    "startBlock": 82991556,
+    "endBlock": 82993304,
+    "totalUsdc": 0,
+    "ts": "2026-02-14T22:04:04.069Z"
   }
 ]
