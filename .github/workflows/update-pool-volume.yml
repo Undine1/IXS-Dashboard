@@ -1,0 +1,98 @@
+name: Update Pool Volume
+
+on:
+  schedule:
+    - cron: '0 * * * *' # hourly at minute 0 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Run updater and commit
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pool-volume-update
+      cancel-in-progress: true
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository (use PAT for push)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.15.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f yarn.lock ]; then
+            npm ci
+          else
+            echo "No lockfile found — running 'npm install' instead of 'npm ci'"
+            npm install
+          fi
+
+      - name: Run pool updater
+        env:
+          POLYGON_RPC: ${{ secrets.POLYGON_RPC }}
+          POLYGON_RPC_LIST: ${{ secrets.POLYGON_RPC_LIST }}
+          POLYGON_USDC: ${{ secrets.POLYGON_USDC }}
+          # Use ETHERSCAN_API_KEY secret for indexer API access
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          BLOCKS_PER_DAY: ${{ env.BLOCKS_PER_DAY }}
+          LOG_CHUNK: '200'
+          MAX_FETCH_PASSES: '2'
+          MAX_CHUNK_TIME_MS: '5000'
+          WINDOW_SECONDS: '3600'
+        run: node ./scripts/update_pool_volume_indexer.js
+
+      - name: Commit updated data files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git status --porcelain | grep -q "public/data/pool_volume.json\|public/data/pool_volume_runs.json\|public/data/pool_volume_checkpoint.json"; then
+            git add public/data/pool_volume.json public/data/pool_volume_runs.json public/data/pool_volume_checkpoint.json || true
+            git commit -m "data: update pool volume from indexer updater [skip ci]" || echo "No changes to commit"
+            git push
+          else
+            echo "No data changes"
+          fi
+      - name: Upload run artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pool-volume-artifacts
+          path: |
+            public/data/pool_volume_runs.json
+            public/data/pool_volume_alert.json
+
+      - name: Check run alerts and fail if thresholds exceeded
+        env:
+          ALERT_INDEXER_CALLS: ${{ env.ALERT_INDEXER_CALLS || '50' }}
+          ALERT_PROVIDER_BANS: ${{ env.ALERT_PROVIDER_BANS || '1' }}
+        run: |
+          node -e "const fs=require('fs'); const p='public/data/pool_volume_alert.json'; const maxCalls=Number(process.env.ALERT_INDEXER_CALLS||'50'); const maxProvider=Number(process.env.ALERT_PROVIDER_BANS||'1'); if(!fs.existsSync(p)){console.log('No alert file, continuing'); process.exit(0);} const a=JSON.parse(fs.readFileSync(p)); const apiCalls=Number(a.apiCallCount||0); const reasons=Array.isArray(a.reasons)?a.reasons.map(String):[]; const providerSignals=reasons.filter((r)=>/request-failed|429|throttle|ban|forbidden|invalid-address/i.test(r)).length; const overCalls=apiCalls>maxCalls; const overProvider=providerSignals>maxProvider; if(a.alert||overCalls||overProvider){ console.error('Run alert triggered',{alert:a.alert,apiCalls,maxCalls,providerSignals,maxProvider,reasons}); process.exit(1);} console.log('No alerts',{apiCalls,providerSignals,maxCalls,maxProvider});"
+
+      - name: Preinstall Vercel CLI (with legacy peer deps)
+        run: |
+          npm config set legacy-peer-deps true
+          npm i -g vercel@50.17.1 --legacy-peer-deps
+        shell: bash
+
+      - name: Deploy to Vercel (no commit)
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-args: '--prod --confirm'
+          working-directory: .
+        env:
+          # Ensure npm resolves peer deps permissively when the action installs the vercel CLI
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
