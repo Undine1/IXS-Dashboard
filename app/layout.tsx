@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Blockchain Dashboard",
-  description: "Real-time blockchain transaction monitoring and analytics platform",
+  title: "IXS Statistics",
+  description: "IXS burn telemetry, cross-chain liquidity, and platform volume statistics.",
 };
 
 export default function RootLayout({
