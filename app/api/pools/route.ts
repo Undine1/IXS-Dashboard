@@ -26,17 +26,17 @@ type PoolDebug = {
   reserve1Float?: number;
   price0?: number;
   price1?: number;
-  usdValue?: number;
+  usdValue?: number | null;
   error?: string;
 };
 
 type PoolWithValue = PoolConfig & {
-  value: number;
+  value: number | null;
   debug?: PoolDebug;
 };
 
 type FetchPoolResult = {
-  usdValue: number;
+  usdValue: number | null;
   derivedIxsPrice: number | null;
   debug: PoolDebug;
 };
@@ -245,39 +245,45 @@ async function fetchPoolValue(pool: PoolConfig, prices: Prices): Promise<FetchPo
 
     const ixsAddress = IXS_ADDRESS_BY_NETWORK[pool.network];
     const stableTokens = STABLE_TOKENS_BY_NETWORK[pool.network] || [];
-    const knownIxsUsd = prices[pool.network]?.ixs?.usd || 0;
+    const knownIxsUsd = prices[pool.network]?.ixs?.usd;
     const token0Lower = token0.toLowerCase();
     const token1Lower = token1.toLowerCase();
 
-    let price0 = 0;
-    if (token0Lower === ixsAddress) {
+    let price0: number | null = null;
+    if (token0Lower === ixsAddress && typeof knownIxsUsd === 'number' && knownIxsUsd > 0) {
       price0 = knownIxsUsd;
     } else if (stableTokens.includes(token0Lower)) {
       price0 = 1;
     }
 
-    let price1 = 0;
-    if (token1Lower === ixsAddress) {
+    let price1: number | null = null;
+    if (token1Lower === ixsAddress && typeof knownIxsUsd === 'number' && knownIxsUsd > 0) {
       price1 = knownIxsUsd;
     } else if (stableTokens.includes(token1Lower)) {
       price1 = 1;
     }
 
     if (pool.priceSource) {
-      if (token0Lower === ixsAddress && price1 === 0) price1 = 1;
-      if (token1Lower === ixsAddress && price0 === 0) price0 = 1;
+      if (token0Lower === ixsAddress && price1 === null) price1 = 1;
+      if (token1Lower === ixsAddress && price0 === null) price0 = 1;
     }
 
-    if (price0 > 0 && price1 === 0 && reserve1Float > 0) {
+    if (price0 !== null && price0 > 0 && price1 === null && reserve1Float > 0) {
       price1 = (reserve0Float * price0) / reserve1Float;
-    } else if (price1 > 0 && price0 === 0 && reserve0Float > 0) {
+    } else if (price1 !== null && price1 > 0 && price0 === null && reserve0Float > 0) {
       price0 = (reserve1Float * price1) / reserve0Float;
     }
 
-    const usdValue = reserve0Float * price0 + reserve1Float * price1;
+    const hasPrice0 = price0 !== null && Number.isFinite(price0) && price0 >= 0;
+    const hasPrice1 = price1 !== null && Number.isFinite(price1) && price1 >= 0;
+    const price0Value = hasPrice0 ? (price0 ?? 0) : 0;
+    const price1Value = hasPrice1 ? (price1 ?? 0) : 0;
+    const usdValue = hasPrice0 || hasPrice1
+      ? reserve0Float * price0Value + reserve1Float * price1Value
+      : null;
     let derivedIxsPrice: number | null = null;
-    if (token0Lower === ixsAddress && price0 > 0) derivedIxsPrice = price0;
-    if (token1Lower === ixsAddress && price1 > 0) derivedIxsPrice = price1;
+    if (token0Lower === ixsAddress && hasPrice0 && price0Value > 0) derivedIxsPrice = price0Value;
+    if (token1Lower === ixsAddress && hasPrice1 && price1Value > 0) derivedIxsPrice = price1Value;
 
     const debug: PoolDebug = {
       token0,
@@ -286,8 +292,8 @@ async function fetchPoolValue(pool: PoolConfig, prices: Prices): Promise<FetchPo
       decimals1,
       reserve0Float,
       reserve1Float,
-      price0,
-      price1,
+      ...(hasPrice0 ? { price0: price0Value } : {}),
+      ...(hasPrice1 ? { price1: price1Value } : {}),
       usdValue,
     };
 
@@ -295,7 +301,7 @@ async function fetchPoolValue(pool: PoolConfig, prices: Prices): Promise<FetchPo
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error(`[pools API] Error fetching ${pool.name} pool value:`, errMsg);
-    return { usdValue: 0, derivedIxsPrice: null, debug: { error: errMsg } };
+    return { usdValue: null, derivedIxsPrice: null, debug: { error: errMsg } };
   }
 }
 

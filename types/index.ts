@@ -25,13 +25,13 @@ export interface FilterOptions {
 
 export interface BurnAddress {
   address: string;
-  balance: string;
+  balance: string | null;
   label: string;
   network: 'ethereum' | 'polygon' | 'base';
 }
 
 export interface TokenBurnStats {
-  totalBurned: string;
+  totalBurned: string | null;
   burnAddresses: BurnAddress[];
   lastUpdated: number;
 }
@@ -43,7 +43,7 @@ export interface Pool {
   name: string;
   address: string;
   network: ChainNetwork;
-  value?: number;
+  value?: number | null;
   priceSource?: boolean;
   tokenContract?: string;
 }
@@ -56,7 +56,7 @@ export interface PoolsApiResponse {
 
 export interface TvlPrivateEntry {
   label: string;
-  value: number;
+  value: number | null;
   verifiedBy: {
     label: string;
     href: string;

@@ -24,7 +24,7 @@ export async function fetchTokenBurnStatsFromAPI(): Promise<TokenBurnStats> {
     if (!response.ok) {
       console.error('[Client] API error:', response.statusText);
       return {
-        totalBurned: '0',
+        totalBurned: null,
         burnAddresses: [],
         lastUpdated: Date.now(),
       };
@@ -36,72 +36,73 @@ export async function fetchTokenBurnStatsFromAPI(): Promise<TokenBurnStats> {
     // Parse the API response and convert to TokenBurnStats format
     const allBurnAddresses: BurnAddress[] = [];
     let totalBurned = BigInt(0);
+    let hasKnownBalance = false;
+    let hasUnknownBalance = false;
 
-    // Process Ethereum balances
-    if (data.ethereum && typeof data.ethereum.balances === 'object') {
-      console.log('[Client] Processing Ethereum balances:', data.ethereum.balances);
-      for (const [address, balance] of Object.entries(data.ethereum.balances)) {
+    const processNetworkBalances = (
+      network: 'ethereum' | 'polygon' | 'base',
+      balances: Record<string, unknown>
+    ) => {
+      for (const [address, balance] of Object.entries(balances)) {
+        const label = BURN_ADDRESS_LABELS[address.toLowerCase()] || formatAddress(address);
+        if (balance === null || typeof balance === 'undefined' || balance === '') {
+          hasUnknownBalance = true;
+          allBurnAddresses.push({
+            address,
+            balance: null,
+            label,
+            network,
+          });
+          continue;
+        }
+
         try {
           const balanceStr = String(balance);
           const balanceBigInt = BigInt(balanceStr);
           totalBurned += balanceBigInt;
+          hasKnownBalance = true;
 
           allBurnAddresses.push({
             address,
             balance: balanceStr,
-            label: BURN_ADDRESS_LABELS[address.toLowerCase()] || formatAddress(address),
-            network: 'ethereum',
+            label,
+            network,
           });
         } catch (err) {
-          console.error('[Client] Error processing Ethereum address:', address, err);
+          hasUnknownBalance = true;
+          allBurnAddresses.push({
+            address,
+            balance: null,
+            label,
+            network,
+          });
+          console.error(`[Client] Error processing ${network} address:`, address, err);
         }
       }
+    };
+
+    // Process Ethereum balances
+    if (data.ethereum && typeof data.ethereum.balances === 'object') {
+      console.log('[Client] Processing Ethereum balances:', data.ethereum.balances);
+      processNetworkBalances('ethereum', data.ethereum.balances as Record<string, unknown>);
     }
 
     // Process Polygon balances
     if (data.polygon && typeof data.polygon.balances === 'object') {
       console.log('[Client] Processing Polygon balances:', data.polygon.balances);
-      for (const [address, balance] of Object.entries(data.polygon.balances)) {
-        try {
-          const balanceStr = String(balance);
-          const balanceBigInt = BigInt(balanceStr);
-          totalBurned += balanceBigInt;
-
-          allBurnAddresses.push({
-            address,
-            balance: balanceStr,
-            label: BURN_ADDRESS_LABELS[address.toLowerCase()] || formatAddress(address),
-            network: 'polygon',
-          });
-        } catch (err) {
-          console.error('[Client] Error processing Polygon address:', address, err);
-        }
-      }
+      processNetworkBalances('polygon', data.polygon.balances as Record<string, unknown>);
     }
 
     // Process Base balances
     if (data.base && typeof data.base.balances === 'object') {
       console.log('[Client] Processing Base balances:', data.base.balances);
-      for (const [address, balance] of Object.entries(data.base.balances)) {
-        try {
-          const balanceStr = String(balance);
-          const balanceBigInt = BigInt(balanceStr);
-          totalBurned += balanceBigInt;
-
-          allBurnAddresses.push({
-            address,
-            balance: balanceStr,
-            label: BURN_ADDRESS_LABELS[address.toLowerCase()] || formatAddress(address),
-            network: 'base',
-          });
-        } catch (err) {
-          console.error('[Client] Error processing Base address:', address, err);
-        }
-      }
+      processNetworkBalances('base', data.base.balances as Record<string, unknown>);
     }
 
+    const totalBurnedValue = hasKnownBalance && !hasUnknownBalance ? totalBurned.toString() : null;
+
     const result: TokenBurnStats = {
-      totalBurned: totalBurned.toString(),
+      totalBurned: totalBurnedValue,
       burnAddresses: allBurnAddresses,
       lastUpdated: Date.now(),
     };
@@ -111,7 +112,7 @@ export async function fetchTokenBurnStatsFromAPI(): Promise<TokenBurnStats> {
   } catch (error) {
     console.error('[Client] Error fetching burn stats:', error);
     return {
-      totalBurned: '0',
+      totalBurned: null,
       burnAddresses: [],
       lastUpdated: Date.now(),
     };

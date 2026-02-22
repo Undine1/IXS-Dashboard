@@ -5,9 +5,9 @@ const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const API_TIMEOUT = 15000; // 15 seconds
 
 interface BurnStatsApiResponse {
-  ethereum: { balances: Record<string, string> };
-  polygon: { balances: Record<string, string> };
-  base: { balances: Record<string, string> };
+  ethereum: { balances: Record<string, string | null> };
+  polygon: { balances: Record<string, string | null> };
+  base: { balances: Record<string, string | null> };
 }
 
 // Cache configuration
@@ -56,8 +56,8 @@ async function fetchBalancesForNetwork(
   tokenAddress: string,
   burnAddresses: string[],
   network: 'ethereum' | 'polygon' | 'base'
-): Promise<Record<string, string>> {
-  const balances: Record<string, string> = {};
+): Promise<Record<string, string | null>> {
+  const balances: Record<string, string | null> = {};
 
   // Validate inputs
   if (!isValidAddress(tokenAddress)) {
@@ -71,7 +71,7 @@ async function fetchBalancesForNetwork(
     // Validate address format before making API call
     if (!isValidAddress(trimmedAddress)) {
       console.error(`[burnStats API] Invalid address format for ${network}: ${trimmedAddress}`);
-      balances[trimmedAddress] = '0';
+      balances[trimmedAddress] = null;
       continue;
     }
 
@@ -103,15 +103,16 @@ async function fetchBalancesForNetwork(
 
       if (!response.data.result) {
         console.warn(`[burnStats API] No result for ${trimmedAddress} on ${network}`);
-        balances[trimmedAddress] = '0';
+        balances[trimmedAddress] = null;
         continue;
       }
 
-      let balance = BigInt(response.data.result).toString();
+      const balance = BigInt(response.data.result).toString();
 
       if (!balance || !/^\d+$/.test(balance)) {
         console.warn(`[burnStats API] Invalid balance format for ${trimmedAddress}`);
-        balance = '0';
+        balances[trimmedAddress] = null;
+        continue;
       }
 
       balances[trimmedAddress] = balance;
@@ -119,7 +120,7 @@ async function fetchBalancesForNetwork(
     } catch (error) {
       console.error(`[burnStats API] Error fetching ${network} balance for ${trimmedAddress}:`, error);
       // Don't expose API error details to client
-      balances[trimmedAddress] = '0';
+      balances[trimmedAddress] = null;
     }
     await sleep(400); // Add a 400ms delay between requests
   }
@@ -155,9 +156,9 @@ export async function GET() {
       BASE_BURN_ADDRESSES_COUNT: BASE_BURN_ADDRESSES.length,
     });
 
-    let ethereumBalances: Record<string, string> = {};
-    let polygonBalances: Record<string, string> = {};
-    let baseBalances: Record<string, string> = {};
+    let ethereumBalances: Record<string, string | null> = {};
+    let polygonBalances: Record<string, string | null> = {};
+    let baseBalances: Record<string, string | null> = {};
 
     // Fetch Ethereum balances
     if (ETH_TOKEN_ADDRESS && ETH_BURN_ADDRESSES.length > 0) {

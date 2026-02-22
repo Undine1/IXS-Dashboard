@@ -20,16 +20,16 @@ const BURN_ADDRESS_LABELS: Record<string, string> = {
   '0xec36cffd536fac67513871e114df58470696734b': 'Burn Address 3',
 };
 
-export async function fetchTokenBalancesViaWeb3(): Promise<{ totalBurned: string; burnAddresses: BurnAddress[] }> {
+export async function fetchTokenBalancesViaWeb3(): Promise<{ totalBurned: string | null; burnAddresses: BurnAddress[] }> {
   try {
     if (!TOKEN_ADDRESS) {
       console.warn('[tokenBurnService] TOKEN_ADDRESS is not configured');
-      return { totalBurned: '0', burnAddresses: [] };
+      return { totalBurned: null, burnAddresses: [] };
     }
 
     if (BURN_ADDRESSES.length === 0) {
       console.warn('[tokenBurnService] BURN_ADDRESSES are not configured');
-      return { totalBurned: '0', burnAddresses: [] };
+      return { totalBurned: null, burnAddresses: [] };
     }
 
     // Use Ethereum public RPC endpoint
@@ -59,7 +59,7 @@ export async function fetchTokenBalancesViaWeb3(): Promise<{ totalBurned: string
         console.error(`[tokenBurnService] Error fetching balance for ${address}:`, error);
         burnAddressesData.push({
           address,
-          balance: '0',
+          balance: null,
           label: BURN_ADDRESS_LABELS[address.toLowerCase()] || formatAddress(address),
           network: 'ethereum',
         });
@@ -72,7 +72,7 @@ export async function fetchTokenBalancesViaWeb3(): Promise<{ totalBurned: string
     };
   } catch (error) {
     console.error('[tokenBurnService] Error in Web3 service:', error);
-    return { totalBurned: '0', burnAddresses: [] };
+    return { totalBurned: null, burnAddresses: [] };
   }
 }
 

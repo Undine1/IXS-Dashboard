@@ -34,6 +34,15 @@ interface PoolVolumeResponse {
   data?: PoolVolumeData;
 }
 
+function toFiniteNumberOrNull(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 interface ChainIconProps {
   network: string;
   alt: string;
@@ -86,7 +95,13 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
         const res = await fetch('/data/tvlConfig.json');
         if (res.ok) {
           const cfg = (await res.json()) as TvlConfigPayload;
-          if (cfg.privateEntry) setPrivateEntry(cfg.privateEntry);
+          if (cfg.privateEntry) {
+            setPrivateEntry({
+              label: cfg.privateEntry.label || DEFAULT_PRIVATE_ENTRY.label,
+              value: toFiniteNumberOrNull(cfg.privateEntry.value ?? DEFAULT_PRIVATE_ENTRY.value),
+              verifiedBy: cfg.privateEntry.verifiedBy || DEFAULT_PRIVATE_ENTRY.verifiedBy,
+            });
+          }
           if (Array.isArray(cfg.publicDeals)) setPublicDeals(cfg.publicDeals);
         }
       } catch {
@@ -105,7 +120,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
 
         // Legacy single total_usd -> set total and clear per-pool map
         if (typeof j.data.total_usd !== 'undefined') {
-          setPoolVolumeTotal(Number(j.data.total_usd) || 0);
+          setPoolVolumeTotal(toFiniteNumberOrNull(j.data.total_usd));
           setPoolVolumeMap(null);
           return;
         }
@@ -115,7 +130,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
           const map: Record<string, number | null> = {};
           for (const k of Object.keys(j.data.pools)) {
             const entry = j.data.pools[k];
-            if (entry && typeof entry.total_usd !== 'undefined') map[k.toLowerCase()] = Number(entry.total_usd) || 0;
+            if (entry && typeof entry.total_usd !== 'undefined') map[k.toLowerCase()] = toFiniteNumberOrNull(entry.total_usd);
             else map[k.toLowerCase()] = null; // explicit N/A for this pool
           }
           setPoolVolumeMap(map);
@@ -138,24 +153,34 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   // stats.totalBurned is a wei string — compute numeric token amount from raw wei
   const burnedTokens = (() => {
     try {
-      const raw = String(stats?.totalBurned || '0');
+      if (!stats?.totalBurned) return null;
+      const raw = String(stats.totalBurned);
       const bi = BigInt(raw);
-      return Number(bi) / 1e18;
+      const parsed = Number(bi) / 1e18;
+      return Number.isFinite(parsed) ? parsed : null;
     } catch {
-      return 0;
+      return null;
     }
   })();
   // Ensure we don't go below zero
-  const newMaxSupply = Math.max(0, MAX_SUPPLY - burnedTokens);
+  const newMaxSupply = burnedTokens === null ? null : Math.max(0, MAX_SUPPLY - burnedTokens);
   
   // Percent burned of Total Original Supply
-  const burnedPct = Math.min(100, Math.max(0, (burnedTokens / MAX_SUPPLY) * 100));
+  const burnedPct = burnedTokens === null ? null : Math.min(100, Math.max(0, (burnedTokens / MAX_SUPPLY) * 100));
 
   // 2. TVL Items
-  const tvlPrivateVal = Number(privateEntry.value) || 0;
-  const tvlLaunchpadVal = publicDeals.reduce((sum, deal) => sum + (Number(deal.value) || 0), 0);
-  const tvlPoolsVal = pools.reduce((sum, pool) => sum + (Number(pool.value) || 0), 0);
-  const totalTvl = tvlPrivateVal + tvlPoolsVal; // Excluded launchpad from TVL
+  const tvlPrivateVal = toFiniteNumberOrNull(privateEntry.value);
+  const launchpadValues = publicDeals.map((deal) => toFiniteNumberOrNull(deal.value));
+  const hasUnknownLaunchpadValues = launchpadValues.some((value) => value === null);
+  const tvlLaunchpadVal = hasUnknownLaunchpadValues
+    ? null
+    : launchpadValues.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+  const poolValues = pools.map((pool) => toFiniteNumberOrNull(pool.value));
+  const hasUnknownPoolValues = poolValues.some((value) => value === null);
+  const tvlPoolsVal = hasUnknownPoolValues
+    ? null
+    : poolValues.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+  const totalTvl = tvlPrivateVal === null || tvlPoolsVal === null ? null : tvlPrivateVal + tvlPoolsVal; // Excluded launchpad from TVL
   // Platform Volume: sum of Crypto pools (treat pool.value as the pool's USD volume/liquidity)
   const cryptoPools = pools.filter((pool) => pool.type === 'Crypto');
   const poolsByType = pools.reduce<Record<string, Pool[]>>((acc, pool) => {
@@ -216,11 +241,13 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
             <div className="flex-1 flex items-center justify-center">
               <div className="relative inline-block pointer-events-none">
                 <span ref={supplyNumberRef} className="text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                  {formatNumber(newMaxSupply, 0)}
+                  {newMaxSupply === null ? 'N/A' : formatNumber(newMaxSupply, 0)}
                 </span>
-                <span className="absolute left-full top-1/2 transform -translate-y-1/2 ml-1">
-                  <span className="text-sm text-gray-500 whitespace-nowrap">{tokenSymbol || 'IXS'}</span>
-                </span>
+                {newMaxSupply !== null && (
+                  <span className="absolute left-full top-1/2 transform -translate-y-1/2 ml-1">
+                    <span className="text-sm text-gray-500 whitespace-nowrap">{tokenSymbol || 'IXS'}</span>
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -251,8 +278,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                     ) : (
                       cryptoPools.map((p, i) => {
                         const addr = (p.address || '').toLowerCase();
-                        // prefer per-pool value when available, otherwise fall back to aggregate total
-                        const perPoolVal = poolVolumeMap ? (addr in poolVolumeMap ? poolVolumeMap[addr] : undefined) : poolVolumeTotal;
+                        const perPoolVal = poolVolumeMap ? (addr in poolVolumeMap ? poolVolumeMap[addr] : null) : null;
                         const display = typeof perPoolVal === 'number' ? formatUsd(perPoolVal, 0) : 'N/A';
                         return (
                           <div key={`${p.network}-${p.name}-${i}`} className={`${LAYOUT.itemPy} flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}>
@@ -280,12 +306,16 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
               <div className="flex-1 flex items-center justify-center">
                 <div className="relative inline-block pointer-events-none">
                   <span ref={burnedNumberRef} className="text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                    {formatValue(String(stats.totalBurned), 2)}
+                    {formatValue(stats.totalBurned, 2)}
                   </span>
                   <span className="absolute left-full top-1/2 transform -translate-y-1/2 ml-1">
-                    <span className="text-sm font-medium text-red-600 dark:text-[#ff3b30] bg-red-100 dark:bg-red-950/40 px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(255,59,48,0.3)] border border-red-200 dark:border-red-900/50 whitespace-nowrap">
-                      {burnedPct.toFixed(2)}%
-                    </span>
+                    {burnedPct === null ? (
+                      <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">N/A</span>
+                    ) : (
+                      <span className="text-sm font-medium text-red-600 dark:text-[#ff3b30] bg-red-100 dark:bg-red-950/40 px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(255,59,48,0.3)] border border-red-200 dark:border-red-900/50 whitespace-nowrap">
+                        {burnedPct.toFixed(2)}%
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -367,7 +397,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                             <ChainIcon network={network} alt={network} />
                             <div className="text-base font-medium text-gray-900 dark:text-white">{d.name}</div>
                           </div>
-                          <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]">{formatUsd(d.value || 0)}</div>
+                          <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]">{formatUsd(toFiniteNumberOrNull(d.value), 0)}</div>
                         </div>
                       );
                     })}
@@ -407,7 +437,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                           <ChainIcon network="blockchain" alt="" />
                           <div className={`${LAYOUT.verifiedText} text-gray-900 dark:text-white`}>Verified by <a href={privateEntry.verifiedBy.href} target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline dark:text-cyan-400">{privateEntry.verifiedBy.label}</a></div>
                         </div>
-                        <div className={`${LAYOUT.valueText} font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]`}>{formatUsd(privateEntry.value, 0)}</div>
+                        <div className={`${LAYOUT.valueText} font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]`}>{formatUsd(tvlPrivateVal, 0)}</div>
                       </div>
 
                     {Object.entries(poolsByType).map(([type, items]) => (
@@ -420,7 +450,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                                     <ChainIcon network={p.network} alt={p.network} />
                                     <div className="text-base font-medium text-gray-900 dark:text-white">{p.name}</div>
                                   </div>
-                                  <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]">{formatUsd(p.value || 0)}</div>
+                                  <div className="text-base font-mono font-bold text-gray-900 dark:text-white drop-shadow-[0_0_5px_rgba(255,59,48,0.6)]">{formatUsd(toFiniteNumberOrNull(p.value), 0)}</div>
                                 </div>
                               ))}
                             </div>

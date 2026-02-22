@@ -79,7 +79,7 @@ export async function fetchTokenBurnStats(): Promise<TokenBurnStats> {
   } catch (error) {
     console.error('[tokenBurnService] Error fetching token burn stats:', error);
     return {
-      totalBurned: '0',
+      totalBurned: null,
       burnAddresses: [],
       lastUpdated: Date.now(),
     };
