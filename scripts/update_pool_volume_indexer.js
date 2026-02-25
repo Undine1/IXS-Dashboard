@@ -205,6 +205,16 @@ function classifyIndexerError(j) {
   return 'INDEXER_ERROR';
 }
 
+function isIndexerRateLimitedResponse(j) {
+  const txt = indexerErrorText(j).toLowerCase();
+  return (
+    txt.includes('rate limit') ||
+    txt.includes('max calls per sec') ||
+    txt.includes('too many requests') ||
+    txt.includes('429')
+  );
+}
+
 function classifyRpcErrorMessage(message) {
   const txt = String(message || '').toLowerCase();
   if (txt.includes('limit') || txt.includes('rate')) return 'RPC_RATE_LIMIT';
@@ -221,9 +231,10 @@ function makeIndexerError(context, payload, indexer) {
 }
 
 async function fetchIndexerJsonWithBodyRetries(url, context) {
-  const maxAttempts = Number(process.env.INDEXER_BODY_MAX_ATTEMPTS || 3);
+  const maxAttempts = Number(process.env.INDEXER_BODY_MAX_ATTEMPTS || 5);
   const baseDelay = Number(process.env.API_BASE_DELAY_MS || 500); // ms
   const maxDelay = Number(process.env.API_MAX_DELAY_MS || 30000); // ms
+  const rateLimitMinDelay = Number(process.env.INDEXER_RATE_LIMIT_MIN_DELAY_MS || 1200); // ms
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const j = await fetchJson(url);
@@ -231,7 +242,10 @@ async function fetchIndexerJsonWithBodyRetries(url, context) {
     if (code === 'TRANSIENT_INDEXER_ERROR' && attempt < maxAttempts) {
       retryCount += 1;
       const exp = Math.min(maxDelay, baseDelay * Math.pow(2, attempt - 1));
-      const waitMs = Math.floor(Math.random() * exp);
+      let waitMs = Math.floor(Math.random() * exp);
+      if (isIndexerRateLimitedResponse(j)) {
+        waitMs = Math.max(waitMs, rateLimitMinDelay);
+      }
       console.warn(`${context} returned transient error; attempt ${attempt}/${maxAttempts}, retrying after ${waitMs}ms`);
       await new Promise((r) => setTimeout(r, waitMs));
       continue;
