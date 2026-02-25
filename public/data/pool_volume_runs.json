@@ -1465,5 +1465,15 @@
     "totalUsdc": 0,
     "source": "rpc-fallback",
     "ts": "2026-02-25T19:39:25.041Z"
+  },
+  {
+    "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
+    "startTs": 1772048330,
+    "endTs": 1772050004,
+    "startBlock": 42629491,
+    "endBlock": 42630327,
+    "totalUsdc": 0,
+    "source": "indexer",
+    "ts": "2026-02-25T20:06:45.293Z"
   }
 ]
