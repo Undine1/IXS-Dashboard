@@ -269,6 +269,7 @@ async function getBlockByTimestamp(ts, chain = DEFAULT_CHAIN, chainid = CHAIN_ID
   const maxSkewSteps = Math.max(0, Number(process.env.BLOCK_BY_TIME_MAX_SKEW_STEPS || 4));
   const skewStepSeconds = Math.max(1, Number(process.env.BLOCK_BY_TIME_SKEW_SECONDS || 30));
   let queryTs = Math.floor(Number(ts));
+  let sawNoClosest = false;
 
   for (let step = 0; step <= maxSkewSteps; step++) {
     const url = buildIndexerUrl(indexer, {
@@ -286,9 +287,12 @@ async function getBlockByTimestamp(ts, chain = DEFAULT_CHAIN, chainid = CHAIN_ID
 
     // Some indexers lag head time briefly and return "No closest block found".
     // Retry using an earlier timestamp before failing the whole pool.
-    if (isNoClosestBlockFoundResponse(j) && step < maxSkewSteps) {
-      queryTs = Math.max(0, queryTs - skewStepSeconds);
-      continue;
+    if (isNoClosestBlockFoundResponse(j)) {
+      sawNoClosest = true;
+      if (step < maxSkewSteps) {
+        queryTs = Math.max(0, queryTs - skewStepSeconds);
+        continue;
+      }
     }
 
     if (j.status !== '1') {
@@ -298,6 +302,11 @@ async function getBlockByTimestamp(ts, chain = DEFAULT_CHAIN, chainid = CHAIN_ID
     const err = makeIndexerError(`Invalid block number for timestamp ${queryTs}`, j, indexer);
     err.code = 'INVALID_BLOCK_NUMBER';
     throw err;
+  }
+
+  if (sawNoClosest && getRpcUrlsForChain(chain).length > 0) {
+    console.warn(`Falling back to RPC for getBlockByTimestamp chain=${chain} ts=${ts}`);
+    return getBlockByTimestampRpc(ts, chain);
   }
 
   throw new Error(`Unreachable: exhausted timestamp skew retries for ts=${ts}`);
@@ -676,10 +685,16 @@ async function main() {
         console.log('Block range', startBlock, endBlock);
         totalUsdc = await sumTokenTransfersViaIndexer(startBlock, endBlock, pairAddr, usdcAddr, chain, chainid);
       } catch (idxErr) {
-        if (idxErr && idxErr.code === 'CHAIN_PLAN_RESTRICTED') {
+        const recoverableCodes = new Set([
+          'CHAIN_PLAN_RESTRICTED',
+          'INVALID_BLOCK_NUMBER',
+          'INVALID_BLOCK_RANGE',
+          'TRANSIENT_INDEXER_ERROR',
+        ]);
+        if (idxErr && recoverableCodes.has(idxErr.code) && getRpcUrlsForChain(chain).length > 0) {
           source = 'rpc-fallback';
           appendAlertReason(
-            `indexer-fallback-rpc: pool=${addr} chain=${chain} reason=${(idxErr && idxErr.message) || 'CHAIN_PLAN_RESTRICTED'}`
+            `indexer-fallback-rpc: pool=${addr} chain=${chain} code=${idxErr.code} reason=${(idxErr && idxErr.message) || idxErr.code}`
           );
           startBlock = await getBlockByTimestampRpc(startTs, chain);
           endBlock = await getBlockByTimestampRpc(endTs, chain);
