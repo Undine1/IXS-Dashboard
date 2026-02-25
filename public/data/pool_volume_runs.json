@@ -1475,5 +1475,15 @@
     "totalUsdc": 0,
     "source": "indexer",
     "ts": "2026-02-25T20:06:45.293Z"
+  },
+  {
+    "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
+    "startTs": 1772050004,
+    "endTs": 1772050196,
+    "startBlock": 42630328,
+    "endBlock": 42630421,
+    "totalUsdc": 17.716904,
+    "source": "indexer",
+    "ts": "2026-02-25T20:09:57.102Z"
   }
 ]
