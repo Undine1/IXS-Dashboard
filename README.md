@@ -8,7 +8,7 @@ A production-ready analytics dashboard that tracks IXS token burns and Total Val
 - App entry: [app/page.tsx](app/page.tsx)
 - APIs: [app/api/pools/route.ts](app/api/pools/route.ts), [app/api/burnStats/route.ts](app/api/burnStats/route.ts)
 - Components: [components/BurnStats.tsx](components/BurnStats.tsx), [components/TransactionList.tsx](components/TransactionList.tsx)
-- Scripts: `scripts/update_pool_volume_indexer.js`, `scripts/update_pool_volume_rpc.js`
+- Scripts: `scripts/update_pool_volume_indexer.js`
 - Data outputs: `public/data/pool_volume.json`, `public/data/pool_volume_checkpoint.json`, `public/data/pool_volume_runs.json`, `public/data/pool_volume_alert.json`
 - CI workflow: `.github/workflows/update-pool-volume.yml`
 
@@ -29,14 +29,17 @@ A production-ready analytics dashboard that tracks IXS token burns and Total Val
 - `lib/` — on-chain helpers, token/burn services, TVL config loader and utils
 - `scripts/` — updater scripts
   - `update_pool_volume_indexer.js` — indexer-based incremental updater (Etherscan v2 compatible), resilient (exponential backoff, deterministic per-pool jitter), writes `public/data/pool_volume*.json` and `public/data/pool_volume_alert.json` on failure
-  - `update_pool_volume_rpc.js` - compatibility entrypoint that delegates to `update_pool_volume_indexer.js`
 - `public/data/` — computed artifacts persisted by CI scripts (consumed by the front-end)
 - `.github/workflows/` — CI workflows; `update-pool-volume.yml` runs the updater and commits outputs
 
 ## Environment variables
 Create a `.env.local` in the project root (do not commit). Key variables used by the project and CI scripts:
 - `ALCHEMY_API_KEY` — (optional) used by provider-based RPC endpoints if configured
-- `ETHERSCAN_API_KEY` — required by indexer-based updater (Etherscan-compatible indexer)
+- `ETHERSCAN_API_KEY` — default key for indexer-based updater (Etherscan-compatible indexer)
+- `POLYGONSCAN_API_KEY` — (optional) Polygon-native explorer key for pool updater
+- `BASESCAN_API_KEY` — (optional) Base-native explorer key for pool updater
+- `BASE_RPC` / `BASE_RPC_LIST` — (optional) Base JSON-RPC endpoint(s) for fallback log scanning
+- `POLYGON_RPC` / `POLYGON_RPC_LIST` — (optional) Polygon JSON-RPC endpoint(s) for fallback log scanning
 - `GH_PAT` — (CI only) personal access token used by the workflow to push generated artifacts back to the repo
 - `POLYGON_USDC` - optional override of the default tracked USDC token address for updater jobs
 
@@ -57,7 +60,6 @@ npm run dev
 ```bash
 cd scripts
 node update_pool_volume_indexer.js  # primary updater (recommended)
-node update_pool_volume_rpc.js      # compatibility alias to the indexer updater
 ```
 
 Notes: The scripts write to `public/data/` — running them locally will overwrite those files and they will be served by the dev server.
@@ -68,7 +70,7 @@ Notes: The scripts write to `public/data/` — running them locally will overwri
 
 ## Updater behavior and resilience
 - Indexer script uses exponential backoff with full jitter, honors `Retry-After`, and writes an alert file `public/data/pool_volume_alert.json` when retry budget is exhausted.
-- The compatibility `update_pool_volume_rpc.js` script delegates to the indexer updater so legacy command usage still works.
+- If indexer access is plan-restricted for a chain, the updater automatically falls back to chain RPC (`eth_getLogs`) when RPC endpoints are available.
 - The updater maintains per-pool checkpoints in `public/data/pool_volume_checkpoint.json` so runs can resume without re-scanning completed ranges.
 
 ## CI / GitHub Actions

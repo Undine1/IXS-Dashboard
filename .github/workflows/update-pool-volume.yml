@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  VERCEL_CLI_VERSION: '50.23.2'
+
 jobs:
   update:
     name: Run updater and commit
@@ -43,9 +46,15 @@ jobs:
         env:
           POLYGON_RPC: ${{ secrets.POLYGON_RPC }}
           POLYGON_RPC_LIST: ${{ secrets.POLYGON_RPC_LIST }}
+          BASE_RPC: ${{ secrets.BASE_RPC }}
+          BASE_RPC_LIST: ${{ secrets.BASE_RPC_LIST }}
           POLYGON_USDC: ${{ secrets.POLYGON_USDC }}
           # Use ETHERSCAN_API_KEY secret for indexer API access
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          # Optional chain-native explorer keys. If set, updater can bypass
+          # Etherscan cross-chain plan limits for Polygon/Base.
+          POLYGONSCAN_API_KEY: ${{ secrets.POLYGONSCAN_API_KEY }}
+          BASESCAN_API_KEY: ${{ secrets.BASESCAN_API_KEY }}
           BLOCKS_PER_DAY: ${{ env.BLOCKS_PER_DAY }}
           LOG_CHUNK: '200'
           MAX_FETCH_PASSES: '2'
@@ -79,20 +88,11 @@ jobs:
         run: |
           node -e "const fs=require('fs'); const p='public/data/pool_volume_alert.json'; const maxCalls=Number(process.env.ALERT_INDEXER_CALLS||'50'); const maxProvider=Number(process.env.ALERT_PROVIDER_BANS||'1'); if(!fs.existsSync(p)){console.log('No alert file, continuing'); process.exit(0);} const a=JSON.parse(fs.readFileSync(p)); const apiCalls=Number(a.apiCallCount||0); const reasons=Array.isArray(a.reasons)?a.reasons.map(String):[]; const providerSignals=reasons.filter((r)=>/request-failed|429|throttle|ban|forbidden|invalid-address/i.test(r)).length; const overCalls=apiCalls>maxCalls; const overProvider=providerSignals>maxProvider; if(a.alert||overCalls||overProvider){ console.error('Run alert triggered',{alert:a.alert,apiCalls,maxCalls,providerSignals,maxProvider,reasons}); process.exit(1);} console.log('No alerts',{apiCalls,providerSignals,maxCalls,maxProvider});"
 
-      - name: Preinstall Vercel CLI (with legacy peer deps)
-        run: |
-          npm config set legacy-peer-deps true
-          npm i -g vercel@50.17.1 --legacy-peer-deps
-        shell: bash
-
       - name: Deploy to Vercel (no commit)
-        uses: amondnet/vercel-action@v20
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-args: '--prod --confirm'
-          working-directory: .
+        run: npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy --prod --yes --token "$VERCEL_TOKEN"
         env:
-          # Ensure npm resolves peer deps permissively when the action installs the vercel CLI
-          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+          NPM_CONFIG_USERCONFIG: /dev/null
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
