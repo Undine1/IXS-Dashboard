@@ -195,6 +195,9 @@ function classifyIndexerError(j) {
   if (txt.includes('free api access is not supported for this chain')) return 'CHAIN_PLAN_RESTRICTED';
   if (txt.includes('invalid api key')) return 'INVALID_API_KEY';
   if (txt.includes('max rate limit')) return 'TRANSIENT_INDEXER_ERROR';
+  if (txt.includes('rate limit')) return 'TRANSIENT_INDEXER_ERROR';
+  if (txt.includes('max calls per sec')) return 'TRANSIENT_INDEXER_ERROR';
+  if (txt.includes('too many requests')) return 'TRANSIENT_INDEXER_ERROR';
   if (txt.includes('unexpected exception')) return 'TRANSIENT_INDEXER_ERROR';
   if (txt.includes('query timeout')) return 'TRANSIENT_INDEXER_ERROR';
   if (txt.includes('temporarily unavailable')) return 'TRANSIENT_INDEXER_ERROR';
