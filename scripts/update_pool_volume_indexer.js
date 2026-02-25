@@ -175,6 +175,21 @@ function indexerErrorText(j) {
   return parts.join(' ').trim();
 }
 
+function isNoClosestBlockFoundResponse(j) {
+  const txt = indexerErrorText(j).toLowerCase();
+  return txt.includes('no closest block found');
+}
+
+function isNoTransfersFoundResponse(j) {
+  if (!j || j.status !== '0') return false;
+  const msg = String(j.message || '').toLowerCase();
+  const resultTxt = typeof j.result === 'string' ? j.result.toLowerCase() : '';
+  const hasEmptyResultArray = Array.isArray(j.result) && j.result.length === 0;
+  if (msg.includes('no transactions found') || resultTxt.includes('no transactions found')) return true;
+  if (msg.includes('no token transfers found') || resultTxt.includes('no token transfers found')) return true;
+  return hasEmptyResultArray && (msg.includes('no ') || resultTxt.includes('no '));
+}
+
 function classifyIndexerError(j) {
   const txt = indexerErrorText(j).toLowerCase();
   if (txt.includes('free api access is not supported for this chain')) return 'CHAIN_PLAN_RESTRICTED';
@@ -234,23 +249,41 @@ function parseBlockNumberResult(result) {
 
 async function getBlockByTimestamp(ts, chain = DEFAULT_CHAIN, chainid = CHAIN_IDS.polygon) {
   const indexer = getIndexerConfig(chain, chainid);
-  const url = buildIndexerUrl(indexer, {
-    module: 'block',
-    action: 'getblocknobytime',
-    timestamp: String(ts),
-    closest: 'before',
-  });
-  const j = await fetchIndexerJsonWithBodyRetries(url, 'getblocknobytime');
-  if (j.status !== '1') {
-    throw makeIndexerError('Failed to get block by time', j, indexer);
-  }
-  const block = parseBlockNumberResult(j.result);
-  if (!Number.isFinite(block) || block < 0) {
-    const err = makeIndexerError(`Invalid block number for timestamp ${ts}`, j, indexer);
+  const maxSkewSteps = Math.max(0, Number(process.env.BLOCK_BY_TIME_MAX_SKEW_STEPS || 4));
+  const skewStepSeconds = Math.max(1, Number(process.env.BLOCK_BY_TIME_SKEW_SECONDS || 30));
+  let queryTs = Math.floor(Number(ts));
+
+  for (let step = 0; step <= maxSkewSteps; step++) {
+    const url = buildIndexerUrl(indexer, {
+      module: 'block',
+      action: 'getblocknobytime',
+      timestamp: String(Math.max(0, queryTs)),
+      closest: 'before',
+    });
+    const j = await fetchIndexerJsonWithBodyRetries(url, 'getblocknobytime');
+
+    if (j.status === '1') {
+      const block = parseBlockNumberResult(j.result);
+      if (Number.isFinite(block) && block >= 0) return Math.floor(block);
+    }
+
+    // Some indexers lag head time briefly and return "No closest block found".
+    // Retry using an earlier timestamp before failing the whole pool.
+    if (isNoClosestBlockFoundResponse(j) && step < maxSkewSteps) {
+      queryTs = Math.max(0, queryTs - skewStepSeconds);
+      continue;
+    }
+
+    if (j.status !== '1') {
+      throw makeIndexerError('Failed to get block by time', j, indexer);
+    }
+
+    const err = makeIndexerError(`Invalid block number for timestamp ${queryTs}`, j, indexer);
     err.code = 'INVALID_BLOCK_NUMBER';
     throw err;
   }
-  return Math.floor(block);
+
+  throw new Error(`Unreachable: exhausted timestamp skew retries for ts=${ts}`);
 }
 
 async function fetchTokenTxs(startBlock, endBlock, pairAddr, usdcAddr, chain = DEFAULT_CHAIN, chainid = CHAIN_IDS.polygon, page = 1, offset = 1000) {
@@ -272,7 +305,7 @@ async function fetchTokenTxs(startBlock, endBlock, pairAddr, usdcAddr, chain = D
     sort: 'asc',
   });
   const j = await fetchIndexerJsonWithBodyRetries(url, 'tokentx');
-  if (j.status === '0' && j.message === 'No transactions found') return [];
+  if (isNoTransfersFoundResponse(j)) return [];
   if (j.status !== '1') throw makeIndexerError('tokentx error', j, indexer);
   if (!Array.isArray(j.result)) return [];
   return j.result;
