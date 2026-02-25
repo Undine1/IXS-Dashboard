@@ -48,6 +48,8 @@ jobs:
           POLYGON_RPC_LIST: ${{ secrets.POLYGON_RPC_LIST }}
           BASE_RPC: ${{ secrets.BASE_RPC }}
           BASE_RPC_LIST: ${{ secrets.BASE_RPC_LIST }}
+          # Route Base indexer calls to Blockscout's Etherscan-compatible API.
+          BASESCAN_API_BASE_URL: https://base.blockscout.com/api
           POLYGON_USDC: ${{ secrets.POLYGON_USDC }}
           # Use ETHERSCAN_API_KEY secret for indexer API access
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}

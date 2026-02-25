@@ -38,6 +38,7 @@ Create a `.env.local` in the project root (do not commit). Key variables used by
 - `ETHERSCAN_API_KEY` — default key for indexer-based updater (Etherscan-compatible indexer)
 - `POLYGONSCAN_API_KEY` — (optional) Polygon-native explorer key for pool updater
 - `BASESCAN_API_KEY` — (optional) Base-native explorer key for pool updater
+- `BASESCAN_API_BASE_URL` — (recommended for Base) set to `https://base.blockscout.com/api` to use Blockscout's RPC-compatible API for `module/action` calls
 - `BASE_RPC` / `BASE_RPC_LIST` — (optional) Base JSON-RPC endpoint(s) for fallback log scanning
 - `POLYGON_RPC` / `POLYGON_RPC_LIST` — (optional) Polygon JSON-RPC endpoint(s) for fallback log scanning
 - `GH_PAT` — (CI only) personal access token used by the workflow to push generated artifacts back to the repo

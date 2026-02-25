@@ -20,6 +20,7 @@ Configuration
 - Optional per-chain keys:
   - `POLYGONSCAN_API_KEY` for Polygon-native explorer access.
   - `BASESCAN_API_KEY` for Base-native explorer access.
+  - `BASESCAN_API_BASE_URL` (recommended for Base) set to `https://base.blockscout.com/api` to use Blockscout's RPC-compatible `module/action` API.
   - These help avoid Etherscan V2 cross-chain plan restrictions.
 - Optional RPC fallbacks:
   - `BASE_RPC` / `BASE_RPC_LIST` for Base RPC log-scanning fallback.
