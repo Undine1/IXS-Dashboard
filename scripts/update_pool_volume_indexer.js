@@ -293,6 +293,10 @@ async function getBlockByTimestamp(ts, chain = DEFAULT_CHAIN, chainid = CHAIN_ID
         queryTs = Math.max(0, queryTs - skewStepSeconds);
         continue;
       }
+      if (getRpcUrlsForChain(chain).length > 0) {
+        // Break and use RPC lookup instead of throwing away the whole pool.
+        break;
+      }
     }
 
     if (j.status !== '1') {
@@ -662,7 +666,7 @@ async function main() {
       // validate addresses before making API calls
       if (!isValidAddress(usdcAddr) || !isValidAddress(pairAddr)) {
         console.warn(`Skipping ${addr}: invalid address format (usdc=${usdcAddr}, pair=${pairAddr})`);
-        appendAlertReason(`invalid-address: ${addr} usdc=${usdcAddr} pair=${pairAddr}`);
+        appendAlertReason(`invalid-address: ${addr} usdc=${usdcAddr} pair=${pairAddr}`, true);
         // save checkpoint to avoid reprocessing this bad entry repeatedly
         checkpoint[addr] = { lastTimestamp: endTs || now, lastBlock: null };
         if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
@@ -736,7 +740,7 @@ async function main() {
         const keyHint = CHAIN_SCAN_KEY_ENVS[chain] || 'ETHERSCAN_API_KEY';
         const reason = `unsupported-chain-plan: pool=${addr} chain=${chain}; configure ${keyHint} or upgrade ETHERSCAN_API_KEY`;
         console.warn(reason);
-        appendAlertReason(reason);
+        appendAlertReason(reason, true);
         // preserve a stable start point so successful future runs can backfill.
         if (!checkpoint[addr] && Number.isFinite(startTs)) {
           checkpoint[addr] = { lastTimestamp: startTs, lastBlock: null };
@@ -745,7 +749,8 @@ async function main() {
         continue;
       }
       appendAlertReason(
-        `pool-error: pool=${addr} chain=${chain} code=${(e && e.code) || 'unknown'} msg=${(e && e.message) || String(e)}`
+        `pool-error: pool=${addr} chain=${chain} code=${(e && e.code) || 'unknown'} msg=${(e && e.message) || String(e)}`,
+        true
       );
       console.error('Error processing', rawAddr, e);
       // if retries were exhausted earlier, the alert file should already exist.
