@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
+import { PRIVATE_ENTRY } from '@/lib/tvlConfig';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -89,6 +92,19 @@ function computeTvlUsd(pools: PoolsApiResponse): number {
   return Number(total.toFixed(2));
 }
 
+function readPrivateTvlValue(): number {
+  try {
+    const tvlConfigPath = path.join(process.cwd(), 'public', 'data', 'tvlConfig.json');
+    const raw = fs.readFileSync(tvlConfigPath, 'utf8');
+    const parsed = JSON.parse(raw) as { privateEntry?: { value?: number | string | null } };
+    const value = parseFiniteNumber(parsed?.privateEntry?.value, Number(PRIVATE_ENTRY.value ?? 0));
+    return value > 0 ? value : 0;
+  } catch {
+    const fallback = Number(PRIVATE_ENTRY.value ?? 0);
+    return Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
+  }
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
@@ -113,7 +129,7 @@ export async function GET(req: Request) {
     const poolsJson = (await poolsRes.json()) as PoolsApiResponse;
     const burnJson = (await burnRes.json()) as BurnStatsApiResponse;
 
-    const tvl_usd = computeTvlUsd(poolsJson);
+    const tvl_usd = Number((computeTvlUsd(poolsJson) + readPrivateTvlValue()).toFixed(2));
     const total_tokens_burned = computeTotalTokensBurned(burnJson, parseTokenDecimals());
     const total_supply = parseTotalSupply();
     const circulating_supply = Math.max(0, total_supply - total_tokens_burned);
