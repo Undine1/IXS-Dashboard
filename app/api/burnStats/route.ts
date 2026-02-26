@@ -128,7 +128,7 @@ async function fetchBalancesForNetwork(
   return balances;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     // Validate API key exists (on server side only)
     if (!ALCHEMY_API_KEY) {
@@ -140,7 +140,9 @@ export async function GET() {
     }
 
     const now = Date.now();
-    if (cachedData && (now - lastFetchTime) < CACHE_DURATION) {
+    const url = new URL(req.url);
+    const forceFresh = url.searchParams.get('fresh') === '1' || url.searchParams.get('fresh') === 'true';
+    if (!forceFresh && cachedData && (now - lastFetchTime) < CACHE_DURATION) {
       console.log('[burnStats API] Returning cached data');
       return NextResponse.json(cachedData);
     }
