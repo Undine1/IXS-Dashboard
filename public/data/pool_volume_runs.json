@@ -2525,5 +2525,25 @@
     "totalUsdc": 0,
     "source": "indexer",
     "ts": "2026-02-27T18:10:34.218Z"
+  },
+  {
+    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
+    "startTs": 1772215735,
+    "endTs": 1772219590,
+    "startBlock": 83547852,
+    "endBlock": 83549764,
+    "totalUsdc": 0,
+    "source": "indexer",
+    "ts": "2026-02-27T19:13:12.904Z"
+  },
+  {
+    "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
+    "startTs": 1772215833,
+    "endTs": 1772219690,
+    "startBlock": 42713243,
+    "endBlock": 42715166,
+    "totalUsdc": 0,
+    "source": "indexer",
+    "ts": "2026-02-27T19:14:51.426Z"
   }
 ]
