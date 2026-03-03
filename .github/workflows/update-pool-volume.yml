@@ -62,6 +62,7 @@ jobs:
           MAX_FETCH_PASSES: '2'
           MAX_CHUNK_TIME_MS: '5000'
           WINDOW_SECONDS: '3600'
+          MAX_JITTER: '8'
         run: node ./scripts/update_pool_volume_indexer.js
 
       - name: Commit updated data files
