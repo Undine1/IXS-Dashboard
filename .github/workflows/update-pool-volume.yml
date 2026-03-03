@@ -71,7 +71,28 @@ jobs:
           if git status --porcelain | grep -q "public/data/pool_volume.json\|public/data/pool_volume_runs.json\|public/data/pool_volume_checkpoint.json"; then
             git add public/data/pool_volume.json public/data/pool_volume_runs.json public/data/pool_volume_checkpoint.json || true
             git commit -m "data: update pool volume from indexer updater [skip ci]" || echo "No changes to commit"
-            git push
+            branch="${GITHUB_REF_NAME:-main}"
+            max_attempts=5
+            for attempt in $(seq 1 "$max_attempts"); do
+              if git push origin "HEAD:${branch}"; then
+                echo "Push succeeded on attempt ${attempt}"
+                break
+              fi
+
+              if [ "$attempt" -eq "$max_attempts" ]; then
+                echo "::error::Push failed after ${max_attempts} attempts"
+                exit 1
+              fi
+
+              echo "Push failed on attempt ${attempt}; rebasing and retrying..."
+              sleep $((attempt * 5))
+              git fetch origin "${branch}"
+              git rebase "origin/${branch}" || {
+                git rebase --abort || true
+                echo "::warning::Rebase failed while retrying push"
+                exit 1
+              }
+            done
           else
             echo "No data changes"
           fi
