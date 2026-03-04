@@ -8,6 +8,7 @@ import { Pool, PoolsApiResponse, TokenBurnStats } from '@/types';
 export default function Dashboard() {
   const [burnStats, setBurnStats] = useState<TokenBurnStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [pools, setPools] = useState<Pool[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
 
@@ -44,15 +45,41 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    if (!loading) return;
+
+    const interval = setInterval(() => {
+      setLoadingProgress((previous) => {
+        if (previous >= 92) return previous;
+        if (previous < 40) return previous + 6;
+        if (previous < 70) return previous + 3;
+        return previous + 1;
+      });
+    }, 180);
+
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  useEffect(() => {
     const loadData = async () => {
       setLoading(true);
+      setLoadingProgress(8);
       try {
         // Fetch burn stats and pools in parallel so the page stays in
         // "Loading statistics..." until both are available.
-        const burnsPromise = fetchTokenBurnStatsFromAPI();
+        const burnsPromise = fetchTokenBurnStatsFromAPI().then((result) => {
+          setLoadingProgress((previous) => Math.max(previous, 58));
+          return result;
+        });
         const poolsPromise: Promise<PoolsApiResponse | null> = fetch('/api/pools')
           .then(async (r) => (r.ok ? ((await r.json()) as PoolsApiResponse) : null))
-          .catch(() => null);
+          .then((result) => {
+            setLoadingProgress((previous) => Math.max(previous, 82));
+            return result;
+          })
+          .catch(() => {
+            setLoadingProgress((previous) => Math.max(previous, 82));
+            return null;
+          });
 
         const [burnsResult, poolsResult] = await Promise.all([burnsPromise, poolsPromise]);
 
@@ -72,6 +99,8 @@ export default function Dashboard() {
         setPools([]);
         setWarnings([]);
       } finally {
+        setLoadingProgress(100);
+        await new Promise((resolve) => setTimeout(resolve, 140));
         setLoading(false);
       }
     };
@@ -124,8 +153,19 @@ export default function Dashboard() {
         </div>
 
         {loading ? (
-          <div className="p-8 bg-white dark:bg-gray-800 rounded-lg shadow text-center">
-            <p className="text-gray-600 dark:text-gray-400">Loading statistics...</p>
+          <div className="py-8 md:py-10">
+            <div className="mx-auto w-full max-w-2xl">
+              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                <span>Updating Statistics</span>
+                <span>{Math.round(loadingProgress)}%</span>
+              </div>
+              <div className="mt-3 h-4 w-full rounded-md border border-slate-300/90 bg-transparent p-0.5 dark:border-slate-600/90">
+                <div
+                  className="h-full rounded-sm bg-slate-700 transition-[width] duration-200 ease-out dark:bg-slate-200"
+                  style={{ width: `${Math.max(0, Math.min(100, loadingProgress))}%` }}
+                />
+              </div>
+            </div>
           </div>
         ) : burnStats && burnStats.burnAddresses.length > 0 ? (
           <BurnStats stats={burnStats} tokenSymbol={process.env.NEXT_PUBLIC_TOKEN_SYMBOL} pools={pools} warnings={warnings} />
