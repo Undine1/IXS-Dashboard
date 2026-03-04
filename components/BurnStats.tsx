@@ -89,14 +89,7 @@ interface CollapsiblePanelProps {
 }
 
 function ChainIcon({ network, alt }: ChainIconProps) {
-  const prefersSvg = network === 'blockchain';
-  const primarySrc = prefersSvg ? `/images/chains/${network}.svg` : `/images/chains/${network}.png`;
-  const fallbackSrc = prefersSvg ? `/images/chains/${network}.png` : `/images/chains/${network}.svg`;
-  const [src, setSrc] = useState(primarySrc);
-
-  useEffect(() => {
-    setSrc(primarySrc);
-  }, [primarySrc]);
+  const src = `/images/chains/${network}.png`;
 
   return (
     <Image
@@ -105,9 +98,6 @@ function ChainIcon({ network, alt }: ChainIconProps) {
       width={20}
       height={20}
       className="w-5 h-5 object-contain"
-      onError={() => {
-        setSrc((current) => (current === fallbackSrc ? current : fallbackSrc));
-      }}
     />
   );
 }
@@ -710,28 +700,36 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                         <div className="text-xs text-yellow-700 bg-yellow-100/90 px-2 py-1 rounded border border-yellow-200 text-right dark:text-yellow-300 dark:bg-yellow-950/35 dark:border-yellow-800/60">{warnings.length} warning(s)</div>
                       )}
 
-                      <div className={insetListClass}>
-                        <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-300 text-center border-b border-gray-100 dark:border-slate-700/70">Private</div>
-                        <div className={insetRowClass}>
-                          <div className={`flex items-center ${LAYOUT.itemGap}`}>
-                            <ChainIcon network="blockchain" alt="" />
-                            <div className="text-sm text-gray-900 dark:text-white">Verified by <a href={privateEntry.verifiedBy.href} target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline dark:text-cyan-400">{privateEntry.verifiedBy.label}</a></div>
+                      <div className="space-y-3">
+                        <div className="py-1 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-300">
+                          Private
+                        </div>
+                        <div className={insetListClass}>
+                          <div className={insetRowClass}>
+                            <div className={`flex items-center ${LAYOUT.itemGap}`}>
+                              <ChainIcon network="blockchain" alt="" />
+                              <div className="text-sm text-gray-900 dark:text-white">Verified by <a href={privateEntry.verifiedBy.href} target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline dark:text-cyan-400">{privateEntry.verifiedBy.label}</a></div>
+                            </div>
+                            <div className="text-sm font-mono font-bold text-gray-900 dark:text-white">{formatUsd(tvlPrivateVal, 0)}</div>
                           </div>
-                          <div className="text-sm font-mono font-bold text-gray-900 dark:text-white">{formatUsd(tvlPrivateVal, 0)}</div>
                         </div>
 
-                        {Object.entries(poolsByType).map(([type, items], sectionIndex) => (
-                          <div key={type}>
-                            <div className={`px-3 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-300 text-center border-b border-gray-100 dark:border-slate-700/70 ${sectionIndex > 0 ? 'border-t' : ''}`}>{TYPE_LABELS[type] || type}</div>
-                            {items.map((p, i) => (
-                              <div key={`${p.network}-${p.name}-${i}`} className={insetRowClass}>
-                                <div className={`flex items-center ${LAYOUT.itemGap}`}>
-                                  <ChainIcon network={p.network} alt={p.network} />
-                                  <div className="text-sm font-medium text-gray-900 dark:text-white">{p.name}</div>
+                        {Object.entries(poolsByType).map(([type, items]) => (
+                          <div key={type} className="space-y-2">
+                            <div className="py-1 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-300">
+                              {TYPE_LABELS[type] || type}
+                            </div>
+                            <div className={insetListClass}>
+                              {items.map((p, i) => (
+                                <div key={`${p.network}-${p.name}-${i}`} className={insetRowClass}>
+                                  <div className={`flex items-center ${LAYOUT.itemGap}`}>
+                                    <ChainIcon network={p.network} alt={p.network} />
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{p.name}</div>
+                                  </div>
+                                  <div className="text-sm font-mono font-bold text-gray-900 dark:text-white">{formatUsd(toFiniteNumberOrNull(p.value), 0)}</div>
                                 </div>
-                                <div className="text-sm font-mono font-bold text-gray-900 dark:text-white">{formatUsd(toFiniteNumberOrNull(p.value), 0)}</div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -778,7 +776,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                         </div>
                       ) : null}
 
-                      <div className="grid grid-cols-[56px_120px_minmax(0,1fr)_22px] sm:grid-cols-[60px_140px_minmax(0,1fr)_22px] gap-3 rounded-xl border border-gray-200/80 bg-gray-50/80 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:border-slate-700/70 dark:bg-slate-900/60 dark:text-gray-300">
+                      <div className="grid grid-cols-[56px_120px_minmax(0,1fr)_22px] sm:grid-cols-[60px_140px_minmax(0,1fr)_22px] gap-3 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-300">
                         <span>rank</span>
                         <span>Address</span>
                         <span className="text-right">Tokens</span>
@@ -822,7 +820,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                       </div>
 
                       <label className="block">
-                        <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
+                        <span className="mb-1 block text-center text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-300">
                           Search Address
                         </span>
                         <input
