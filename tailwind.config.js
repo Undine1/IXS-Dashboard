@@ -12,8 +12,8 @@ module.exports = {
         foreground: "var(--foreground)",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)"],
-        mono: ["var(--font-geist-mono)"],
+        sans: ["Arial", "Helvetica", "sans-serif"],
+        mono: ["Arial", "Helvetica", "sans-serif"],
       },
     },
   },

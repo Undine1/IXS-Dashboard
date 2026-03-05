@@ -363,6 +363,8 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   const supplyTitleRef = useRef<HTMLParagraphElement | null>(null);
   const supplyTitleTextRef = useRef<HTMLSpanElement | null>(null);
   const [supplyCheckLeft, setSupplyCheckLeft] = useState<string | null>(null);
+  const holderTableRef = useRef<HTMLDivElement | null>(null);
+  const [holderScrollbarWidth, setHolderScrollbarWidth] = useState<number>(0);
 
   useLayoutEffect(() => {
     function positionCheck() {
@@ -380,6 +382,29 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
     window.addEventListener('resize', positionCheck);
     return () => window.removeEventListener('resize', positionCheck);
   }, [stats?.totalBurned, newMaxSupply]);
+
+  useLayoutEffect(() => {
+    function syncHolderHeaderWidth() {
+      window.requestAnimationFrame(() => {
+        const container = holderTableRef.current;
+        if (!container) {
+          setHolderScrollbarWidth(0);
+          return;
+        }
+
+        const styles = window.getComputedStyle(container);
+        const borderLeft = Number.parseFloat(styles.borderLeftWidth) || 0;
+        const borderRight = Number.parseFloat(styles.borderRightWidth) || 0;
+        const scrollbarWidth = container.offsetWidth - container.clientWidth - borderLeft - borderRight;
+        const normalized = Math.max(0, Math.round(scrollbarWidth));
+        setHolderScrollbarWidth((current) => (current === normalized ? current : normalized));
+      });
+    }
+
+    syncHolderHeaderWidth();
+    window.addEventListener('resize', syncHolderHeaderWidth);
+    return () => window.removeEventListener('resize', syncHolderHeaderWidth);
+  }, [showHolderRankings, visibleHolderRows.length, holderLoading]);
 
   useEffect(() => {
     return () => {
@@ -746,7 +771,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                 <button
                   onClick={() => setShowHolderRankings((s) => !s)}
                   aria-expanded={showHolderRankings}
-                  className={`text-left bg-transparent px-6 pt-8 pb-8 flex flex-col justify-between relative overflow-visible z-20 min-h-[140px] transition-[filter] duration-200 hover:brightness-[1.01] ${
+                  className={`text-left bg-transparent px-6 pt-8 pb-8 flex flex-col justify-between relative overflow-visible z-20 transition-[filter] duration-200 hover:brightness-[1.01] ${
                     showHolderRankings
                       ? 'rounded-t-2xl'
                       : 'rounded-2xl'
@@ -776,15 +801,18 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                         </div>
                       ) : null}
 
-                      <div className="grid grid-cols-[56px_120px_minmax(0,1fr)_22px] sm:grid-cols-[60px_140px_minmax(0,1fr)_22px] gap-3 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-300">
-                        <span>rank</span>
-                        <span>Address</span>
-                        <span className="text-right">Tokens</span>
-                        <span aria-hidden />
+                      <div
+                        className="grid grid-cols-12 items-center gap-2 pl-4 pr-4 py-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-300"
+                        style={{ paddingRight: `${16 + holderScrollbarWidth}px` }}
+                      >
+                        <span className="col-span-1 text-left" aria-hidden />
+                        <span className="col-span-5 pl-5 text-left">holder</span>
+                        <span className="col-span-6 text-right">tokens</span>
                       </div>
 
                       <div
-                        className="modern-scrollbar overflow-y-scroll rounded-xl border border-gray-100 bg-white/70 dark:border-slate-700 dark:bg-slate-900/30"
+                        ref={holderTableRef}
+                        className="modern-scrollbar overflow-y-auto rounded-xl border border-gray-100 bg-white/70 dark:border-slate-700 dark:bg-slate-900/30"
                         style={{ maxHeight: `${holderListMaxHeightPx}px` }}
                       >
                         {holderLoading ? (
@@ -796,15 +824,15 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                             {visibleHolderRows.map((row) => (
                               <div
                                 key={`${row.rank}-${row.holder}`}
-                                className="box-border grid h-11 grid-cols-[56px_120px_minmax(0,1fr)] sm:grid-cols-[60px_140px_minmax(0,1fr)] items-center gap-3 border-b border-gray-100 px-3 text-sm hover:bg-gray-50/90 last:border-b-0 dark:border-slate-700/70 dark:hover:bg-slate-800/60"
+                                className="box-border grid h-11 grid-cols-12 items-center gap-2 border-b border-gray-100 px-4 text-sm hover:bg-gray-50/90 last:border-b-0 dark:border-slate-700/70 dark:hover:bg-slate-800/60"
                               >
-                                <span className="font-semibold text-gray-900 dark:text-gray-100">{row.rank}</span>
+                                <span className="col-span-1 text-left font-semibold tabular-nums text-gray-900 dark:text-gray-100">{row.rank}</span>
                                 <button
                                   type="button"
                                   onClick={() => void handleCopyHolderAddress(row.holder)}
                                   title={copiedHolderAddress === row.holder ? 'Copied' : 'Click to copy full address'}
                                   aria-label={`Copy address ${row.holder}`}
-                                  className={`text-left font-mono text-xs sm:text-sm whitespace-nowrap transition-colors ${
+                                  className={`col-span-5 w-full pl-5 text-left font-mono text-sm whitespace-nowrap transition-colors ${
                                     copiedHolderAddress === row.holder
                                       ? 'text-emerald-700 dark:text-emerald-300'
                                       : 'text-cyan-700 dark:text-cyan-300'
@@ -812,7 +840,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                                 >
                                   {formatHolderAddress(row.holder)}
                                 </button>
-                                <span className="w-full text-right font-mono font-bold text-gray-900 dark:text-white">{row.totalIxs}</span>
+                                <span className="col-span-6 w-full text-right font-mono font-bold text-gray-900 dark:text-white">{row.totalIxs}</span>
                               </div>
                             ))}
                           </div>
@@ -820,7 +848,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                       </div>
 
                       <label className="block">
-                        <span className="mb-1 block text-center text-[11px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-300">
+                        <span className="mb-1 block text-center text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-300">
                           Search Address
                         </span>
                         <input
