@@ -1,24 +1,6 @@
 [
   {
     "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
-    "startTs": 1771010754,
-    "endTs": 1771788965,
-    "startBlock": 82945365,
-    "endBlock": 83334468,
-    "totalUsdc": 590.0876880000001,
-    "ts": "2026-02-22T19:36:19.145Z"
-  },
-  {
-    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
-    "startTs": 1771788965,
-    "endTs": 1771790612,
-    "startBlock": 83334468,
-    "endBlock": 83335287,
-    "totalUsdc": 0,
-    "ts": "2026-02-22T20:03:32.476Z"
-  },
-  {
-    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
     "startTs": 1771790612,
     "endTs": 1771794279,
     "startBlock": 83335292,
@@ -4928,5 +4910,25 @@
     "totalUsdc": 0,
     "source": "indexer",
     "ts": "2026-03-06T12:05:42.289Z"
+  },
+  {
+    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
+    "startTs": 1772798729,
+    "endTs": 1772803334,
+    "startBlock": 83839349,
+    "endBlock": 83841645,
+    "totalUsdc": 101.246396,
+    "source": "indexer",
+    "ts": "2026-03-06T13:22:15.212Z"
+  },
+  {
+    "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
+    "startTs": 1772798741,
+    "endTs": 1772803343,
+    "startBlock": 43002441,
+    "endBlock": 43002441,
+    "totalUsdc": 0,
+    "source": "indexer",
+    "ts": "2026-03-06T13:22:23.764Z"
   }
 ]
