@@ -6,7 +6,7 @@ What it does
 - Pages ERC-20 transfer history for the configured IXS token contracts on Ethereum, Base, and Polygon.
 - Maintains a private incremental state file at `data/holder_rankings_state.json`.
 - Writes the public top-holder snapshot to `public/data/holder_rankings.json`.
-- Runs daily via GitHub Actions and commits updated artifacts back to the repo.
+- Runs hourly via GitHub Actions and commits updated artifacts back to the repo.
 
 Why this replaces Dune
 - No Dune credits.
@@ -18,7 +18,7 @@ Files of interest
 - `app/api/holderRankings/route.ts` - file-backed API route consumed by the app.
 - `public/data/holder_rankings.json` - public snapshot used by the UI.
 - `data/holder_rankings_state.json` - incremental private state and checkpoints.
-- `.github/workflows/update-holder-rankings.yml` - daily automation and deploy flow.
+- `.github/workflows/update-holder-rankings.yml` - hourly automation and deploy flow.
 
 How the updater works
 1. Loads the saved state from `data/holder_rankings_state.json` if present.

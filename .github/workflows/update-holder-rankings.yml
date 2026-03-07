@@ -2,7 +2,7 @@ name: Update Holder Rankings
 
 on:
   schedule:
-    - cron: '15 2 * * *' # daily at 02:15 UTC
+    - cron: '10 * * * *' # hourly at minute 10 UTC
   workflow_dispatch: {}
 
 permissions:

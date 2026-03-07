@@ -89,7 +89,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 
 ## GitHub Actions
 - `.github/workflows/update-pool-volume.yml` runs the pool updater, commits its outputs, and deploys.
-- `.github/workflows/update-holder-rankings.yml` runs the holder updater daily, commits `public/data/holder_rankings.json` plus `data/holder_rankings_state.json`, and deploys.
+- `.github/workflows/update-holder-rankings.yml` runs the holder updater hourly, commits `public/data/holder_rankings.json` plus `data/holder_rankings_state.json`, and deploys.
 
 ## Data outputs
 - `public/data/pool_volume.json` - per-pool cumulative totals
