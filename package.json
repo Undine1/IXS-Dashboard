@@ -7,7 +7,8 @@
     "dev:delayed": "node ./scripts/dev-delay.js",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "update:holder-rankings": "node ./scripts/update_holder_rankings.js"
   },
   "dependencies": {
     "axios": "^1.13.4",

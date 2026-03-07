@@ -1,100 +1,108 @@
 # IXS / Blockchain Dashboard
 
-A production-ready analytics dashboard that tracks IXS token burns and Total Value Locked (TVL) across multiple chains (Ethereum, Polygon, Base). It uses lightweight on-chain reads (JSON-RPC / eth_call) and a small set of update scripts to maintain aggregated pool volumes and burn statistics written to `public/data`.
+A production-ready analytics dashboard that tracks IXS token burns, Total Value Locked (TVL), and holder rankings across Ethereum, Polygon, and Base. It uses lightweight on-chain reads plus a small set of updater scripts that persist artifacts into `public/data`.
 
-**Status:** Working prototype with multi-chain support, an indexer-backed incremental updater, and CI automation to persist computed artifacts.
+**Status:** Working prototype with multi-chain support, indexer/RPC-backed incremental updaters, and CI automation to persist computed artifacts.
 
 ## Quick links
 - App entry: [app/page.tsx](app/page.tsx)
-- APIs: [app/api/pools/route.ts](app/api/pools/route.ts), [app/api/burnStats/route.ts](app/api/burnStats/route.ts)
+- APIs: [app/api/pools/route.ts](app/api/pools/route.ts), [app/api/burnStats/route.ts](app/api/burnStats/route.ts), [app/api/holderRankings/route.ts](app/api/holderRankings/route.ts)
 - Components: [components/BurnStats.tsx](components/BurnStats.tsx), [components/TransactionList.tsx](components/TransactionList.tsx)
-- Scripts: `scripts/update_pool_volume_indexer.js`
-- Data outputs: `public/data/pool_volume.json`, `public/data/pool_volume_checkpoint.json`, `public/data/pool_volume_runs.json`, `public/data/pool_volume_alert.json`
-- CI workflow: `.github/workflows/update-pool-volume.yml`
+- Scripts: `scripts/update_pool_volume_indexer.js`, `scripts/update_holder_rankings.js`
+- Data outputs: `public/data/pool_volume.json`, `public/data/holder_rankings.json`, `public/data/pool_volume_checkpoint.json`, `public/data/pool_volume_runs.json`, `public/data/pool_volume_alert.json`
+- CI workflows: `.github/workflows/update-pool-volume.yml`, `.github/workflows/update-holder-rankings.yml`
 
 ## Project overview
-- Purpose: Track cumulative token burns and pool TVL (USD) using on-chain derived prices where possible. Also maintain a seeded, incremental "life-time volume" metric for selected pools via log-scanning (USDC Transfer events) and indexer fallbacks.
-- Approach: Use an indexer (Etherscan-compatible API) for incremental updates with retries and checkpoints. Scripts persist results to `public/data/` so the Next.js app can serve stable, cached artifacts.
+- Purpose: Track cumulative token burns, pool TVL (USD), and IXS holder rankings using on-chain derived data where possible.
+- Approach: Use an indexer (Etherscan-compatible API) for pool volume updates and direct chain RPC for holder rankings. Scripts persist outputs so the Next.js app can serve stable snapshots.
 
 ## Tech stack
 - Next.js (App Router) + TypeScript
 - Tailwind CSS
-- Node.js scripts for background tasks (under `scripts/`)
-- Minimal direct JSON-RPC (no heavy web3 frameworks for indexer/RPC calls)
+- Node.js scripts for background tasks
+- Direct JSON-RPC calls where possible
 
-## Files & structure (high-level)
-- `app/` — Next.js app routes and pages (`page.tsx`, `layout.tsx`, `globals.css`)
-- `app/api/` — server routes: `pools/route.ts` (TVL), `burnStats/route.ts` (burn addresses)
-- `components/` — UI components used by the dashboard
-- `lib/` — on-chain helpers, token/burn services, TVL config loader and utils
-- `scripts/` — updater scripts
-  - `update_pool_volume_indexer.js` — indexer-based incremental updater (Etherscan v2 compatible), resilient (exponential backoff, deterministic per-pool jitter), writes `public/data/pool_volume*.json` and `public/data/pool_volume_alert.json` on failure
-- `public/data/` — computed artifacts persisted by CI scripts (consumed by the front-end)
-- `.github/workflows/` — CI workflows; `update-pool-volume.yml` runs the updater and commits outputs
+## Files & structure
+- `app/` - Next.js routes and pages
+- `app/api/` - API routes for pools, burn stats, and holder rankings
+- `components/` - UI components used by the dashboard
+- `lib/` - on-chain helpers, token/burn services, TVL config loader, and utils
+- `scripts/` - updater scripts
+  - `update_pool_volume_indexer.js` - incremental pool volume updater
+  - `update_holder_rankings.js` - incremental holder snapshot updater
+- `public/data/` - public artifacts consumed by the app
+- `data/` - non-public incremental state for holder rankings
+- `.github/workflows/` - scheduled automation
 
 ## Environment variables
-Create a `.env.local` in the project root (do not commit). Key variables used by the project and CI scripts:
-- `ALCHEMY_API_KEY` — (optional) used by provider-based RPC endpoints if configured
-- `ETHERSCAN_API_KEY` — default key for indexer-based updater (Etherscan-compatible indexer)
-- `POLYGONSCAN_API_KEY` — (optional) Polygon-native explorer key for pool updater
-- `BASESCAN_API_KEY` — (optional) Base-native explorer key for pool updater
-- `BASESCAN_API_BASE_URL` — (recommended for Base) set to `https://base.blockscout.com/api` to use Blockscout's RPC-compatible API for `module/action` calls
-- `BASE_RPC` / `BASE_RPC_LIST` — (optional) Base JSON-RPC endpoint(s) for fallback log scanning
-- `POLYGON_RPC` / `POLYGON_RPC_LIST` — (optional) Polygon JSON-RPC endpoint(s) for fallback log scanning
-- `GH_PAT` — (CI only) personal access token used by the workflow to push generated artifacts back to the repo
-- `POLYGON_USDC` - optional override of the default tracked USDC token address for updater jobs
+Create a `.env.local` in the project root.
 
-Note: scripts/update_pool_volume_indexer.js automatically reads .env.local for local runs when variables are not already exported in the shell.
+- `ALCHEMY_API_KEY` - optional shared RPC credential for Ethereum, Polygon, and Base
+- `ETHERSCAN_API_KEY` - default key for the pool volume updater
+- `ETHEREUM_RPC` / `ETHEREUM_RPC_LIST` - optional Ethereum RPC URL(s) for holder rankings
+- `POLYGON_RPC` / `POLYGON_RPC_LIST` - optional Polygon RPC URL(s) for pool fallback and holder rankings
+- `BASE_RPC` / `BASE_RPC_LIST` - optional Base RPC URL(s) for pool fallback and holder rankings
+- `POLYGONSCAN_API_KEY` - optional Polygon explorer key for pool volume
+- `BASESCAN_API_KEY` - optional Base explorer key for pool volume
+- `BASESCAN_API_BASE_URL` - recommended Base explorer API base URL (`https://base.blockscout.com/api`)
+- `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` - optional page size for Alchemy transfer pagination
+- `HOLDER_RANKINGS_LOG_CHUNK` - optional initial `eth_getLogs` block span
+- `HOLDER_RANKINGS_MIN_LOG_CHUNK` - optional minimum block span after backoff
+- `HOLDER_RANKINGS_SAVE_EVERY_BATCHES` - optional save cadence during long bootstrap runs
+- `GH_PAT` - CI token used to push generated artifacts
+- `POLYGON_USDC` - optional override of the tracked USDC token address for pool volume jobs
+
+`scripts/update_pool_volume_indexer.js` and `scripts/update_holder_rankings.js` both auto-load `.env.local` when environment variables are not already exported.
 
 ## Running locally
-1. Install deps
+1. Install dependencies
 ```bash
 npm ci
 ```
 
-2. Dev server
+2. Start the dev server
 ```bash
 npm run dev
 ```
 
-3. Run updater scripts locally (example):
+3. Run the pool volume updater
 ```bash
-cd scripts
-node update_pool_volume_indexer.js  # primary updater (recommended)
+node ./scripts/update_pool_volume_indexer.js
 ```
 
-Notes: The scripts write to `public/data/` — running them locally will overwrite those files and they will be served by the dev server.
+4. Run the holder rankings updater
+```bash
+npm run update:holder-rankings
+```
+
+The updaters write to `public/data/`. The holder updater also writes `data/holder_rankings_state.json`.
 
 ## APIs
-- `GET /api/pools` — returns pools with computed `value` fields (USD). If a pool's USD price cannot be derived from configured price-source pools the `value` will be `0`.
-- `GET /api/burnStats` — returns aggregated burn totals and per-address balances.
+- `GET /api/pools` - returns pools with computed USD values
+- `GET /api/burnStats` - returns aggregated burn totals and per-address balances
+- `GET /api/holderRankings` - returns the latest file-backed holder snapshot from `public/data/holder_rankings.json`
 
-## Updater behavior and resilience
-- Indexer script uses exponential backoff with full jitter, honors `Retry-After`, and writes an alert file `public/data/pool_volume_alert.json` when retry budget is exhausted.
-- If indexer access is plan-restricted for a chain, the updater automatically falls back to chain RPC (`eth_getLogs`) when RPC endpoints are available.
-- The updater maintains per-pool checkpoints in `public/data/pool_volume_checkpoint.json` so runs can resume without re-scanning completed ranges.
+## Updater behavior
+- The pool volume updater uses exponential backoff, optional explorer fallbacks, and per-pool checkpoints.
+- The holder rankings updater prefers Alchemy Asset Transfers pagination, falls back to `eth_getLogs` when needed, keeps cumulative per-holder balances in `data/holder_rankings_state.json`, and writes a public top-500 snapshot.
+- The first holder rankings run is the expensive bootstrap. Later runs only scan blocks after the last saved checkpoint.
 
-## CI / GitHub Actions
-- The repository contains `.github/workflows/update-pool-volume.yml` that runs the updater, commits `public/data/*` outputs, and deploys. The workflow uses a concurrency group to avoid overlapping runs and a PAT (`GH_PAT`) to push commits.
-- Actions compatibility note: when authoring or pinning actions, prefer `@actions/core@^1.10.0` (or newer) for any authored/composed actions; avoid deprecated workflow commands such as `::set-output` / `::save-state` and update or pin third-party actions that still use them.
+## GitHub Actions
+- `.github/workflows/update-pool-volume.yml` runs the pool updater, commits its outputs, and deploys.
+- `.github/workflows/update-holder-rankings.yml` runs the holder updater daily, commits `public/data/holder_rankings.json` plus `data/holder_rankings_state.json`, and deploys.
 
 ## Data outputs
-- `public/data/pool_volume.json` — per-pool cumulative totals (seeded values + increments)
-- `public/data/pool_volume_checkpoint.json` — per-pool scan checkpoints (last-scanned block/timestamp)
-- `public/data/pool_volume_runs.json` — run history and counters
-- `public/data/pool_volume_alert.json` — alert produced if updater exhausted retry budget
+- `public/data/pool_volume.json` - per-pool cumulative totals
+- `public/data/pool_volume_checkpoint.json` - per-pool scan checkpoints
+- `public/data/pool_volume_runs.json` - pool updater run history
+- `public/data/pool_volume_alert.json` - pool updater alert output
+- `public/data/holder_rankings.json` - top-holder snapshot served by `/api/holderRankings`
+- `data/holder_rankings_state.json` - non-public cumulative balances and per-chain checkpoints for holder rankings
 
 ## Troubleshooting
-- If updates fail, inspect `public/data/pool_volume_alert.json` and `public/data/pool_volume_runs.json` to identify failing pools or APIs.
+- If pool updates fail, inspect `public/data/pool_volume_alert.json` and `public/data/pool_volume_runs.json`.
+- If holder updates fail, run `npm run update:holder-rankings` locally with the same RPC credentials and inspect `data/holder_rankings_state.json`.
 
-## Contributing
-- Keep `POOLS` configuration (in `app/api/pools/route.ts`) ordered: price-source pools (e.g., token‑USDC price sources) must be listed before pools that depend on those prices.
-- When adding new pools, add a price-source pool for the chain if none exists.
-
-## Next steps and optional improvements
-- Add runtime validation that warns/fails when pools exist for a chain but no price-source pool is configured.
-- Add telemetry for API/indexer usage and per-run provider counters.
-
-If you'd like, I can also add a small CI check to scan `.github/workflows/` for deprecated workflow commands or implement the runtime price-source validation — tell me which to add next.
-
-
+## Additional docs
+- [docs/pool_volume_automation.md](docs/pool_volume_automation.md)
+- [docs/holder_rankings_automation.md](docs/holder_rankings_automation.md)

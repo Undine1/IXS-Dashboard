@@ -1,0 +1,115 @@
+name: Update Holder Rankings
+
+on:
+  schedule:
+    - cron: '15 2 * * *' # daily at 02:15 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  VERCEL_CLI_VERSION: '50.23.2'
+
+jobs:
+  update:
+    name: Build holder snapshot and deploy
+    runs-on: ubuntu-latest
+    concurrency:
+      group: holder-rankings-update
+      cancel-in-progress: true
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository (use PAT for push)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.15.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f yarn.lock ]; then
+            npm ci
+          else
+            echo "No lockfile found, running 'npm install' instead of 'npm ci'"
+            npm install
+          fi
+
+      - name: Run holder rankings updater
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
+          ETHEREUM_RPC_LIST: ${{ secrets.ETHEREUM_RPC_LIST }}
+          ETH_RPC: ${{ secrets.ETH_RPC }}
+          POLYGON_RPC: ${{ secrets.POLYGON_RPC }}
+          POLYGON_RPC_LIST: ${{ secrets.POLYGON_RPC_LIST }}
+          BASE_RPC: ${{ secrets.BASE_RPC }}
+          BASE_RPC_LIST: ${{ secrets.BASE_RPC_LIST }}
+          HOLDER_RANKINGS_LIMIT: ${{ vars.HOLDER_RANKINGS_LIMIT }}
+          HOLDER_RANKINGS_LOG_CHUNK: ${{ vars.HOLDER_RANKINGS_LOG_CHUNK }}
+          HOLDER_RANKINGS_MIN_LOG_CHUNK: ${{ vars.HOLDER_RANKINGS_MIN_LOG_CHUNK }}
+          HOLDER_RANKINGS_SAVE_EVERY_BATCHES: ${{ vars.HOLDER_RANKINGS_SAVE_EVERY_BATCHES }}
+          HOLDER_RANKINGS_ETHEREUM_TOKEN_ADDRESS: ${{ vars.HOLDER_RANKINGS_ETHEREUM_TOKEN_ADDRESS }}
+          HOLDER_RANKINGS_BASE_TOKEN_ADDRESS: ${{ vars.HOLDER_RANKINGS_BASE_TOKEN_ADDRESS }}
+          HOLDER_RANKINGS_POLYGON_TOKEN_ADDRESS: ${{ vars.HOLDER_RANKINGS_POLYGON_TOKEN_ADDRESS }}
+          HOLDER_RANKINGS_ETHEREUM_START_BLOCK: ${{ vars.HOLDER_RANKINGS_ETHEREUM_START_BLOCK }}
+          HOLDER_RANKINGS_BASE_START_BLOCK: ${{ vars.HOLDER_RANKINGS_BASE_START_BLOCK }}
+          HOLDER_RANKINGS_POLYGON_START_BLOCK: ${{ vars.HOLDER_RANKINGS_POLYGON_START_BLOCK }}
+        run: npm run update:holder-rankings
+
+      - name: Commit updated snapshot files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git status --porcelain | grep -q "public/data/holder_rankings.json\|data/holder_rankings_state.json"; then
+            git add public/data/holder_rankings.json data/holder_rankings_state.json
+            git commit -m "data: update holder rankings snapshot [skip ci]" || echo "No changes to commit"
+            branch="${GITHUB_REF_NAME:-main}"
+            max_attempts=5
+            for attempt in $(seq 1 "$max_attempts"); do
+              if git push origin "HEAD:${branch}"; then
+                echo "Push succeeded on attempt ${attempt}"
+                break
+              fi
+
+              if [ "$attempt" -eq "$max_attempts" ]; then
+                echo "::error::Push failed after ${max_attempts} attempts"
+                exit 1
+              fi
+
+              echo "Push failed on attempt ${attempt}; rebasing and retrying..."
+              sleep $((attempt * 5))
+              git fetch origin "${branch}"
+              git rebase "origin/${branch}" || {
+                git rebase --abort || true
+                echo "::warning::Rebase failed while retrying push"
+                exit 1
+              }
+            done
+          else
+            echo "No snapshot changes"
+          fi
+
+      - name: Upload holder snapshot artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: holder-rankings-artifacts
+          path: |
+            public/data/holder_rankings.json
+            data/holder_rankings_state.json
+
+      - name: Deploy to Vercel (no commit)
+        run: npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy --prod --yes --token "$VERCEL_TOKEN"
+        env:
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+          NPM_CONFIG_USERCONFIG: /dev/null
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
