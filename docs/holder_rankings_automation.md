@@ -20,7 +20,6 @@ Files of interest
 - `public/data/holder_rankings.json` - public snapshot used by the UI.
 - `data/holder_rankings_state.json` - incremental private state and checkpoints.
 - `data/holder_labels.json` - manual address labels and exclusion rules.
-- `data/holder_labels.template.jsonc` - commented template with placeholder entries you can fill in before copying to the live registry.
 - `.github/workflows/update-holder-rankings.yml` - hourly automation and deploy flow.
 
 How the updater works
@@ -35,7 +34,6 @@ How the updater works
 
 Label registry
 - `data/holder_labels.json` is a committed registry keyed by address.
-- `data/holder_labels.template.jsonc` is a commented scratch file with 20 ready-made placeholders.
 - Supported fields per address:
   - `label` - friendly display name shown in the UI
   - `category` - short tag such as `bridge`, `protocol`, `burn`, `contract`, or `system`
