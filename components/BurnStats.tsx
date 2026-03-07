@@ -761,7 +761,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                 <button
                   onClick={() => setShowHolderRankings((s) => !s)}
                   aria-expanded={showHolderRankings}
-                  className={`text-left bg-transparent px-6 pt-8 pb-8 flex flex-col justify-between relative overflow-visible z-20 transition-[filter] duration-200 hover:brightness-[1.01] ${
+                  className={`text-left bg-transparent px-6 pt-8 pb-8 flex flex-col justify-between relative overflow-visible z-20 min-h-[140px] transition-[filter] duration-200 hover:brightness-[1.01] ${
                     showHolderRankings
                       ? 'rounded-t-2xl'
                       : 'rounded-2xl'
