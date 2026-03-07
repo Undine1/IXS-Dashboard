@@ -159,6 +159,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   const [showHolderRankings, setShowHolderRankings] = useState<boolean>(false);
   const [cardSection, setCardSection] = useState<CardSection>('all');
   const [holderSearch, setHolderSearch] = useState<string>('');
+  const [hideNamedHolders, setHideNamedHolders] = useState<boolean>(false);
   const [holderRows, setHolderRows] = useState<HolderRankingRow[]>([]);
   const [holderLoading, setHolderLoading] = useState<boolean>(true);
   const [holderError, setHolderError] = useState<string | null>(null);
@@ -264,15 +265,18 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   }, []);
 
   const holderSearchNormalized = holderSearch.trim().toLowerCase();
-  const visibleHolderRows = holderSearchNormalized
-    ? holderRows.filter((row) => {
-      const label = typeof row.label === 'string' ? row.label.toLowerCase() : '';
-      return (
-        row.holder.includes(holderSearchNormalized) ||
-        label.includes(holderSearchNormalized)
-      );
-    })
-    : holderRows;
+  const visibleHolderRows = holderRows.filter((row) => {
+    if (hideNamedHolders && row.label) {
+      return false;
+    }
+
+    if (!holderSearchNormalized) {
+      return true;
+    }
+
+    const label = typeof row.label === 'string' ? row.label.toLowerCase() : '';
+    return row.holder.includes(holderSearchNormalized) || label.includes(holderSearchNormalized);
+  });
   const holderRowsVisible = 10;
   const holderRowHeightPx = 56;
   const holderListMaxHeightPx = holderRowsVisible * holderRowHeightPx;
@@ -787,6 +791,20 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                           {holderError}
                         </div>
                       ) : null}
+
+                      <div className="flex items-center justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setHideNamedHolders((current) => !current)}
+                          className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors ${
+                            hideNamedHolders
+                              ? 'border-slate-800 bg-slate-800 text-white dark:border-slate-200 dark:bg-slate-100 dark:text-slate-900'
+                              : 'border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-100 dark:border-slate-700 dark:bg-slate-800/70 dark:text-gray-300 dark:hover:bg-slate-700/90'
+                          }`}
+                        >
+                          {hideNamedHolders ? 'Show Named' : 'Hide Named'}
+                        </button>
+                      </div>
 
                       <div
                         className="grid grid-cols-12 items-center gap-2 pl-4 pr-4 py-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-300"
