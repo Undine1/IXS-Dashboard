@@ -845,7 +845,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                                       : 'text-cyan-700 dark:text-cyan-300'
                                   }`}
                                 >
-                                  <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                  <span className="inline-flex items-baseline gap-2">
                                     <span className="shrink-0 font-mono text-sm text-current">
                                       {formatHolderAddress(row.holder)}
                                     </span>
