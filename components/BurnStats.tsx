@@ -50,6 +50,8 @@ interface HolderRankingsResponse {
   error?: string;
 }
 
+const HOLDER_DISPLAY_LIMIT = 500;
+
 function toFiniteNumberOrNull(value: unknown): number | null {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'string' && value.trim() !== '') {
@@ -265,18 +267,24 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   }, []);
 
   const holderSearchNormalized = holderSearch.trim().toLowerCase();
-  const visibleHolderRows = holderRows.filter((row) => {
-    if (hideNamedHolders && row.label) {
-      return false;
-    }
+  const baseHolderRows = hideNamedHolders
+    ? holderRows
+        .filter((row) => !row.label)
+        .map((row, index) => ({
+          ...row,
+          rank: index + 1,
+        }))
+    : holderRows.slice(0, HOLDER_DISPLAY_LIMIT);
+  const visibleHolderRows = baseHolderRows
+    .filter((row) => {
+      if (!holderSearchNormalized) {
+        return true;
+      }
 
-    if (!holderSearchNormalized) {
-      return true;
-    }
-
-    const label = typeof row.label === 'string' ? row.label.toLowerCase() : '';
-    return row.holder.includes(holderSearchNormalized) || label.includes(holderSearchNormalized);
-  });
+      const label = typeof row.label === 'string' ? row.label.toLowerCase() : '';
+      return row.holder.includes(holderSearchNormalized) || label.includes(holderSearchNormalized);
+    })
+    .slice(0, HOLDER_DISPLAY_LIMIT);
   const holderRowsVisible = 10;
   const holderRowHeightPx = 56;
   const holderListMaxHeightPx = holderRowsVisible * holderRowHeightPx;

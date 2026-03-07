@@ -51,7 +51,7 @@ Configuration
   - `POLYGON_RPC_LIST`
   - `BASE_RPC_LIST`
 - Optional holder updater tuning:
-  - `HOLDER_RANKINGS_LIMIT` (default `500`)
+  - `HOLDER_RANKINGS_LIMIT` (default `600`)
   - `HOLDER_RANKINGS_EXCLUDED_ADDRESSES` (comma-separated global exclusion list)
   - `HOLDER_RANKINGS_ETHEREUM_EXCLUDED_ADDRESSES`
   - `HOLDER_RANKINGS_BASE_EXCLUDED_ADDRESSES`
