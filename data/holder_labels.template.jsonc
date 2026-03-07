@@ -1,0 +1,134 @@
+{
+  // Holder label template.
+  // Copy filled entries from this file into data/holder_labels.json.
+  // Valid categories you can reuse: treasury, team, bridge, protocol, exchange,
+  // burn, contract, multisig, market-maker, custody, liquidity, partner.
+  //
+  // Rules:
+  // - Address must be lowercase 0x...40 hex chars.
+  // - `label` is what shows in the UI.
+  // - `category` becomes the badge.
+  // - `excludeFromRanking: true` hides the address from the public leaderboard.
+  // - Leave commented blocks commented until you have a real label to add.
+  "addresses": {
+    // "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
+    //   "label": "Label 01",
+    //   "category": "treasury",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+    //   "label": "Label 02",
+    //   "category": "team",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0xcccccccccccccccccccccccccccccccccccccccc": {
+    //   "label": "Label 03",
+    //   "category": "multisig",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0xdddddddddddddddddddddddddddddddddddddddd": {
+    //   "label": "Label 04",
+    //   "category": "bridge",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": {
+    //   "label": "Label 05",
+    //   "category": "protocol",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0xffffffffffffffffffffffffffffffffffffffff": {
+    //   "label": "Label 06",
+    //   "category": "exchange",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0x1111111111111111111111111111111111111111": {
+    //   "label": "Label 07",
+    //   "category": "market-maker",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0x2222222222222222222222222222222222222222": {
+    //   "label": "Label 08",
+    //   "category": "custody",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0x3333333333333333333333333333333333333333": {
+    //   "label": "Label 09",
+    //   "category": "liquidity",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0x4444444444444444444444444444444444444444": {
+    //   "label": "Label 10",
+    //   "category": "partner",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0x5555555555555555555555555555555555555555": {
+    //   "label": "Label 11",
+    //   "category": "treasury",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0x6666666666666666666666666666666666666666": {
+    //   "label": "Label 12",
+    //   "category": "team",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0x7777777777777777777777777777777777777777": {
+    //   "label": "Label 13",
+    //   "category": "multisig",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0x8888888888888888888888888888888888888888": {
+    //   "label": "Label 14",
+    //   "category": "bridge",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0x9999999999999999999999999999999999999999": {
+    //   "label": "Label 15",
+    //   "category": "protocol",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0xabababababababababababababababababababab": {
+    //   "label": "Label 16",
+    //   "category": "exchange",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd": {
+    //   "label": "Label 17",
+    //   "category": "market-maker",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0xefefefefefefefefefefefefefefefefefefefef": {
+    //   "label": "Label 18",
+    //   "category": "custody",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0x1212121212121212121212121212121212121212": {
+    //   "label": "Label 19",
+    //   "category": "liquidity",
+    //   "excludeFromRanking": false
+    // },
+
+    // "0x3434343434343434343434343434343434343434": {
+    //   "label": "Label 20",
+    //   "category": "partner",
+    //   "excludeFromRanking": false
+    // }
+  }
+}
