@@ -6,7 +6,7 @@
       "excludeFromRanking": true
     },
     "0x000000000000000000000000000000000000dead": {
-      "label": "Dead Wallet",
+      "label": "Burn Address",
       "category": "burn",
       "excludeFromRanking": true
     },
@@ -31,12 +31,56 @@
       "excludeFromRanking": true
     },
     "0x3ee18b2214aff97000d974cf647e7c347e8fa585": {
-      "label": "Wormhole Token Bridge",
+      "label": "Wormhole Bridge",
       "category": "bridge"
     },
     "0x000000000004444c5dc75cb358380d2e3de08a90": {
-      "label": "Uniswap V4 Pool Manager",
+      "label": "Uniswap V4",
       "category": "protocol"
+    },
+    "0x3cc936b795a188f0e246cbb2d74c5bd190aecf18": {
+      "label": "MEXC 3",
+      "category": "exchange"
+    },
+    "0x9642b23ed1e01df1092b92641051881a322f5d4e": {
+      "label": "MEXC 16",
+      "category": "exchange"
+    },
+    "0xc09bf2b1bc8725903c509e8caeef9190857215a8": {
+      "label": "Uniswap V2",
+      "category": "protocol"
+    },
+    "0x2982bb64bcd07ac3315c32cb2bb7e5e8a2de7d67": {
+      "label": "Bitmart 16",
+      "category": "exchange"
+    },
+    "0x29065a4c1f2f20d1e263930088890d6f49fe715a": {
+      "label": "Poloniex 10",
+      "category": "exchange"
+    },
+    "0xbca34ed5875079cc561840f3409a790769821dbc": {
+      "label": "Coinex 39",
+      "category": "exchange"
+    },
+    "0x13ca6daab84af2a452f86ea437bb90c6217a220c": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x7c01aa3783577e15fd7e272443d44b92d5b21056": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xcf8ce57fa442ba50acbc57147a62ad03873ffa73": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xc56d93dd1d48f93814901cf685c3cd0eac0e849d": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x43f5d2deecc2942ccf92df93d94d6959d24ead19": {
+      "label": "Contract",
+      "category": "contract"
     },
     "0x21dd761cac8461a68344f40d2f12e172a18a297f": {
       "category": "contract"
