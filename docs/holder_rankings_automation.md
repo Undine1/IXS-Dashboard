@@ -7,6 +7,7 @@ What it does
 - Maintains a private incremental state file at `data/holder_rankings_state.json`.
 - Writes the public top-holder snapshot to `public/data/holder_rankings.json`.
 - Runs hourly via GitHub Actions and commits updated artifacts back to the repo.
+- Excludes burn/system addresses from the public ranking snapshot while keeping full balances in private state.
 
 Why this replaces Dune
 - No Dune credits.
@@ -42,6 +43,10 @@ Configuration
   - `BASE_RPC_LIST`
 - Optional holder updater tuning:
   - `HOLDER_RANKINGS_LIMIT` (default `500`)
+  - `HOLDER_RANKINGS_EXCLUDED_ADDRESSES` (comma-separated global exclusion list)
+  - `HOLDER_RANKINGS_ETHEREUM_EXCLUDED_ADDRESSES`
+  - `HOLDER_RANKINGS_BASE_EXCLUDED_ADDRESSES`
+  - `HOLDER_RANKINGS_POLYGON_EXCLUDED_ADDRESSES`
   - `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` (default `1000`)
   - `HOLDER_RANKINGS_LOG_CHUNK` (default `20000`)
   - `HOLDER_RANKINGS_MIN_LOG_CHUNK` (default `500`)
@@ -91,3 +96,4 @@ Operational notes
 - The snapshot file is the only data served publicly.
 - The state file is committed to the repo for persistence between scheduled runs, but it is not served by Next.js.
 - On Alchemy Free, `eth_getLogs` is severely block-range limited; using `ALCHEMY_API_KEY` enables the updater to use `alchemy_getAssetTransfers` instead.
+- By default the public ranking excludes the zero address, `0x...dead`, and the three token contract addresses. Use the exclusion env vars above to add project-specific burn or treasury addresses.

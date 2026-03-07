@@ -46,6 +46,7 @@ Create a `.env.local` in the project root.
 - `BASESCAN_API_KEY` - optional Base explorer key for pool volume
 - `BASESCAN_API_BASE_URL` - recommended Base explorer API base URL (`https://base.blockscout.com/api`)
 - `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` - optional page size for Alchemy transfer pagination
+- `HOLDER_RANKINGS_EXCLUDED_ADDRESSES` - optional comma-separated addresses to hide from the public holder ranking
 - `HOLDER_RANKINGS_LOG_CHUNK` - optional initial `eth_getLogs` block span
 - `HOLDER_RANKINGS_MIN_LOG_CHUNK` - optional minimum block span after backoff
 - `HOLDER_RANKINGS_SAVE_EVERY_BATCHES` - optional save cadence during long bootstrap runs
@@ -85,6 +86,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 ## Updater behavior
 - The pool volume updater uses exponential backoff, optional explorer fallbacks, and per-pool checkpoints.
 - The holder rankings updater prefers Alchemy Asset Transfers pagination, falls back to `eth_getLogs` when needed, keeps cumulative per-holder balances in `data/holder_rankings_state.json`, and writes a public top-500 snapshot.
+- The public holder ranking excludes zero/dead/token-contract addresses by default and supports extra exclusions through env vars.
 - The first holder rankings run is the expensive bootstrap. Later runs only scan blocks after the last saved checkpoint.
 
 ## GitHub Actions

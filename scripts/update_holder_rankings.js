@@ -35,6 +35,7 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+const DEAD_ADDRESS = '0x000000000000000000000000000000000000dead';
 const TRANSFER_TOPIC0 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const DEFAULT_TOKEN_DECIMALS = 18;
 const DEFAULT_LIMIT = 500;
@@ -80,6 +81,20 @@ const TOKEN_CONFIGS = [
     decimals: Number(process.env.HOLDER_RANKINGS_POLYGON_DECIMALS || DEFAULT_TOKEN_DECIMALS),
     startBlockEnv: 'HOLDER_RANKINGS_POLYGON_START_BLOCK',
   },
+];
+
+const EXCLUSION_ENV_KEYS = [
+  'HOLDER_RANKINGS_EXCLUDED_ADDRESSES',
+  'HOLDER_RANKINGS_ETHEREUM_EXCLUDED_ADDRESSES',
+  'HOLDER_RANKINGS_BASE_EXCLUDED_ADDRESSES',
+  'HOLDER_RANKINGS_POLYGON_EXCLUDED_ADDRESSES',
+  'NEXT_PUBLIC_ETH_BURN_ADDRESSES',
+  'NEXT_PUBLIC_BASE_BURN_ADDRESSES',
+  'NEXT_PUBLIC_POLYGON_BURN_ADDRESSES',
+];
+
+const DEFAULT_PROJECT_EXCLUDED_ADDRESSES = [
+  '0xec36cffd536fac67513871e114df58470696734b',
 ];
 
 const STATE_DIR = path.join(__dirname, '..', 'data');
@@ -135,6 +150,32 @@ function parseRpcListValue(value) {
     .map((entry) => entry.trim())
     .filter(Boolean);
 }
+
+function parseAddressList(value) {
+  return parseRpcListValue(value).map((entry) => String(entry || '').toLowerCase()).filter(isValidAddress);
+}
+
+function buildExcludedAddressSet() {
+  const excluded = new Set([ZERO_ADDRESS, DEAD_ADDRESS]);
+
+  for (const config of TOKEN_CONFIGS) {
+    excluded.add(config.address);
+  }
+
+  for (const address of DEFAULT_PROJECT_EXCLUDED_ADDRESSES) {
+    excluded.add(address);
+  }
+
+  for (const key of EXCLUSION_ENV_KEYS) {
+    for (const address of parseAddressList(process.env[key])) {
+      excluded.add(address);
+    }
+  }
+
+  return excluded;
+}
+
+const EXCLUDED_ADDRESSES = buildExcludedAddressSet();
 
 function getRpcUrlsForChain(chain) {
   const urls = [];
@@ -607,6 +648,7 @@ function buildPublicPayload(state) {
 
   for (const [holder, chainBalances] of Object.entries(state.holders || {})) {
     if (!isValidAddress(holder) || !chainBalances || typeof chainBalances !== 'object') continue;
+    if (EXCLUDED_ADDRESSES.has(holder)) continue;
 
     let totalRaw = 0n;
     let chainsHolding = 0;
