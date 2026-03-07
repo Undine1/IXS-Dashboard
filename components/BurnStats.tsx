@@ -845,12 +845,12 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                                       : 'text-cyan-700 dark:text-cyan-300'
                                   }`}
                                 >
-                                  <span className="flex items-baseline gap-2 overflow-hidden">
+                                  <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                     <span className="shrink-0 font-mono text-sm text-current">
                                       {formatHolderAddress(row.holder)}
                                     </span>
                                     {row.label ? (
-                                      <span className="truncate text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                                      <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
                                         {row.label}
                                       </span>
                                     ) : null}
