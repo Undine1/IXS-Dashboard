@@ -160,8 +160,6 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   const [cardSection, setCardSection] = useState<CardSection>('all');
   const [holderSearch, setHolderSearch] = useState<string>('');
   const [holderRows, setHolderRows] = useState<HolderRankingRow[]>([]);
-  const [holderTotalRows, setHolderTotalRows] = useState<number>(0);
-  const [holderLastRefreshed, setHolderLastRefreshed] = useState<string | null>(null);
   const [holderLoading, setHolderLoading] = useState<boolean>(true);
   const [holderError, setHolderError] = useState<string | null>(null);
   const [copiedHolderAddress, setCopiedHolderAddress] = useState<string | null>(null);
@@ -240,23 +238,17 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
           const message = payload?.error || 'Unable to load holder rankings';
           if (!cancelled) setHolderError(message);
           if (!cancelled) setHolderRows([]);
-          if (!cancelled) setHolderTotalRows(0);
-          if (!cancelled) setHolderLastRefreshed(null);
           return;
         }
 
         if (!cancelled) {
           const rows = Array.isArray(payload.rows) ? payload.rows : [];
           setHolderRows(rows);
-          setHolderTotalRows(typeof payload.totalRowCount === 'number' ? payload.totalRowCount : rows.length);
-          setHolderLastRefreshed(payload.lastRefreshed || null);
         }
       } catch {
         if (!cancelled) {
           setHolderError('Unable to load holder rankings');
           setHolderRows([]);
-          setHolderTotalRows(0);
-          setHolderLastRefreshed(null);
         }
       } finally {
         if (!cancelled) setHolderLoading(false);
@@ -284,15 +276,6 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   const holderRowsVisible = 10;
   const holderRowHeightPx = 56;
   const holderListMaxHeightPx = holderRowsVisible * holderRowHeightPx;
-
-  const holderLastRefreshedLabel = holderLastRefreshed
-    ? new Date(holderLastRefreshed).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-    : 'N/A';
 
   const focusOptions: Array<{ value: CardSection; label: string }> = [
     { value: 'all', label: 'All' },
@@ -786,12 +769,9 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                 >
                   <CardRail gradientClass="from-red-600 via-red-500 to-orange-400" roundedClass="rounded-t-2xl" />
                   <p className="text-sm font-semibold text-teal-500 dark:text-teal-400 text-center">Holder Rankings</p>
-                  <div className="flex-1 flex flex-col items-center justify-center gap-1">
+                  <div className="flex-1 flex items-center justify-center">
                     <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                      {holderLoading ? 'Syncing...' : `Top ${holderTotalRows || 0}`}
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      Last refreshed: {holderLoading ? 'Syncing...' : holderLastRefreshedLabel}
+                      {holderLoading ? 'Syncing...' : 'Top 500'}
                     </span>
                   </div>
 
