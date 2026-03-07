@@ -5,12 +5,18 @@ import BurnStats from '@/components/BurnStats';
 import { fetchTokenBurnStatsFromAPI } from '@/lib/clientBurnService';
 import { Pool, PoolsApiResponse, TokenBurnStats } from '@/types';
 
+interface SyncStatusResponse {
+  ok?: boolean;
+  lastDeploymentCompletedAt?: string | null;
+}
+
 export default function Dashboard() {
   const [burnStats, setBurnStats] = useState<TokenBurnStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [pools, setPools] = useState<Pool[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [lastDeploymentCompletedAt, setLastDeploymentCompletedAt] = useState<string | null>(null);
 
   const hasBurnData = Boolean(burnStats && burnStats.burnAddresses.length > 0);
 
@@ -28,8 +34,8 @@ export default function Dashboard() {
         ? 'Warning'
         : 'Offline';
 
-  const lastSync = hasBurnData && burnStats?.lastUpdated
-    ? new Date(burnStats.lastUpdated).toLocaleString('en-US', {
+  const lastSync = lastDeploymentCompletedAt
+    ? new Date(lastDeploymentCompletedAt).toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -80,8 +86,22 @@ export default function Dashboard() {
             setLoadingProgress((previous) => Math.max(previous, 82));
             return null;
           });
+        const syncStatusPromise: Promise<SyncStatusResponse | null> = fetch('/api/syncStatus', { cache: 'no-store' })
+          .then(async (r) => (r.ok ? ((await r.json()) as SyncStatusResponse) : null))
+          .then((result) => {
+            setLoadingProgress((previous) => Math.max(previous, 92));
+            return result;
+          })
+          .catch(() => {
+            setLoadingProgress((previous) => Math.max(previous, 92));
+            return null;
+          });
 
-        const [burnsResult, poolsResult] = await Promise.all([burnsPromise, poolsPromise]);
+        const [burnsResult, poolsResult, syncStatusResult] = await Promise.all([
+          burnsPromise,
+          poolsPromise,
+          syncStatusPromise,
+        ]);
 
         if (burnsResult) {
           setBurnStats(burnsResult);
@@ -94,10 +114,17 @@ export default function Dashboard() {
           setPools([]);
           setWarnings([]);
         }
+
+        if (syncStatusResult?.ok) {
+          setLastDeploymentCompletedAt(syncStatusResult.lastDeploymentCompletedAt || null);
+        } else {
+          setLastDeploymentCompletedAt(null);
+        }
       } catch (error) {
         console.error('[Dashboard] Failed to load data:', error);
         setPools([]);
         setWarnings([]);
+        setLastDeploymentCompletedAt(null);
       } finally {
         setLoadingProgress(100);
         await new Promise((resolve) => setTimeout(resolve, 140));
