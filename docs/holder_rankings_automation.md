@@ -19,6 +19,7 @@ Files of interest
 - `app/api/holderRankings/route.ts` - file-backed API route consumed by the app.
 - `public/data/holder_rankings.json` - public snapshot used by the UI.
 - `data/holder_rankings_state.json` - incremental private state and checkpoints.
+- `data/holder_labels.json` - manual address labels and exclusion rules.
 - `.github/workflows/update-holder-rankings.yml` - hourly automation and deploy flow.
 
 How the updater works
@@ -30,6 +31,14 @@ How the updater works
    - Applies balance deltas per holder in raw token units.
 3. Rebuilds the combined top-500 snapshot.
 4. Writes the updated state and public JSON artifacts.
+
+Label registry
+- `data/holder_labels.json` is a committed registry keyed by address.
+- Supported fields per address:
+  - `label` - friendly display name shown in the UI
+  - `category` - short tag such as `bridge`, `protocol`, `burn`, `contract`, or `system`
+  - `excludeFromRanking` - if `true`, the address is removed from the public ranking snapshot
+- This is the preferred place to maintain known wallet names over time.
 
 Configuration
 - Preferred: set `ALCHEMY_API_KEY` and let the script derive the three chain RPC endpoints.

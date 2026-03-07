@@ -39,6 +39,8 @@ interface HolderRankingRow {
   holder: string;
   chainsHolding: number;
   totalIxs: string;
+  label?: string | null;
+  labelCategory?: string | null;
 }
 
 interface HolderRankingsResponse {
@@ -64,6 +66,23 @@ function formatHolderAddress(address: string): string {
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   }
   return `${address.slice(0, 2)}...${address.slice(-4)}`;
+}
+
+function getHolderLabelTone(category?: string | null): string {
+  switch ((category || '').toLowerCase()) {
+    case 'bridge':
+      return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-500/10 dark:text-amber-200';
+    case 'protocol':
+      return 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/60 dark:bg-violet-500/10 dark:text-violet-200';
+    case 'burn':
+      return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-500/10 dark:text-rose-200';
+    case 'contract':
+      return 'border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200';
+    case 'system':
+      return 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-500/10 dark:text-sky-200';
+    default:
+      return 'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-900/60 dark:bg-cyan-500/10 dark:text-cyan-200';
+  }
 }
 
 interface ChainIconProps {
@@ -272,10 +291,18 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
 
   const holderSearchNormalized = holderSearch.trim().toLowerCase();
   const visibleHolderRows = holderSearchNormalized
-    ? holderRows.filter((row) => row.holder.includes(holderSearchNormalized))
+    ? holderRows.filter((row) => {
+      const label = typeof row.label === 'string' ? row.label.toLowerCase() : '';
+      const category = typeof row.labelCategory === 'string' ? row.labelCategory.toLowerCase() : '';
+      return (
+        row.holder.includes(holderSearchNormalized) ||
+        label.includes(holderSearchNormalized) ||
+        category.includes(holderSearchNormalized)
+      );
+    })
     : holderRows;
   const holderRowsVisible = 10;
-  const holderRowHeightPx = 44;
+  const holderRowHeightPx = 56;
   const holderListMaxHeightPx = holderRowsVisible * holderRowHeightPx;
 
   const holderLastRefreshedLabel = holderLastRefreshed
@@ -824,7 +851,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                             {visibleHolderRows.map((row) => (
                               <div
                                 key={`${row.rank}-${row.holder}`}
-                                className="box-border grid h-11 grid-cols-12 items-center gap-2 border-b border-gray-100 px-4 text-sm hover:bg-gray-50/90 last:border-b-0 dark:border-slate-700/70 dark:hover:bg-slate-800/60"
+                                className="box-border grid min-h-14 grid-cols-12 items-center gap-2 border-b border-gray-100 px-4 py-2 text-sm hover:bg-gray-50/90 last:border-b-0 dark:border-slate-700/70 dark:hover:bg-slate-800/60"
                               >
                                 <span className="col-span-1 text-left font-semibold tabular-nums text-gray-900 dark:text-gray-100">{row.rank}</span>
                                 <button
@@ -838,7 +865,21 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                                       : 'text-cyan-700 dark:text-cyan-300'
                                   }`}
                                 >
-                                  {formatHolderAddress(row.holder)}
+                                  <span className="flex flex-wrap items-center gap-2 font-sans">
+                                    {row.label ? (
+                                      <span className="font-semibold text-gray-900 dark:text-gray-100">{row.label}</span>
+                                    ) : null}
+                                    {row.labelCategory ? (
+                                      <span
+                                        className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] ${getHolderLabelTone(row.labelCategory)}`}
+                                      >
+                                        {row.labelCategory}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  <span className="mt-0.5 block font-mono text-xs text-current/80">
+                                    {formatHolderAddress(row.holder)}
+                                  </span>
                                 </button>
                                 <span className="col-span-6 w-full text-right font-mono font-bold text-gray-900 dark:text-white">{row.totalIxs}</span>
                               </div>
@@ -855,7 +896,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                           type="text"
                           value={holderSearch}
                           onChange={(event) => setHolderSearch(event.target.value)}
-                          placeholder="0x..."
+                          placeholder="0x... or label"
                           className="w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm font-mono text-gray-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200/70 dark:border-slate-600 dark:bg-slate-900/70 dark:text-gray-100 dark:focus:border-cyan-400 dark:focus:ring-cyan-800/60"
                         />
                       </label>

@@ -93,13 +93,10 @@ const EXCLUSION_ENV_KEYS = [
   'NEXT_PUBLIC_POLYGON_BURN_ADDRESSES',
 ];
 
-const DEFAULT_PROJECT_EXCLUDED_ADDRESSES = [
-  '0xec36cffd536fac67513871e114df58470696734b',
-];
-
 const STATE_DIR = path.join(__dirname, '..', 'data');
 const OUTPUT_DIR = path.join(__dirname, '..', 'public', 'data');
 const STATE_FILE = path.join(STATE_DIR, 'holder_rankings_state.json');
+const LABELS_FILE = path.join(STATE_DIR, 'holder_labels.json');
 const OUTPUT_FILE = path.join(OUTPUT_DIR, 'holder_rankings.json');
 
 let rpcCallCount = 0;
@@ -155,15 +152,51 @@ function parseAddressList(value) {
   return parseRpcListValue(value).map((entry) => String(entry || '').toLowerCase()).filter(isValidAddress);
 }
 
-function buildExcludedAddressSet() {
+function normalizeHolderLabelRegistry(raw) {
+  const input = raw && typeof raw === 'object' ? raw : {};
+  const source =
+    input.addresses && typeof input.addresses === 'object' && !Array.isArray(input.addresses)
+      ? input.addresses
+      : input;
+  const labels = {};
+
+  for (const [address, value] of Object.entries(source)) {
+    const normalizedAddress = String(address || '').toLowerCase();
+    if (!isValidAddress(normalizedAddress) || !value || typeof value !== 'object' || Array.isArray(value)) {
+      continue;
+    }
+
+    const label = typeof value.label === 'string' ? value.label.trim() : '';
+    const category = typeof value.category === 'string' ? value.category.trim().toLowerCase() : '';
+    const excludeFromRanking = value.excludeFromRanking === true;
+
+    if (!label && !category && !excludeFromRanking) continue;
+
+    labels[normalizedAddress] = {
+      label: label || null,
+      category: category || null,
+      excludeFromRanking,
+    };
+  }
+
+  return labels;
+}
+
+function readHolderLabelRegistry() {
+  return normalizeHolderLabelRegistry(readJson(LABELS_FILE, {}));
+}
+
+function buildExcludedAddressSet(holderLabels) {
   const excluded = new Set([ZERO_ADDRESS, DEAD_ADDRESS]);
 
   for (const config of TOKEN_CONFIGS) {
     excluded.add(config.address);
   }
 
-  for (const address of DEFAULT_PROJECT_EXCLUDED_ADDRESSES) {
-    excluded.add(address);
+  for (const [address, metadata] of Object.entries(holderLabels || {})) {
+    if (metadata && metadata.excludeFromRanking) {
+      excluded.add(address);
+    }
   }
 
   for (const key of EXCLUSION_ENV_KEYS) {
@@ -174,8 +207,6 @@ function buildExcludedAddressSet() {
 
   return excluded;
 }
-
-const EXCLUDED_ADDRESSES = buildExcludedAddressSet();
 
 function getRpcUrlsForChain(chain) {
   const urls = [];
@@ -642,13 +673,14 @@ async function processChainViaAlchemyAssetTransfers(state, chainState, config, l
   };
 }
 
-function buildPublicPayload(state) {
+function buildPublicPayload(state, holderLabels) {
   const limit = Math.max(1, Number(process.env.HOLDER_RANKINGS_LIMIT || DEFAULT_LIMIT));
+  const excludedAddresses = buildExcludedAddressSet(holderLabels);
   const entries = [];
 
   for (const [holder, chainBalances] of Object.entries(state.holders || {})) {
     if (!isValidAddress(holder) || !chainBalances || typeof chainBalances !== 'object') continue;
-    if (EXCLUDED_ADDRESSES.has(holder)) continue;
+    if (excludedAddresses.has(holder)) continue;
 
     let totalRaw = 0n;
     let chainsHolding = 0;
@@ -662,7 +694,13 @@ function buildPublicPayload(state) {
     }
 
     if (totalRaw <= 0n) continue;
-    entries.push({ holder, totalRaw, chainsHolding });
+    entries.push({
+      holder,
+      totalRaw,
+      chainsHolding,
+      label: holderLabels && holderLabels[holder] ? holderLabels[holder].label : null,
+      labelCategory: holderLabels && holderLabels[holder] ? holderLabels[holder].category : null,
+    });
   }
 
   entries.sort((left, right) => {
@@ -679,6 +717,8 @@ function buildPublicPayload(state) {
       holder: entry.holder,
       chainsHolding: entry.chainsHolding,
       totalIxs: formatTokenAmount(entry.totalRaw, DEFAULT_TOKEN_DECIMALS, 2),
+      label: entry.label,
+      labelCategory: entry.labelCategory,
     })),
     totalRowCount: entries.length,
     lastRefreshed: state.updatedAt || null,
@@ -820,6 +860,7 @@ async function main() {
   ensureDirectory(OUTPUT_DIR);
 
   const state = normalizeState(readJson(STATE_FILE, createDefaultState()));
+  const holderLabels = readHolderLabelRegistry();
   for (const config of TOKEN_CONFIGS) {
     const summary = await processChain(state, config);
     console.log(
@@ -831,7 +872,7 @@ async function main() {
   state.updatedAt = completedAt;
   persistState(state);
 
-  const publicPayload = buildPublicPayload(state);
+  const publicPayload = buildPublicPayload(state, holderLabels);
   writeJson(OUTPUT_FILE, publicPayload, 2);
 
   console.log(

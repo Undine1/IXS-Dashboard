@@ -31,7 +31,7 @@ A production-ready analytics dashboard that tracks IXS token burns, Total Value 
   - `update_pool_volume_indexer.js` - incremental pool volume updater
   - `update_holder_rankings.js` - incremental holder snapshot updater
 - `public/data/` - public artifacts consumed by the app
-- `data/` - non-public incremental state for holder rankings
+- `data/` - non-public incremental state and manual label registry for holder rankings
 - `.github/workflows/` - scheduled automation
 
 ## Environment variables
@@ -100,6 +100,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - `public/data/pool_volume_alert.json` - pool updater alert output
 - `public/data/holder_rankings.json` - top-holder snapshot served by `/api/holderRankings`
 - `data/holder_rankings_state.json` - non-public cumulative balances and per-chain checkpoints for holder rankings
+- `data/holder_labels.json` - manual address labels and exclusion rules for holder rankings
 
 ## Troubleshooting
 - If pool updates fail, inspect `public/data/pool_volume_alert.json` and `public/data/pool_volume_runs.json`.

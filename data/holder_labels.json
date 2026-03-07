@@ -1,0 +1,42 @@
+{
+  "addresses": {
+    "0x0000000000000000000000000000000000000000": {
+      "label": "Zero Address",
+      "category": "system",
+      "excludeFromRanking": true
+    },
+    "0x000000000000000000000000000000000000dead": {
+      "label": "Dead Wallet",
+      "category": "burn",
+      "excludeFromRanking": true
+    },
+    "0x73d7c860998ca3c01ce8c808f5577d94d545d1b4": {
+      "label": "IXS Contract (Ethereum)",
+      "category": "contract",
+      "excludeFromRanking": true
+    },
+    "0xfe550bffb51eb645ea3b324d772a19ac449e92c5": {
+      "label": "IXS Contract (Base)",
+      "category": "contract",
+      "excludeFromRanking": true
+    },
+    "0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8": {
+      "label": "IXS Contract (Polygon)",
+      "category": "contract",
+      "excludeFromRanking": true
+    },
+    "0xec36cffd536fac67513871e114df58470696734b": {
+      "label": "IXS Burn Wallet (Ethereum)",
+      "category": "burn",
+      "excludeFromRanking": true
+    },
+    "0x3ee18b2214aff97000d974cf647e7c347e8fa585": {
+      "label": "Wormhole Token Bridge",
+      "category": "bridge"
+    },
+    "0x000000000004444c5dc75cb358380d2e3de08a90": {
+      "label": "Uniswap V4 Pool Manager",
+      "category": "protocol"
+    }
+  }
+}
