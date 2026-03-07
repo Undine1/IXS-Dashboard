@@ -16,8 +16,8 @@ jobs:
     name: Run updater and commit
     runs-on: ubuntu-latest
     concurrency:
-      group: pool-volume-update
-      cancel-in-progress: true
+      group: dashboard-data-update
+      cancel-in-progress: false
     timeout-minutes: 60
     steps:
       - name: Checkout repository (use PAT for push)

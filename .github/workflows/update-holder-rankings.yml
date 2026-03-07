@@ -16,8 +16,8 @@ jobs:
     name: Build holder snapshot and deploy
     runs-on: ubuntu-latest
     concurrency:
-      group: holder-rankings-update
-      cancel-in-progress: true
+      group: dashboard-data-update
+      cancel-in-progress: false
     timeout-minutes: 90
     steps:
       - name: Checkout repository (use PAT for push)
