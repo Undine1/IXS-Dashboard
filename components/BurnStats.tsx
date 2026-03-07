@@ -40,7 +40,6 @@ interface HolderRankingRow {
   chainsHolding: number;
   totalIxs: string;
   label?: string | null;
-  labelCategory?: string | null;
 }
 
 interface HolderRankingsResponse {

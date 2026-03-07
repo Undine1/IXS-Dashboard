@@ -11,7 +11,6 @@ interface HolderRankingRow {
   chainsHolding: number;
   totalIxs: string;
   label: string | null;
-  labelCategory: string | null;
 }
 
 interface HolderRankingsSuccessPayload {
@@ -71,10 +70,6 @@ function normalizeRow(row: unknown, index: number): HolderRankingRow | null {
   const totalIxs =
     typeof payload.totalIxs === 'string' && payload.totalIxs.trim() !== '' ? payload.totalIxs : '0.00';
   const label = typeof payload.label === 'string' && payload.label.trim() !== '' ? payload.label.trim() : null;
-  const labelCategory =
-    typeof payload.labelCategory === 'string' && payload.labelCategory.trim() !== ''
-      ? payload.labelCategory.trim().toLowerCase()
-      : null;
 
   return {
     rank,
@@ -82,7 +77,6 @@ function normalizeRow(row: unknown, index: number): HolderRankingRow | null {
     chainsHolding,
     totalIxs,
     label,
-    labelCategory,
   };
 }
 

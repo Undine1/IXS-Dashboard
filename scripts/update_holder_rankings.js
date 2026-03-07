@@ -699,7 +699,6 @@ function buildPublicPayload(state, holderLabels) {
       totalRaw,
       chainsHolding,
       label: holderLabels && holderLabels[holder] ? holderLabels[holder].label : null,
-      labelCategory: holderLabels && holderLabels[holder] ? holderLabels[holder].category : null,
     });
   }
 
@@ -718,7 +717,6 @@ function buildPublicPayload(state, holderLabels) {
       chainsHolding: entry.chainsHolding,
       totalIxs: formatTokenAmount(entry.totalRaw, DEFAULT_TOKEN_DECIMALS, 2),
       label: entry.label,
-      labelCategory: entry.labelCategory,
     })),
     totalRowCount: entries.length,
     lastRefreshed: state.updatedAt || null,
