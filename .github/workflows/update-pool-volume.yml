@@ -48,9 +48,8 @@ jobs:
           BACKUP_API_KEY: ${{ secrets.BACKUP_API_KEY }}
           POLYGON_USDC: ${{ secrets.POLYGON_USDC }}
           BLOCKS_PER_DAY: ${{ env.BLOCKS_PER_DAY }}
-          LOG_CHUNK: '200'
-          MAX_FETCH_PASSES: '2'
-          MAX_CHUNK_TIME_MS: '5000'
+          RPC_LOG_BLOCK_CHUNK: '200'
+          RPC_MIN_LOG_BLOCK_CHUNK: '10'
           WINDOW_SECONDS: '3600'
           MAX_JITTER: '8'
         run: node ./scripts/update_pool_volume_indexer.js

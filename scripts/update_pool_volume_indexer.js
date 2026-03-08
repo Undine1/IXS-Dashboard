@@ -345,26 +345,89 @@ async function fetchTransferLogsRpc(chain, usdcAddr, fromBlock, endBlock, pairTo
   return Array.isArray(logs) ? logs : [];
 }
 
+function inferMaxLogRangeFromError(error) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  const rangeMatch = message.match(/up to a (\d+) block range/i);
+  if (rangeMatch) {
+    const parsed = Number(rangeMatch[1]);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+  }
+
+  const suggestedRangeMatch = message.match(/should work:\s*\[(0x[0-9a-f]+),\s*(0x[0-9a-f]+)\]/i);
+  if (suggestedRangeMatch) {
+    const start = fromRpcHex(suggestedRangeMatch[1]);
+    const end = fromRpcHex(suggestedRangeMatch[2]);
+    if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+      return Math.floor(end - start + 1);
+    }
+  }
+
+  return null;
+}
+
 async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6) {
-  const chunkSize = Math.max(10, Number(process.env.RPC_LOG_BLOCK_CHUNK || 500));
+  const configuredMaxChunk = Math.max(
+    10,
+    Number(process.env.RPC_LOG_BLOCK_CHUNK || process.env.LOG_CHUNK || 500),
+  );
+  const configuredMinChunk = Math.max(
+    1,
+    Math.min(configuredMaxChunk, Number(process.env.RPC_MIN_LOG_BLOCK_CHUNK || 10)),
+  );
   const pairTopic = addrToTopic(pairAddr);
   const seen = new Set();
   let totalRaw = 0n;
+  let chunkSize = configuredMaxChunk;
 
-  for (let from = startBlock; from <= endBlock; from += chunkSize) {
+  for (let from = startBlock; from <= endBlock;) {
     const to = Math.min(endBlock, from + chunkSize - 1);
-    const outgoing = await fetchTransferLogsRpc(chain, usdcAddr, from, to, pairTopic, false);
-    const incoming = await fetchTransferLogsRpc(chain, usdcAddr, from, to, pairTopic, true);
-    const merged = outgoing.concat(incoming);
-    for (const log of merged) {
-      const k = logKey(log);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      try {
-        totalRaw += BigInt(log.data || '0x0');
-      } catch {
-        // ignore malformed log payload
+
+    try {
+      const outgoing = await fetchTransferLogsRpc(chain, usdcAddr, from, to, pairTopic, false);
+      const incoming = await fetchTransferLogsRpc(chain, usdcAddr, from, to, pairTopic, true);
+      const merged = outgoing.concat(incoming);
+      for (const log of merged) {
+        const k = logKey(log);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        try {
+          totalRaw += BigInt(log.data || '0x0');
+        } catch {
+          // ignore malformed log payload
+        }
       }
+
+      from = to + 1;
+
+      if (merged.length === 0 && chunkSize < configuredMaxChunk) {
+        chunkSize = Math.min(configuredMaxChunk, chunkSize * 2);
+      }
+    } catch (error) {
+      if (chunkSize <= configuredMinChunk) {
+        throw new Error(
+          `Failed eth_getLogs scan for ${chain} blocks ${from}-${to}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+
+      const inferredMaxChunk = inferMaxLogRangeFromError(error);
+      const nextChunkSize = inferredMaxChunk != null
+        ? Math.max(configuredMinChunk, Math.min(chunkSize - 1, inferredMaxChunk))
+        : Math.max(configuredMinChunk, Math.floor(chunkSize / 2));
+
+      if (nextChunkSize === chunkSize) {
+        throw new Error(
+          `Failed eth_getLogs scan for ${chain} blocks ${from}-${to}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+
+      console.warn(
+        `[pool-volume] ${chain}: reducing log chunk ${chunkSize} -> ${nextChunkSize} after eth_getLogs error`,
+      );
+      chunkSize = nextChunkSize;
     }
   }
 
