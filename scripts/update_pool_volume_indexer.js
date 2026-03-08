@@ -61,6 +61,7 @@ let retryCount = 0;
 let totalPoolCount = 0;
 let successfulPoolCount = 0;
 let failedPoolCount = 0;
+const latestBlockCache = new Map();
 
 if (!ALCHEMY_API_KEY && !BACKUP_API_KEY) {
   console.error('At least one RPC API key is required (ALCHEMY_API_KEY or BACKUP_API_KEY)');
@@ -276,6 +277,17 @@ async function getLatestBlockRpc(chain) {
   return n;
 }
 
+async function getLatestBlockState(chain) {
+  if (latestBlockCache.has(chain)) {
+    return latestBlockCache.get(chain);
+  }
+
+  const latestNumber = await getLatestBlockRpc(chain);
+  const latestBlock = await getBlockByNumberRpc(chain, latestNumber);
+  latestBlockCache.set(chain, latestBlock);
+  return latestBlock;
+}
+
 async function getBlockByNumberRpc(chain, blockNumber) {
   const block = await rpcCall(chain, 'eth_getBlockByNumber', [asRpcHex(blockNumber), false]);
   if (!block || block.number == null || block.timestamp == null) {
@@ -300,8 +312,7 @@ async function getBlockByTimestampRpc(ts, chain) {
     err.code = 'RPC_INVALID_TIMESTAMP';
     throw err;
   }
-  const latestNum = await getLatestBlockRpc(chain);
-  const latest = await getBlockByNumberRpc(chain, latestNum);
+  const latest = await getLatestBlockState(chain);
   if (targetTs >= latest.timestamp) return latest.number;
 
   let low = 0;
@@ -475,6 +486,9 @@ async function main() {
       const legacyCheckpointKey = `${addr}-${chain}`;
       const poolCheckpoint = checkpoint[addr] || checkpoint[legacyCheckpointKey] || {};
       const checkpointStartTs = toEpochSeconds(poolCheckpoint.lastTimestamp);
+      const checkpointStartBlock = Number.isFinite(Number(poolCheckpoint.lastBlock))
+        ? Math.floor(Number(poolCheckpoint.lastBlock))
+        : null;
       const poolLastUpdatedTs = toEpochSeconds(pool.lastUpdated);
       startTs = checkpointStartTs || poolLastUpdatedTs || (now - Number(process.env.WINDOW_SECONDS || 3600));
       const endTs = Math.floor(Date.now() / 1000);
@@ -506,12 +520,20 @@ async function main() {
       let endBlock;
       let totalUsdc = 0;
       const source = 'alchemy-rpc';
-      startBlock = await getBlockByTimestamp(startTs, chain);
+      startBlock = checkpointStartBlock != null ? checkpointStartBlock + 1 : await getBlockByTimestamp(startTs, chain);
       endBlock = await getBlockByTimestamp(endTs, chain);
-      if (!Number.isFinite(startBlock) || !Number.isFinite(endBlock) || endBlock < startBlock) {
+      if (!Number.isFinite(startBlock) || !Number.isFinite(endBlock)) {
         const err = new Error(`Invalid block range resolved: start=${startBlock}, end=${endBlock}`);
         err.code = 'INVALID_BLOCK_RANGE';
         throw err;
+      }
+      if (startBlock > endBlock) {
+        console.log(`Skipping ${addr}: no new blocks since checkpoint (start=${startBlock}, end=${endBlock})`);
+        checkpoint[addr] = { lastTimestamp: endTs, lastBlock: endBlock };
+        if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
+        fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+        successfulPoolCount += 1;
+        continue;
       }
       console.log('Block range', startBlock, endBlock);
       const tokenDecimals = Number(pool.usdc_decimals || pool.decimals || process.env.USDC_DECIMALS || 6);
