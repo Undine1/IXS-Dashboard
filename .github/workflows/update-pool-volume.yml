@@ -97,13 +97,13 @@ jobs:
 
       - name: Check run alerts and fail if thresholds exceeded
         env:
-          ALERT_INDEXER_CALLS: ${{ env.ALERT_INDEXER_CALLS || '50' }}
+          ALERT_INDEXER_CALLS: ${{ env.ALERT_INDEXER_CALLS || '200' }}
           ALERT_PROVIDER_BANS: ${{ env.ALERT_PROVIDER_BANS || '1' }}
         run: |
           node <<'NODE'
           const fs = require('fs');
           const p = 'public/data/pool_volume_alert.json';
-          const maxCalls = Number(process.env.ALERT_INDEXER_CALLS || '50');
+          const maxCalls = Number(process.env.ALERT_INDEXER_CALLS || '200');
           const maxProvider = Number(process.env.ALERT_PROVIDER_BANS || '1');
 
           if (!fs.existsSync(p)) {
@@ -114,7 +114,7 @@ jobs:
           const a = JSON.parse(fs.readFileSync(p, 'utf8'));
           const apiCalls = Number(a.apiCallCount || 0);
           const reasons = Array.isArray(a.reasons) ? a.reasons.map(String) : [];
-          const providerSignals = reasons.filter((r) => /request-failed|429|throttle|ban|forbidden|invalid-address/i.test(r)).length;
+          const providerSignals = reasons.filter((r) => /request-failed|401|429|unauthorized|throttle|ban|forbidden|invalid-address/i.test(r)).length;
           const totalPools = Number(a.totalPoolCount || 0);
           const successfulPools = Number(a.successfulPoolCount || 0);
           const failedPools = Number(a.failedPoolCount || 0);

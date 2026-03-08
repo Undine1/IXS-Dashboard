@@ -191,6 +191,21 @@ function logKey(log) {
   return `${(log && log.transactionHash) || ''}:${(log && log.logIndex) || ''}`;
 }
 
+function getProviderHost(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return String(url || 'unknown-provider');
+  }
+}
+
+function getProviderLabel(url) {
+  const host = getProviderHost(url).toLowerCase();
+  if (host.includes('alchemy')) return 'alchemy';
+  if (host.includes('infura')) return 'infura';
+  return host || 'unknown';
+}
+
 async function rpcCall(chain, method, params) {
   const urls = getRpcUrlsForChain(chain);
   if (!urls.length) {
@@ -200,7 +215,10 @@ async function rpcCall(chain, method, params) {
   }
 
   let lastErr = null;
+  const providerErrors = [];
   for (const url of urls) {
+    const providerLabel = getProviderLabel(url);
+    const providerHost = getProviderHost(url);
     try {
       const payload = { jsonrpc: '2.0', id: Date.now(), method, params };
       const res = await requestWithRetries(url, {
@@ -223,14 +241,28 @@ async function rpcCall(chain, method, params) {
         err.code = classifyRpcErrorMessage(msg);
         throw err;
       }
+      if (providerErrors.length > 0) {
+        console.warn(
+          `[pool-volume] ${chain} ${method}: using fallback provider ${providerLabel} (${providerHost}) after previous failures: ${providerErrors.join(' | ')}`,
+        );
+      }
       return j.result;
     } catch (e) {
+      const code = (e && e.code) || 'unknown';
+      const message = (e && e.message) || String(e);
+      providerErrors.push(`${providerLabel}@${providerHost} code=${code} msg=${message}`);
+      console.warn(`[pool-volume] ${chain} ${method}: provider ${providerLabel} (${providerHost}) failed: ${message}`);
       lastErr = e;
       continue;
     }
   }
 
-  throw lastErr || new Error(`RPC call failed for ${method}`);
+  const aggregate = new Error(
+    `RPC call failed for chain=${chain} method=${method}; providers tried: ${providerErrors.join(' | ')}`,
+  );
+  aggregate.code = (lastErr && lastErr.code) || 'RPC_ALL_PROVIDERS_FAILED';
+  aggregate.providerErrors = providerErrors;
+  throw aggregate;
 }
 
 async function getLatestBlockRpc(chain) {
