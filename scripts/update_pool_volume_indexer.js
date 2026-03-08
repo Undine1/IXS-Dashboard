@@ -228,7 +228,15 @@ async function rpcCall(chain, method, params) {
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        const err = new Error(`RPC HTTP ${res.status} ${res.statusText} at ${url}`);
+        let responseText = '';
+        try {
+          responseText = (await res.text()).replace(/\s+/g, ' ').trim();
+        } catch {
+          responseText = '';
+        }
+        const err = new Error(
+          `RPC HTTP ${res.status} ${res.statusText} at ${url}${responseText ? `: ${responseText}` : ''}`,
+        );
         if (res.status === 403) err.code = 'RPC_FORBIDDEN';
         else if (res.status === 429) err.code = 'RPC_RATE_LIMIT';
         else if (res.status === 408 || res.status === 504) err.code = 'RPC_TIMEOUT';
