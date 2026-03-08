@@ -47,6 +47,11 @@ const networkToAlchemy: Record<ChainNetwork, string> = {
   polygon: 'polygon-mainnet',
   base: 'base-mainnet',
 };
+const networkToInfura: Record<ChainNetwork, string> = {
+  ethereum: 'mainnet',
+  polygon: 'polygon-mainnet',
+  base: 'base-mainnet',
+};
 
 const STABLE_TOKENS_BY_NETWORK: Record<ChainNetwork, string[]> = {
   ethereum: [
@@ -144,40 +149,39 @@ function bigintToDecimalNumber(value: bigint, decimals: number, precision = 12):
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function getAlchemyUrls(network: ChainNetwork): string[] {
+function getRpcUrls(network: ChainNetwork): string[] {
   const alchemyNetwork = networkToAlchemy[network];
-  if (!alchemyNetwork) return [];
+  const infuraNetwork = networkToInfura[network];
 
   const urls: string[] = [];
-  const addKey = (key: string) => {
-    if (!key) return;
-    const url = `https://${alchemyNetwork}.g.alchemy.com/v2/${key}`;
+  const addUrl = (url: string | null) => {
+    if (!url) return;
     if (!urls.includes(url)) urls.push(url);
   };
 
-  addKey(ALCHEMY_API_KEY);
-  addKey(BACKUP_API_KEY);
+  addUrl(ALCHEMY_API_KEY && alchemyNetwork ? `https://${alchemyNetwork}.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : null);
+  addUrl(BACKUP_API_KEY && infuraNetwork ? `https://${infuraNetwork}.infura.io/v3/${BACKUP_API_KEY}` : null);
   return urls;
 }
 
 async function alchemyCall(
-  alchemyUrls: string[],
+  rpcUrls: string[],
   payload: Record<string, unknown>,
   maxRetries = 7
 ): Promise<string> {
-  if (!alchemyUrls.length) {
-    throw new Error('alchemyCall: no Alchemy API key configured');
+  if (!rpcUrls.length) {
+    throw new Error('rpcCall: no RPC API key configured');
   }
 
   let lastError: unknown = null;
 
-  for (const alchemyUrl of alchemyUrls) {
+  for (const rpcUrl of rpcUrls) {
     let attempt = 0;
     let delay = 700;
 
     while (attempt <= maxRetries) {
       try {
-        const resp = await axios.post(alchemyUrl, payload, {
+        const resp = await axios.post(rpcUrl, payload, {
           headers: { 'Content-Type': 'application/json' },
           timeout: API_TIMEOUT,
         });
@@ -216,38 +220,38 @@ async function alchemyCall(
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error('alchemyCall: exceeded retries');
+  throw lastError instanceof Error ? lastError : new Error('rpcCall: exceeded retries');
 }
 
 async function fetchPoolValue(pool: PoolConfig, prices: Prices): Promise<FetchPoolResult> {
-  const alchemyUrls = getAlchemyUrls(pool.network);
+  const rpcUrls = getRpcUrls(pool.network);
 
   try {
-    const token0Hex = await alchemyCall(alchemyUrls, {
+    const token0Hex = await alchemyCall(rpcUrls, {
       jsonrpc: '2.0',
       id: 1,
       method: 'eth_call',
       params: [{ to: pool.address, data: '0x0dfe1681' }, 'latest'],
     });
-    const token1Hex = await alchemyCall(alchemyUrls, {
+    const token1Hex = await alchemyCall(rpcUrls, {
       jsonrpc: '2.0',
       id: 2,
       method: 'eth_call',
       params: [{ to: pool.address, data: '0xd21220a7' }, 'latest'],
     });
-    const decimals0Hex = await alchemyCall(alchemyUrls, {
+    const decimals0Hex = await alchemyCall(rpcUrls, {
       jsonrpc: '2.0',
       id: 3,
       method: 'eth_call',
       params: [{ to: normalizeAddressFromHex(token0Hex), data: '0x313ce567' }, 'latest'],
     });
-    const decimals1Hex = await alchemyCall(alchemyUrls, {
+    const decimals1Hex = await alchemyCall(rpcUrls, {
       jsonrpc: '2.0',
       id: 4,
       method: 'eth_call',
       params: [{ to: normalizeAddressFromHex(token1Hex), data: '0x313ce567' }, 'latest'],
     });
-    const reservesHex = await alchemyCall(alchemyUrls, {
+    const reservesHex = await alchemyCall(rpcUrls, {
       jsonrpc: '2.0',
       id: 5,
       method: 'eth_call',
@@ -336,7 +340,7 @@ export async function GET(req: Request) {
     const debugMode = url.searchParams.get('debug') === '1' || url.searchParams.get('debug') === 'true';
 
     if (!ALCHEMY_API_KEY && !BACKUP_API_KEY) {
-      console.warn('[pools API] No Alchemy API key is set; eth_calls will fail');
+      console.warn('[pools API] No RPC API key is set; eth_calls will fail');
     }
 
     const prices: Prices = {};

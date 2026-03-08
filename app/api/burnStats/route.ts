@@ -22,6 +22,11 @@ const networkToAlchemy: Record<string, string> = {
   polygon: 'polygon-mainnet',
   base: 'base-mainnet'
 };
+const networkToInfura: Record<string, string> = {
+  ethereum: 'mainnet',
+  polygon: 'polygon-mainnet',
+  base: 'base-mainnet'
+};
 
 // Ethereum Configuration
 const ETH_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_ETH_TOKEN_ADDRESS || '').trim();
@@ -53,19 +58,18 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function getAlchemyUrls(network: 'ethereum' | 'polygon' | 'base'): string[] {
+function getRpcUrls(network: 'ethereum' | 'polygon' | 'base'): string[] {
   const alchemyNetwork = networkToAlchemy[network];
-  if (!alchemyNetwork) return [];
+  const infuraNetwork = networkToInfura[network];
 
   const urls: string[] = [];
-  const addKey = (key: string) => {
-    if (!key) return;
-    const url = `https://${alchemyNetwork}.g.alchemy.com/v2/${key}`;
+  const addUrl = (url: string | null) => {
+    if (!url) return;
     if (!urls.includes(url)) urls.push(url);
   };
 
-  addKey(ALCHEMY_API_KEY);
-  addKey(BACKUP_API_KEY);
+  addUrl(ALCHEMY_API_KEY && alchemyNetwork ? `https://${alchemyNetwork}.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : null);
+  addUrl(BACKUP_API_KEY && infuraNetwork ? `https://${infuraNetwork}.infura.io/v3/${BACKUP_API_KEY}` : null);
   return urls;
 }
 
@@ -108,9 +112,9 @@ async function fetchBalancesForNetwork(
         ]
       };
 
-      const urls = getAlchemyUrls(network);
+      const urls = getRpcUrls(network);
       if (!urls.length) {
-        throw new Error(`Alchemy is not configured for ${network}`);
+        throw new Error(`RPC provider is not configured for ${network}`);
       }
 
       let responseData: { result?: string } | null = null;
@@ -165,7 +169,7 @@ export async function GET(req: Request) {
   try {
     // Validate API key exists (on server side only)
     if (!ALCHEMY_API_KEY && !BACKUP_API_KEY) {
-      console.error('[burnStats API] Alchemy API keys are not configured');
+      console.error('[burnStats API] RPC API keys are not configured');
       return NextResponse.json(
         { error: 'Service misconfiguration' },
         { status: 500 }

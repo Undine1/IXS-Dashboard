@@ -26,8 +26,9 @@ How the updater works
 1. Loads the saved state from `data/holder_rankings_state.json` if present.
 2. For each configured chain:
    - Resolves the token contract deployment block if no checkpoint exists yet.
-   - Uses `ALCHEMY_API_KEY`, then `BACKUP_API_KEY` if needed.
-   - Pages transfer history with `alchemy_getAssetTransfers`.
+   - Uses `ALCHEMY_API_KEY` for `alchemy_getAssetTransfers`.
+   - Falls back to standard JSON-RPC using `ALCHEMY_API_KEY`, then `BACKUP_API_KEY` if needed.
+   - Pages transfer history with `alchemy_getAssetTransfers`, then falls back to `eth_getLogs` if the Alchemy-specific path is unavailable.
    - Applies balance deltas per holder in raw token units.
 3. Rebuilds the combined top-500 snapshot.
 4. Writes the updated state and public JSON artifacts.
@@ -43,7 +44,7 @@ Label registry
 Configuration
 - Set `ALCHEMY_API_KEY` and let the script derive the three chain RPC endpoints.
 - Optional:
-  - `BACKUP_API_KEY` as a second Alchemy key for fallback
+  - `BACKUP_API_KEY` as an Infura project key for fallback
 - Optional holder updater tuning:
   - `HOLDER_RANKINGS_LIMIT` (default `600`)
   - `HOLDER_RANKINGS_EXCLUDED_ADDRESSES` (comma-separated global exclusion list)
@@ -71,7 +72,7 @@ Bootstrap notes
 
 Running locally
 1. Put `ALCHEMY_API_KEY` in `.env.local`.
-2. Optionally add `BACKUP_API_KEY`.
+2. Optionally add `BACKUP_API_KEY` as an Infura project key.
 3. Run:
    ```bash
    npm run update:holder-rankings
@@ -99,5 +100,5 @@ Operational notes
 - The app still reads `/api/holderRankings`; only the data source changed.
 - The snapshot file is the only data served publicly.
 - The state file is committed to the repo for persistence between scheduled runs, but it is not served by Next.js.
-- On Alchemy Free, `eth_getLogs` is severely block-range limited; using the Alchemy Asset Transfers path avoids that issue.
+- On Alchemy Free, `eth_getLogs` is severely block-range limited; the Alchemy Asset Transfers path remains the preferred primary path.
 - By default the public ranking excludes the zero address, `0x...dead`, and the three token contract addresses. Use the exclusion env vars above to add project-specific burn or treasury addresses.

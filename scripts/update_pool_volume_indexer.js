@@ -41,6 +41,11 @@ const ALCHEMY_NETWORKS = {
   polygon: 'polygon-mainnet',
   base: 'base-mainnet',
 };
+const INFURA_NETWORKS = {
+  ethereum: 'mainnet',
+  polygon: 'polygon-mainnet',
+  base: 'base-mainnet',
+};
 
 const GLOBAL_USDC = (process.env.POLYGON_USDC || '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174').toLowerCase();
 const GLOBAL_PAIR = (process.env.PAIR_ADDRESS || '0xd093a031df30f186976a1e2936b16d95ca7919d6').toLowerCase();
@@ -58,7 +63,7 @@ let successfulPoolCount = 0;
 let failedPoolCount = 0;
 
 if (!ALCHEMY_API_KEY && !BACKUP_API_KEY) {
-  console.error('At least one Alchemy API key is required (ALCHEMY_API_KEY or BACKUP_API_KEY)');
+  console.error('At least one RPC API key is required (ALCHEMY_API_KEY or BACKUP_API_KEY)');
   process.exit(2);
 }
 
@@ -142,22 +147,21 @@ function normalizeChain(chain) {
 
 function getAlchemyRpcUrlsForChain(chain) {
   const network = ALCHEMY_NETWORKS[normalizeChain(chain)];
+  if (!ALCHEMY_API_KEY) return [];
 
   const urls = [];
-  const addKey = (key) => {
-    const normalized = String(key || '').trim();
-    if (!normalized) return;
-    const url = `https://${network}.g.alchemy.com/v2/${normalized}`;
-    if (!urls.includes(url)) urls.push(url);
-  };
-
-  addKey(ALCHEMY_API_KEY);
-  addKey(BACKUP_API_KEY);
+  urls.push(`https://${network}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`);
   return urls;
 }
 
+function getInfuraRpcUrlsForChain(chain) {
+  const network = INFURA_NETWORKS[normalizeChain(chain)];
+  if (!network || !BACKUP_API_KEY) return [];
+  return [`https://${network}.infura.io/v3/${BACKUP_API_KEY}`];
+}
+
 function getRpcUrlsForChain(chain) {
-  return getAlchemyRpcUrlsForChain(chain);
+  return [...getAlchemyRpcUrlsForChain(chain), ...getInfuraRpcUrlsForChain(chain)];
 }
 
 async function getBlockByTimestamp(ts, chain) {

@@ -2,7 +2,7 @@
 
 A production-ready analytics dashboard that tracks IXS token burns, Total Value Locked (TVL), and holder rankings across Ethereum, Polygon, and Base. It uses lightweight on-chain reads plus a small set of updater scripts that persist artifacts into `public/data`.
 
-**Status:** Working prototype with multi-chain support, Alchemy-backed incremental updaters, and CI automation to persist computed artifacts.
+**Status:** Working prototype with multi-chain support, Alchemy-first incremental updaters, and CI automation to persist computed artifacts.
 
 ## Quick links
 - App entry: [app/page.tsx](app/page.tsx)
@@ -14,7 +14,7 @@ A production-ready analytics dashboard that tracks IXS token burns, Total Value 
 
 ## Project overview
 - Purpose: Track cumulative token burns, pool TVL (USD), and IXS holder rankings using on-chain derived data where possible.
-- Approach: Use Alchemy-backed RPC for pool volume updates and holder rankings. Scripts persist outputs so the Next.js app can serve stable snapshots.
+- Approach: Use Alchemy as the primary RPC provider, with Infura fallback through `BACKUP_API_KEY`. Scripts persist outputs so the Next.js app can serve stable snapshots.
 
 ## Tech stack
 - Next.js (App Router) + TypeScript
@@ -38,7 +38,7 @@ A production-ready analytics dashboard that tracks IXS token burns, Total Value 
 Create a `.env.local` in the project root.
 
 - `ALCHEMY_API_KEY` - primary shared RPC credential for Ethereum, Polygon, and Base
-- `BACKUP_API_KEY` - optional secondary Alchemy key used as fallback
+- `BACKUP_API_KEY` - optional Infura project key used as fallback
 - `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` - optional page size for Alchemy transfer pagination
 - `HOLDER_RANKINGS_EXCLUDED_ADDRESSES` - optional comma-separated addresses to hide from the public holder ranking
 - `HOLDER_RANKINGS_LOG_CHUNK` - optional initial `eth_getLogs` block span
@@ -78,8 +78,8 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - `GET /api/holderRankings` - returns the latest file-backed holder snapshot from `public/data/holder_rankings.json`
 
 ## Updater behavior
-- The pool volume updater uses Alchemy-backed RPC with exponential backoff and per-pool checkpoints.
-- The holder rankings updater uses Alchemy Asset Transfers pagination, keeps cumulative per-holder balances in `data/holder_rankings_state.json`, and writes a public top-500 snapshot.
+- The pool volume updater uses Alchemy-first JSON-RPC with Infura fallback, exponential backoff, and per-pool checkpoints.
+- The holder rankings updater uses Alchemy Asset Transfers pagination when available, falls back to standard JSON-RPC if needed, keeps cumulative per-holder balances in `data/holder_rankings_state.json`, and writes a public top-500 snapshot.
 - The public holder ranking excludes zero/dead/token-contract addresses by default and supports extra exclusions through env vars.
 - The first holder rankings run is the expensive bootstrap. Later runs only scan blocks after the last saved checkpoint.
 

@@ -5,7 +5,7 @@ Summary of the updater and automation in this repo.
 What it does
 - Persists per-pool lifetime USD totals to `public/data/pool_volume.json`.
 - Runs an hourly updater (`scripts/update_pool_volume_indexer.js`) via GitHub Actions.
-- Uses Alchemy-backed RPC calls to:
+- Uses JSON-RPC calls with provider fallback to:
   - Resolve timestamps to blocks via binary search.
   - Fetch ERC-20 `Transfer` logs via `eth_getLogs`.
 - Applies retry logic with backoff/jitter for transient failures.
@@ -18,7 +18,7 @@ Configuration
   - The updater auto-loads `.env.local` when these variables are not already exported.
 - CI (GitHub Actions): set `ALCHEMY_API_KEY` as a repository secret.
 - Optional:
-  - `BACKUP_API_KEY` as a second Alchemy key for fallback when the primary key is rate-limited or temporarily blocked.
+  - `BACKUP_API_KEY` as an Infura project key for fallback when the primary Alchemy key is rate-limited or temporarily blocked.
 - Optional:
   - `POLYGON_USDC` to override the default tracked USDC address.
   - `PAIR_ADDRESS` to override a default pool address.
@@ -32,8 +32,8 @@ Files of interest
 - `.github/workflows/update-pool-volume.yml` - scheduled automation and deploy flow.
 
 Operational notes
-- The updater uses Alchemy-backed RPC only.
-- `BACKUP_API_KEY` is tried automatically after `ALCHEMY_API_KEY` when present.
+- The updater uses `ALCHEMY_API_KEY` first for Ethereum, Polygon, and Base.
+- `BACKUP_API_KEY` is tried automatically through Infura when present.
 - If rate-limited, tune retry settings with:
   - `API_MAX_ATTEMPTS`
   - `API_BASE_DELAY_MS`

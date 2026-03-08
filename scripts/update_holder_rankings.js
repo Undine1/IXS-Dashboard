@@ -50,6 +50,11 @@ const ALCHEMY_NETWORKS = {
   polygon: 'polygon-mainnet',
   base: 'base-mainnet',
 };
+const INFURA_NETWORKS = {
+  ethereum: 'mainnet',
+  polygon: 'polygon-mainnet',
+  base: 'base-mainnet',
+};
 
 const TOKEN_CONFIGS = [
   {
@@ -155,19 +160,15 @@ function parseAddressList(value) {
 
 function getAlchemyRpcUrlsForChain(chain) {
   const network = ALCHEMY_NETWORKS[chain];
-  if (!network) return [];
+  if (!network || !ALCHEMY_API_KEY) return [];
 
-  const urls = [];
-  const addKey = (key) => {
-    const normalized = String(key || '').trim();
-    if (!normalized) return;
-    const url = `https://${network}.g.alchemy.com/v2/${normalized}`;
-    if (!urls.includes(url)) urls.push(url);
-  };
+  return [`https://${network}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`];
+}
 
-  addKey(ALCHEMY_API_KEY);
-  addKey(BACKUP_API_KEY);
-  return urls;
+function getInfuraRpcUrlsForChain(chain) {
+  const network = INFURA_NETWORKS[chain];
+  if (!network || !BACKUP_API_KEY) return [];
+  return [`https://${network}.infura.io/v3/${BACKUP_API_KEY}`];
 }
 
 function normalizeHolderLabelRegistry(raw) {
@@ -227,7 +228,7 @@ function buildExcludedAddressSet(holderLabels) {
 }
 
 function getRpcUrlsForChain(chain) {
-  return getAlchemyRpcUrlsForChain(chain);
+  return [...getAlchemyRpcUrlsForChain(chain), ...getInfuraRpcUrlsForChain(chain)];
 }
 
 function getAlchemyRpcUrlForChain(chain) {
@@ -748,13 +749,21 @@ async function processChain(state, config) {
       contractStartBlock = 0;
     }
     chainState.contractStartBlock = contractStartBlock;
-    return processChainViaAlchemyAssetTransfers(
-      state,
-      chainState,
-      config,
-      latestBlock,
-      contractStartBlock,
-    );
+    try {
+      return await processChainViaAlchemyAssetTransfers(
+        state,
+        chainState,
+        config,
+        latestBlock,
+        contractStartBlock,
+      );
+    } catch (error) {
+      console.warn(
+        `[holder-rankings] ${config.chain}: alchemy_getAssetTransfers failed, falling back to standard RPC logs: ${
+          error && error.message ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   if (contractStartBlock == null) {
