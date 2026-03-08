@@ -1,6 +1,6 @@
 // Alchemy-backed updater: sums USDC transfers to/from a pair address
 // using Alchemy Asset Transfers first, then RPC block lookups plus
-// eth_getLogs as fallback. Writes increments into
+// Infura-backed eth_getLogs as fallback. Writes increments into
 // public/data/pool_volume.json and updates a checkpoint.
 const fs = require('fs');
 const path = require('path');
@@ -166,6 +166,10 @@ function getRpcUrlsForChain(chain) {
   return [...getAlchemyRpcUrlsForChain(chain), ...getInfuraRpcUrlsForChain(chain)];
 }
 
+function getLogScanRpcUrlsForChain(chain) {
+  return getInfuraRpcUrlsForChain(chain);
+}
+
 async function alchemyCall(chain, method, params) {
   const urls = getAlchemyRpcUrlsForChain(chain);
   if (!urls.length) {
@@ -255,11 +259,10 @@ function getProviderLabel(url) {
   return host || 'unknown';
 }
 
-async function rpcCall(chain, method, params) {
-  const urls = getRpcUrlsForChain(chain);
+async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RPC_MISSING_URL', missingUrlMessage = null) {
   if (!urls.length) {
-    const err = new Error(`No RPC URL configured for chain=${chain}`);
-    err.code = 'RPC_MISSING_URL';
+    const err = new Error(missingUrlMessage || `No RPC URL configured for chain=${chain}`);
+    err.code = missingUrlCode;
     throw err;
   }
 
@@ -320,6 +323,10 @@ async function rpcCall(chain, method, params) {
   aggregate.code = (lastErr && lastErr.code) || 'RPC_ALL_PROVIDERS_FAILED';
   aggregate.providerErrors = providerErrors;
   throw aggregate;
+}
+
+async function rpcCall(chain, method, params) {
+  return rpcCallWithUrls(chain, method, params, getRpcUrlsForChain(chain));
 }
 
 async function getLatestBlockRpc(chain) {
@@ -397,7 +404,14 @@ async function fetchTransferLogsRpc(chain, usdcAddr, fromBlock, endBlock, pairTo
       topics,
     },
   ];
-  const logs = await rpcCall(chain, 'eth_getLogs', params);
+  const logs = await rpcCallWithUrls(
+    chain,
+    'eth_getLogs',
+    params,
+    getLogScanRpcUrlsForChain(chain),
+    'RPC_LOG_FALLBACK_MISSING_URL',
+    `No Infura log-scan fallback configured for chain=${chain}. Set BACKUP_API_KEY.`,
+  );
   return Array.isArray(logs) ? logs : [];
 }
 
@@ -496,26 +510,6 @@ async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, p
   return Number(totalRaw) / Math.pow(10, Number(decimals) || 6);
 }
 
-function inferMaxLogRangeFromError(error) {
-  const message = error instanceof Error ? error.message : String(error || '');
-  const rangeMatch = message.match(/up to a (\d+) block range/i);
-  if (rangeMatch) {
-    const parsed = Number(rangeMatch[1]);
-    if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
-  }
-
-  const suggestedRangeMatch = message.match(/should work:\s*\[(0x[0-9a-f]+),\s*(0x[0-9a-f]+)\]/i);
-  if (suggestedRangeMatch) {
-    const start = fromRpcHex(suggestedRangeMatch[1]);
-    const end = fromRpcHex(suggestedRangeMatch[2]);
-    if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
-      return Math.floor(end - start + 1);
-    }
-  }
-
-  return null;
-}
-
 async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6) {
   const configuredMaxChunk = Math.max(
     10,
@@ -562,10 +556,7 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
         );
       }
 
-      const inferredMaxChunk = inferMaxLogRangeFromError(error);
-      const nextChunkSize = inferredMaxChunk != null
-        ? Math.max(configuredMinChunk, Math.min(chunkSize - 1, inferredMaxChunk))
-        : Math.max(configuredMinChunk, Math.floor(chunkSize / 2));
+      const nextChunkSize = Math.max(configuredMinChunk, Math.floor(chunkSize / 2));
 
       if (nextChunkSize === chunkSize) {
         throw new Error(
@@ -576,7 +567,7 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
       }
 
       console.warn(
-        `[pool-volume] ${chain}: reducing log chunk ${chunkSize} -> ${nextChunkSize} after eth_getLogs error`,
+        `[pool-volume] ${chain}: reducing Infura log chunk ${chunkSize} -> ${nextChunkSize} after eth_getLogs error`,
       );
       chunkSize = nextChunkSize;
     }
@@ -766,7 +757,7 @@ async function main() {
             error && error.message ? error.message : String(error)
           }`,
         );
-        source = 'rpc-logs-fallback';
+        source = 'infura-rpc-logs-fallback';
         totalUsdc = await sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, tokenDecimals);
       }
 
