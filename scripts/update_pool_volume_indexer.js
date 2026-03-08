@@ -35,7 +35,6 @@ loadEnvLocal();
 
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
 const BACKUP_API_KEY = String(process.env.BACKUP_API_KEY || '').trim();
-const DEFAULT_CHAIN = 'polygon';
 const TRANSFER_TOPIC0 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const ALCHEMY_NETWORKS = {
   ethereum: 'eth-mainnet',
@@ -125,9 +124,24 @@ function classifyRpcErrorMessage(message) {
   if (txt.includes('too many requests')) return 'RPC_RATE_LIMIT';
   return 'RPC_ERROR';
 }
+
+function normalizeChain(chain) {
+  const normalized = String(chain || '').trim().toLowerCase();
+  if (!normalized) {
+    const err = new Error('Missing chain configuration');
+    err.code = 'CHAIN_MISSING';
+    throw err;
+  }
+  if (!ALCHEMY_NETWORKS[normalized]) {
+    const err = new Error(`Unsupported chain=${normalized}`);
+    err.code = 'CHAIN_UNSUPPORTED';
+    throw err;
+  }
+  return normalized;
+}
+
 function getAlchemyRpcUrlsForChain(chain) {
-  const network = ALCHEMY_NETWORKS[(chain || DEFAULT_CHAIN).toLowerCase()];
-  if (!network) return [];
+  const network = ALCHEMY_NETWORKS[normalizeChain(chain)];
 
   const urls = [];
   const addKey = (key) => {
@@ -146,7 +160,7 @@ function getRpcUrlsForChain(chain) {
   return getAlchemyRpcUrlsForChain(chain);
 }
 
-async function getBlockByTimestamp(ts, chain = DEFAULT_CHAIN) {
+async function getBlockByTimestamp(ts, chain) {
   return getBlockByTimestampRpc(ts, chain);
 }
 
@@ -406,7 +420,7 @@ async function main() {
 
   for (const rawAddr of Object.keys(poolsMap)) {
     const addr = (rawAddr || '').toLowerCase();
-    let chain = DEFAULT_CHAIN;
+    let chain = 'unknown';
     let startTs = null;
     try {
       // deterministic per-pool jitter to spread bursts
@@ -419,7 +433,7 @@ async function main() {
 
       // determine chain and addresses for this pool
       const pool = poolsMap[addr] || {};
-      chain = (pool.chain || DEFAULT_CHAIN).toLowerCase();
+      chain = normalizeChain(pool.chain);
       const usdcAddr = (pool.usdc || GLOBAL_USDC).toLowerCase();
       const pairAddr = (pool.address || addr || GLOBAL_PAIR).toLowerCase();
       const legacyCheckpointKey = `${addr}-${chain}`;
