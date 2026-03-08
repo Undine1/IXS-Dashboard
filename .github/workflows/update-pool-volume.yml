@@ -45,7 +45,7 @@ jobs:
       - name: Run pool updater
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
-          BACKUP_API_KEY: ${{ secrets.BACKUP_API_KEY }}
+          BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
           POLYGON_USDC: ${{ secrets.POLYGON_USDC }}
           BLOCKS_PER_DAY: ${{ env.BLOCKS_PER_DAY }}
           RPC_LOG_BLOCK_CHUNK: '200'

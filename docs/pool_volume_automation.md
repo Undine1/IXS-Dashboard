@@ -19,7 +19,7 @@ Configuration
   - The updater auto-loads `.env.local` when these variables are not already exported.
 - CI (GitHub Actions): set `ALCHEMY_API_KEY` as a repository secret.
 - Optional:
-  - `BACKUP_API_KEY` as an Infura project key for fallback when the primary Alchemy key is rate-limited or temporarily blocked.
+  - `BACKUP_INFURA_API_KEY` as an Infura project key for fallback when the primary Alchemy key is rate-limited or temporarily blocked.
 - Optional:
   - `POLYGON_USDC` to override the default tracked USDC address.
   - `PAIR_ADDRESS` to override a default pool address.
@@ -38,7 +38,7 @@ Files of interest
 Operational notes
 - The updater uses `ALCHEMY_API_KEY` first for Ethereum, Polygon, and Base.
 - Pool transfer fetching prefers `alchemy_getAssetTransfers`, which avoids the tight `eth_getLogs` block-range limits on Alchemy Free.
-- `BACKUP_API_KEY` is used for the Infura-only `eth_getLogs` fallback.
+- `BACKUP_INFURA_API_KEY` is used for the Infura-only `eth_getLogs` fallback.
 - If the Alchemy transfer API path fails, the updater falls back to standard RPC log scanning through Infura.
 - If rate-limited, tune retry settings with:
   - `API_MAX_ATTEMPTS`

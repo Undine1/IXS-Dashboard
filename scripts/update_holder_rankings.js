@@ -44,7 +44,7 @@ const DEFAULT_MIN_LOG_CHUNK = 500;
 const DEFAULT_SAVE_EVERY_BATCHES = 10;
 
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
-const BACKUP_API_KEY = String(process.env.BACKUP_API_KEY || '').trim();
+const BACKUP_INFURA_API_KEY = String(process.env.BACKUP_INFURA_API_KEY || '').trim();
 const ALCHEMY_NETWORKS = {
   ethereum: 'eth-mainnet',
   polygon: 'polygon-mainnet',
@@ -167,8 +167,8 @@ function getAlchemyRpcUrlsForChain(chain) {
 
 function getInfuraRpcUrlsForChain(chain) {
   const network = INFURA_NETWORKS[chain];
-  if (!network || !BACKUP_API_KEY) return [];
-  return [`https://${network}.infura.io/v3/${BACKUP_API_KEY}`];
+  if (!network || !BACKUP_INFURA_API_KEY) return [];
+  return [`https://${network}.infura.io/v3/${BACKUP_INFURA_API_KEY}`];
 }
 
 function normalizeHolderLabelRegistry(raw) {
@@ -269,7 +269,7 @@ async function requestWithRetries(url, options = {}) {
 async function rpcCall(chain, method, params) {
   const urls = getRpcUrlsForChain(chain);
   if (!urls.length) {
-    throw new Error(`No RPC URL configured for ${chain}. Set ALCHEMY_API_KEY or BACKUP_API_KEY.`);
+    throw new Error(`No RPC URL configured for ${chain}. Set ALCHEMY_API_KEY or BACKUP_INFURA_API_KEY.`);
   }
 
   let lastError = null;

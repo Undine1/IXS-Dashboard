@@ -35,7 +35,7 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
-const BACKUP_API_KEY = String(process.env.BACKUP_API_KEY || '').trim();
+const BACKUP_INFURA_API_KEY = String(process.env.BACKUP_INFURA_API_KEY || '').trim();
 const TRANSFER_TOPIC0 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const ALCHEMY_NETWORKS = {
   ethereum: 'eth-mainnet',
@@ -64,8 +64,8 @@ let successfulPoolCount = 0;
 let failedPoolCount = 0;
 const latestBlockCache = new Map();
 
-if (!ALCHEMY_API_KEY && !BACKUP_API_KEY) {
-  console.error('At least one RPC API key is required (ALCHEMY_API_KEY or BACKUP_API_KEY)');
+if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY) {
+  console.error('At least one RPC API key is required (ALCHEMY_API_KEY or BACKUP_INFURA_API_KEY)');
   process.exit(2);
 }
 
@@ -158,8 +158,8 @@ function getAlchemyRpcUrlsForChain(chain) {
 
 function getInfuraRpcUrlsForChain(chain) {
   const network = INFURA_NETWORKS[normalizeChain(chain)];
-  if (!network || !BACKUP_API_KEY) return [];
-  return [`https://${network}.infura.io/v3/${BACKUP_API_KEY}`];
+  if (!network || !BACKUP_INFURA_API_KEY) return [];
+  return [`https://${network}.infura.io/v3/${BACKUP_INFURA_API_KEY}`];
 }
 
 function getRpcUrlsForChain(chain) {
@@ -410,7 +410,7 @@ async function fetchTransferLogsRpc(chain, usdcAddr, fromBlock, endBlock, pairTo
     params,
     getLogScanRpcUrlsForChain(chain),
     'RPC_LOG_FALLBACK_MISSING_URL',
-    `No Infura log-scan fallback configured for chain=${chain}. Set BACKUP_API_KEY.`,
+    `No Infura log-scan fallback configured for chain=${chain}. Set BACKUP_INFURA_API_KEY.`,
   );
   return Array.isArray(logs) ? logs : [];
 }

@@ -45,7 +45,7 @@ jobs:
       - name: Run holder rankings updater
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
-          BACKUP_API_KEY: ${{ secrets.BACKUP_API_KEY }}
+          BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
           HOLDER_RANKINGS_LIMIT: ${{ vars.HOLDER_RANKINGS_LIMIT }}
           HOLDER_RANKINGS_EXCLUDED_ADDRESSES: ${{ vars.HOLDER_RANKINGS_EXCLUDED_ADDRESSES }}
           HOLDER_RANKINGS_ETHEREUM_EXCLUDED_ADDRESSES: ${{ vars.HOLDER_RANKINGS_ETHEREUM_EXCLUDED_ADDRESSES }}

@@ -14,7 +14,7 @@ A production-ready analytics dashboard that tracks IXS token burns, Total Value 
 
 ## Project overview
 - Purpose: Track cumulative token burns, pool TVL (USD), and IXS holder rankings using on-chain derived data where possible.
-- Approach: Use Alchemy as the primary RPC provider, with Infura fallback through `BACKUP_API_KEY`. Scripts persist outputs so the Next.js app can serve stable snapshots.
+- Approach: Use Alchemy as the primary RPC provider, with Infura fallback through `BACKUP_INFURA_API_KEY`. Scripts persist outputs so the Next.js app can serve stable snapshots.
 
 ## Tech stack
 - Next.js (App Router) + TypeScript
@@ -38,7 +38,7 @@ A production-ready analytics dashboard that tracks IXS token burns, Total Value 
 Create a `.env.local` in the project root.
 
 - `ALCHEMY_API_KEY` - primary shared RPC credential for Ethereum, Polygon, and Base
-- `BACKUP_API_KEY` - optional Infura project key used as fallback
+- `BACKUP_INFURA_API_KEY` - optional Infura project key used as fallback
 - `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` - optional page size for Alchemy transfer pagination
 - `HOLDER_RANKINGS_EXCLUDED_ADDRESSES` - optional comma-separated addresses to hide from the public holder ranking
 - `HOLDER_RANKINGS_LOG_CHUNK` - optional initial `eth_getLogs` block span

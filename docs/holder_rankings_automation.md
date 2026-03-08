@@ -27,7 +27,7 @@ How the updater works
 2. For each configured chain:
    - Resolves the token contract deployment block if no checkpoint exists yet.
    - Uses `ALCHEMY_API_KEY` for `alchemy_getAssetTransfers`.
-   - Falls back to standard JSON-RPC using `ALCHEMY_API_KEY`, then `BACKUP_API_KEY` if needed.
+   - Falls back to standard JSON-RPC using `ALCHEMY_API_KEY`, then `BACKUP_INFURA_API_KEY` if needed.
    - Pages transfer history with `alchemy_getAssetTransfers`, then falls back to `eth_getLogs` if the Alchemy-specific path is unavailable.
    - Applies balance deltas per holder in raw token units.
 3. Rebuilds the combined top-500 snapshot.
@@ -44,7 +44,7 @@ Label registry
 Configuration
 - Set `ALCHEMY_API_KEY` and let the script derive the three chain RPC endpoints.
 - Optional:
-  - `BACKUP_API_KEY` as an Infura project key for fallback
+  - `BACKUP_INFURA_API_KEY` as an Infura project key for fallback
 - Optional holder updater tuning:
   - `HOLDER_RANKINGS_LIMIT` (default `600`)
   - `HOLDER_RANKINGS_EXCLUDED_ADDRESSES` (comma-separated global exclusion list)
@@ -72,7 +72,7 @@ Bootstrap notes
 
 Running locally
 1. Put `ALCHEMY_API_KEY` in `.env.local`.
-2. Optionally add `BACKUP_API_KEY` as an Infura project key.
+2. Optionally add `BACKUP_INFURA_API_KEY` as an Infura project key.
 3. Run:
    ```bash
    npm run update:holder-rankings
@@ -89,7 +89,7 @@ GitHub Actions setup
   - `VERCEL_PROJECT_ID`
 - RPC secrets:
   - `ALCHEMY_API_KEY`
-  - optional `BACKUP_API_KEY`
+  - optional `BACKUP_INFURA_API_KEY`
 - Optional repository variables:
   - `HOLDER_RANKINGS_LOG_CHUNK`
   - `HOLDER_RANKINGS_MIN_LOG_CHUNK`
