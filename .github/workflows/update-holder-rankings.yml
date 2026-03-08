@@ -45,13 +45,7 @@ jobs:
       - name: Run holder rankings updater
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
-          ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
-          ETHEREUM_RPC_LIST: ${{ secrets.ETHEREUM_RPC_LIST }}
-          ETH_RPC: ${{ secrets.ETH_RPC }}
-          POLYGON_RPC: ${{ secrets.POLYGON_RPC }}
-          POLYGON_RPC_LIST: ${{ secrets.POLYGON_RPC_LIST }}
-          BASE_RPC: ${{ secrets.BASE_RPC }}
-          BASE_RPC_LIST: ${{ secrets.BASE_RPC_LIST }}
+          BACKUP_API_KEY: ${{ secrets.BACKUP_API_KEY }}
           HOLDER_RANKINGS_LIMIT: ${{ vars.HOLDER_RANKINGS_LIMIT }}
           HOLDER_RANKINGS_EXCLUDED_ADDRESSES: ${{ vars.HOLDER_RANKINGS_EXCLUDED_ADDRESSES }}
           HOLDER_RANKINGS_ETHEREUM_EXCLUDED_ADDRESSES: ${{ vars.HOLDER_RANKINGS_ETHEREUM_EXCLUDED_ADDRESSES }}

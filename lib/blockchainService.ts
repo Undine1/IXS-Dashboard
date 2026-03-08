@@ -1,10 +1,10 @@
 import axios from 'axios';
 import { Transaction, BlockchainStats } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BLOCKCHAIN_API || 'https://api.etherscan.io/api';
-const ETHERSCAN_API_KEY = process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY || 'YourApiKeyToken';
+const API_BASE_URL = process.env.NEXT_PUBLIC_BLOCKCHAIN_API || '';
+const BLOCKCHAIN_API_KEY = process.env.NEXT_PUBLIC_BLOCKCHAIN_API_KEY || '';
 
-interface EtherscanTransaction {
+interface ExplorerTransaction {
   hash: string;
   from: string;
   to: string;
@@ -25,8 +25,8 @@ export async function fetchLatestTransactions(
       module: 'account',
       action: 'txlist',
       sort: 'desc',
-      apikey: ETHERSCAN_API_KEY,
     };
+    if (BLOCKCHAIN_API_KEY) params.apikey = BLOCKCHAIN_API_KEY;
 
     if (address) {
       params.address = address;
@@ -41,7 +41,7 @@ export async function fetchLatestTransactions(
     };
 
     if (data.status === '1' && Array.isArray(data.result)) {
-      const txs = data.result as EtherscanTransaction[];
+      const txs = data.result as ExplorerTransaction[];
       return txs.slice(0, limit).map((tx) => ({
         hash: tx.hash,
         from: tx.from,

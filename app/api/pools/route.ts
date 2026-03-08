@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { ChainNetwork, Pool } from '@/types';
 
-const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
+const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
+const BACKUP_API_KEY = String(process.env.BACKUP_API_KEY || '').trim();
 const API_TIMEOUT = 15000;
 const WAIT_BETWEEN_POOLS_MS = 600;
 
@@ -143,86 +144,110 @@ function bigintToDecimalNumber(value: bigint, decimals: number, precision = 12):
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function getAlchemyUrls(network: ChainNetwork): string[] {
+  const alchemyNetwork = networkToAlchemy[network];
+  if (!alchemyNetwork) return [];
+
+  const urls: string[] = [];
+  const addKey = (key: string) => {
+    if (!key) return;
+    const url = `https://${alchemyNetwork}.g.alchemy.com/v2/${key}`;
+    if (!urls.includes(url)) urls.push(url);
+  };
+
+  addKey(ALCHEMY_API_KEY);
+  addKey(BACKUP_API_KEY);
+  return urls;
+}
+
 async function alchemyCall(
-  alchemyUrl: string,
+  alchemyUrls: string[],
   payload: Record<string, unknown>,
   maxRetries = 7
 ): Promise<string> {
-  let attempt = 0;
-  let delay = 700;
+  if (!alchemyUrls.length) {
+    throw new Error('alchemyCall: no Alchemy API key configured');
+  }
 
-  while (attempt <= maxRetries) {
-    try {
-      const resp = await axios.post(alchemyUrl, payload, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: API_TIMEOUT,
-      });
-      const data = resp.data as {
-        result?: string;
-        error?: { message?: string };
-      };
+  let lastError: unknown = null;
 
-      if (data.error) {
-        const errMsg = data.error.message || JSON.stringify(data.error);
-        if (isTransientErrorMessage(errMsg) && attempt < maxRetries) {
+  for (const alchemyUrl of alchemyUrls) {
+    let attempt = 0;
+    let delay = 700;
+
+    while (attempt <= maxRetries) {
+      try {
+        const resp = await axios.post(alchemyUrl, payload, {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: API_TIMEOUT,
+        });
+        const data = resp.data as {
+          result?: string;
+          error?: { message?: string };
+        };
+
+        if (data.error) {
+          const errMsg = data.error.message || JSON.stringify(data.error);
+          if (isTransientErrorMessage(errMsg) && attempt < maxRetries) {
+            await sleep(delay);
+            attempt += 1;
+            delay *= 2;
+            continue;
+          }
+          throw new Error(errMsg);
+        }
+
+        if (!data.result) {
+          throw new Error('missing rpc result');
+        }
+
+        return data.result;
+      } catch (error) {
+        lastError = error;
+        const msg = error instanceof Error ? error.message : String(error);
+        if (attempt < maxRetries && isTransientErrorMessage(msg)) {
           await sleep(delay);
           attempt += 1;
           delay *= 2;
           continue;
         }
-        throw new Error(errMsg);
+        break;
       }
-
-      if (!data.result) {
-        throw new Error('missing rpc result');
-      }
-
-      return data.result;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      if (attempt < maxRetries && isTransientErrorMessage(msg)) {
-        await sleep(delay);
-        attempt += 1;
-        delay *= 2;
-        continue;
-      }
-      throw error;
     }
   }
 
-  throw new Error('alchemyCall: exceeded retries');
+  throw lastError instanceof Error ? lastError : new Error('alchemyCall: exceeded retries');
 }
 
 async function fetchPoolValue(pool: PoolConfig, prices: Prices): Promise<FetchPoolResult> {
-  const alchemyNetwork = networkToAlchemy[pool.network];
-  const alchemyUrl = `https://${alchemyNetwork}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
+  const alchemyUrls = getAlchemyUrls(pool.network);
 
   try {
-    const token0Hex = await alchemyCall(alchemyUrl, {
+    const token0Hex = await alchemyCall(alchemyUrls, {
       jsonrpc: '2.0',
       id: 1,
       method: 'eth_call',
       params: [{ to: pool.address, data: '0x0dfe1681' }, 'latest'],
     });
-    const token1Hex = await alchemyCall(alchemyUrl, {
+    const token1Hex = await alchemyCall(alchemyUrls, {
       jsonrpc: '2.0',
       id: 2,
       method: 'eth_call',
       params: [{ to: pool.address, data: '0xd21220a7' }, 'latest'],
     });
-    const decimals0Hex = await alchemyCall(alchemyUrl, {
+    const decimals0Hex = await alchemyCall(alchemyUrls, {
       jsonrpc: '2.0',
       id: 3,
       method: 'eth_call',
       params: [{ to: normalizeAddressFromHex(token0Hex), data: '0x313ce567' }, 'latest'],
     });
-    const decimals1Hex = await alchemyCall(alchemyUrl, {
+    const decimals1Hex = await alchemyCall(alchemyUrls, {
       jsonrpc: '2.0',
       id: 4,
       method: 'eth_call',
       params: [{ to: normalizeAddressFromHex(token1Hex), data: '0x313ce567' }, 'latest'],
     });
-    const reservesHex = await alchemyCall(alchemyUrl, {
+    const reservesHex = await alchemyCall(alchemyUrls, {
       jsonrpc: '2.0',
       id: 5,
       method: 'eth_call',
@@ -310,8 +335,8 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const debugMode = url.searchParams.get('debug') === '1' || url.searchParams.get('debug') === 'true';
 
-    if (!ALCHEMY_API_KEY) {
-      console.warn('[pools API] ALCHEMY_API_KEY not set; eth_calls may fail');
+    if (!ALCHEMY_API_KEY && !BACKUP_API_KEY) {
+      console.warn('[pools API] No Alchemy API key is set; eth_calls will fail');
     }
 
     const prices: Prices = {};

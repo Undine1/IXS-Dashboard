@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 
-const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
+const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
+const BACKUP_API_KEY = String(process.env.BACKUP_API_KEY || '').trim();
 const API_TIMEOUT = 15000; // 15 seconds
 
 interface BurnStatsApiResponse {
@@ -52,6 +53,22 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getAlchemyUrls(network: 'ethereum' | 'polygon' | 'base'): string[] {
+  const alchemyNetwork = networkToAlchemy[network];
+  if (!alchemyNetwork) return [];
+
+  const urls: string[] = [];
+  const addKey = (key: string) => {
+    if (!key) return;
+    const url = `https://${alchemyNetwork}.g.alchemy.com/v2/${key}`;
+    if (!urls.includes(url)) urls.push(url);
+  };
+
+  addKey(ALCHEMY_API_KEY);
+  addKey(BACKUP_API_KEY);
+  return urls;
+}
+
 async function fetchBalancesForNetwork(
   tokenAddress: string,
   burnAddresses: string[],
@@ -78,9 +95,6 @@ async function fetchBalancesForNetwork(
     try {
       console.log(`[burnStats API] Fetching ${network} balance for ${trimmedAddress}`);
 
-      const alchemyNetwork = networkToAlchemy[network];
-      const alchemyUrl = `https://${alchemyNetwork}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
-
       const payload = {
         jsonrpc: "2.0",
         id: 1,
@@ -94,20 +108,39 @@ async function fetchBalancesForNetwork(
         ]
       };
 
-      const response = await axios.post(alchemyUrl, payload, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: API_TIMEOUT,
-      });
+      const urls = getAlchemyUrls(network);
+      if (!urls.length) {
+        throw new Error(`Alchemy is not configured for ${network}`);
+      }
 
-      console.log(`[burnStats API] ${network} response for ${trimmedAddress}:`, response.data);
+      let responseData: { result?: string } | null = null;
+      let lastError: unknown = null;
 
-      if (!response.data.result) {
+      for (const alchemyUrl of urls) {
+        try {
+          const response = await axios.post(alchemyUrl, payload, {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: API_TIMEOUT,
+          });
+          responseData = response.data as { result?: string };
+          console.log(`[burnStats API] ${network} response for ${trimmedAddress}:`, responseData);
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      if (!responseData) {
+        throw lastError instanceof Error ? lastError : new Error(String(lastError));
+      }
+
+      if (!responseData.result) {
         console.warn(`[burnStats API] No result for ${trimmedAddress} on ${network}`);
         balances[trimmedAddress] = null;
         continue;
       }
 
-      const balance = BigInt(response.data.result).toString();
+      const balance = BigInt(responseData.result).toString();
 
       if (!balance || !/^\d+$/.test(balance)) {
         console.warn(`[burnStats API] Invalid balance format for ${trimmedAddress}`);
@@ -131,8 +164,8 @@ async function fetchBalancesForNetwork(
 export async function GET(req: Request) {
   try {
     // Validate API key exists (on server side only)
-    if (!ALCHEMY_API_KEY) {
-      console.error('[burnStats API] ALCHEMY_API_KEY not configured');
+    if (!ALCHEMY_API_KEY && !BACKUP_API_KEY) {
+      console.error('[burnStats API] Alchemy API keys are not configured');
       return NextResponse.json(
         { error: 'Service misconfiguration' },
         { status: 500 }

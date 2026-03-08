@@ -26,8 +26,8 @@ How the updater works
 1. Loads the saved state from `data/holder_rankings_state.json` if present.
 2. For each configured chain:
    - Resolves the token contract deployment block if no checkpoint exists yet.
-   - If `ALCHEMY_API_KEY` is configured, pages transfer history with `alchemy_getAssetTransfers`.
-   - Otherwise falls back to `eth_getLogs` and adaptive block chunking.
+   - Uses `ALCHEMY_API_KEY`, then `BACKUP_API_KEY` if needed.
+   - Pages transfer history with `alchemy_getAssetTransfers`.
    - Applies balance deltas per holder in raw token units.
 3. Rebuilds the combined top-500 snapshot.
 4. Writes the updated state and public JSON artifacts.
@@ -41,15 +41,9 @@ Label registry
 - This is the preferred place to maintain known wallet names over time.
 
 Configuration
-- Preferred: set `ALCHEMY_API_KEY` and let the script derive the three chain RPC endpoints.
-- Alternative: set explicit RPC URLs:
-  - `ETHEREUM_RPC` or `ETH_RPC`
-  - `POLYGON_RPC`
-  - `BASE_RPC`
-- Optional list-based failover:
-  - `ETHEREUM_RPC_LIST`
-  - `POLYGON_RPC_LIST`
-  - `BASE_RPC_LIST`
+- Set `ALCHEMY_API_KEY` and let the script derive the three chain RPC endpoints.
+- Optional:
+  - `BACKUP_API_KEY` as a second Alchemy key for fallback
 - Optional holder updater tuning:
   - `HOLDER_RANKINGS_LIMIT` (default `600`)
   - `HOLDER_RANKINGS_EXCLUDED_ADDRESSES` (comma-separated global exclusion list)
@@ -76,12 +70,13 @@ Bootstrap notes
 - If the script throws a negative-balance error, the saved state is incomplete or the configured start block is too recent.
 
 Running locally
-1. Put `ALCHEMY_API_KEY` or chain RPC URLs in `.env.local`.
-2. Run:
+1. Put `ALCHEMY_API_KEY` in `.env.local`.
+2. Optionally add `BACKUP_API_KEY`.
+3. Run:
    ```bash
    npm run update:holder-rankings
    ```
-3. Confirm the outputs:
+4. Confirm the outputs:
    - `public/data/holder_rankings.json`
    - `data/holder_rankings_state.json`
 
@@ -91,9 +86,9 @@ GitHub Actions setup
   - `VERCEL_TOKEN`
   - `VERCEL_ORG_ID`
   - `VERCEL_PROJECT_ID`
-- RPC secret options:
+- RPC secrets:
   - `ALCHEMY_API_KEY`
-  - or `ETHEREUM_RPC`, `POLYGON_RPC`, `BASE_RPC`
+  - optional `BACKUP_API_KEY`
 - Optional repository variables:
   - `HOLDER_RANKINGS_LOG_CHUNK`
   - `HOLDER_RANKINGS_MIN_LOG_CHUNK`
@@ -104,5 +99,5 @@ Operational notes
 - The app still reads `/api/holderRankings`; only the data source changed.
 - The snapshot file is the only data served publicly.
 - The state file is committed to the repo for persistence between scheduled runs, but it is not served by Next.js.
-- On Alchemy Free, `eth_getLogs` is severely block-range limited; using `ALCHEMY_API_KEY` enables the updater to use `alchemy_getAssetTransfers` instead.
+- On Alchemy Free, `eth_getLogs` is severely block-range limited; using the Alchemy Asset Transfers path avoids that issue.
 - By default the public ranking excludes the zero address, `0x...dead`, and the three token contract addresses. Use the exclusion env vars above to add project-specific burn or treasury addresses.

@@ -5,26 +5,20 @@ Summary of the updater and automation in this repo.
 What it does
 - Persists per-pool lifetime USD totals to `public/data/pool_volume.json`.
 - Runs an hourly updater (`scripts/update_pool_volume_indexer.js`) via GitHub Actions.
-- Uses Etherscan-compatible V2 APIs to:
-  - Resolve timestamp to block (`module=block&action=getblocknobytime`).
-  - Fetch token transfer history (`module=account&action=tokentx`).
+- Uses Alchemy-backed RPC calls to:
+  - Resolve timestamps to blocks via binary search.
+  - Fetch ERC-20 `Transfer` logs via `eth_getLogs`.
 - Applies retry logic with backoff/jitter for transient failures.
 - Persists per-pool checkpoints in `public/data/pool_volume_checkpoint.json`.
 - Appends run summaries to `public/data/pool_volume_runs.json`.
 - Writes `public/data/pool_volume_alert.json` when retry budgets are exhausted.
 
 Configuration
-- Local (`.env.local`): set `ETHERSCAN_API_KEY` (recommended default).
+- Local (`.env.local`): set `ALCHEMY_API_KEY`.
   - The updater auto-loads `.env.local` when these variables are not already exported.
-- CI (GitHub Actions): set `ETHERSCAN_API_KEY` as a repository secret.
-- Optional per-chain keys:
-  - `POLYGONSCAN_API_KEY` for Polygon-native explorer access.
-  - `BASESCAN_API_KEY` for Base-native explorer access.
-  - `BASESCAN_API_BASE_URL` (recommended for Base) set to `https://base.blockscout.com/api` to use Blockscout's RPC-compatible `module/action` API.
-  - These help avoid Etherscan V2 cross-chain plan restrictions.
-- Optional RPC fallbacks:
-  - `BASE_RPC` / `BASE_RPC_LIST` for Base RPC log-scanning fallback.
-  - `POLYGON_RPC` / `POLYGON_RPC_LIST` for Polygon RPC log-scanning fallback.
+- CI (GitHub Actions): set `ALCHEMY_API_KEY` as a repository secret.
+- Optional:
+  - `BACKUP_API_KEY` as a second Alchemy key for fallback when the primary key is rate-limited or temporarily blocked.
 - Optional:
   - `POLYGON_USDC` to override the default tracked USDC address.
   - `PAIR_ADDRESS` to override a default pool address.
@@ -38,8 +32,8 @@ Files of interest
 - `.github/workflows/update-pool-volume.yml` - scheduled automation and deploy flow.
 
 Operational notes
-- The updater primarily uses indexer APIs.
-- If a chain is blocked by explorer plan limits, the updater can automatically fall back to RPC (`eth_getLogs`) for that pool.
+- The updater uses Alchemy-backed RPC only.
+- `BACKUP_API_KEY` is tried automatically after `ALCHEMY_API_KEY` when present.
 - If rate-limited, tune retry settings with:
   - `API_MAX_ATTEMPTS`
   - `API_BASE_DELAY_MS`

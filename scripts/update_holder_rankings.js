@@ -44,6 +44,7 @@ const DEFAULT_MIN_LOG_CHUNK = 500;
 const DEFAULT_SAVE_EVERY_BATCHES = 10;
 
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
+const BACKUP_API_KEY = String(process.env.BACKUP_API_KEY || '').trim();
 const ALCHEMY_NETWORKS = {
   ethereum: 'eth-mainnet',
   polygon: 'polygon-mainnet',
@@ -152,6 +153,23 @@ function parseAddressList(value) {
   return parseRpcListValue(value).map((entry) => String(entry || '').toLowerCase()).filter(isValidAddress);
 }
 
+function getAlchemyRpcUrlsForChain(chain) {
+  const network = ALCHEMY_NETWORKS[chain];
+  if (!network) return [];
+
+  const urls = [];
+  const addKey = (key) => {
+    const normalized = String(key || '').trim();
+    if (!normalized) return;
+    const url = `https://${network}.g.alchemy.com/v2/${normalized}`;
+    if (!urls.includes(url)) urls.push(url);
+  };
+
+  addKey(ALCHEMY_API_KEY);
+  addKey(BACKUP_API_KEY);
+  return urls;
+}
+
 function normalizeHolderLabelRegistry(raw) {
   const input = raw && typeof raw === 'object' ? raw : {};
   const source =
@@ -209,38 +227,11 @@ function buildExcludedAddressSet(holderLabels) {
 }
 
 function getRpcUrlsForChain(chain) {
-  const urls = [];
-  const add = (value) => {
-    const normalized = String(value || '').trim();
-    if (!normalized || urls.includes(normalized)) return;
-    urls.push(normalized);
-  };
-
-  if (chain === 'ethereum') {
-    parseRpcListValue(process.env.ETHEREUM_RPC_LIST).forEach(add);
-    add(process.env.ETHEREUM_RPC);
-    add(process.env.ETH_RPC);
-  } else if (chain === 'base') {
-    parseRpcListValue(process.env.BASE_RPC_LIST).forEach(add);
-    add(process.env.BASE_RPC);
-    add('https://mainnet.base.org');
-  } else if (chain === 'polygon') {
-    parseRpcListValue(process.env.POLYGON_RPC_LIST).forEach(add);
-    add(process.env.POLYGON_RPC);
-  }
-
-  const alchemyNetwork = ALCHEMY_NETWORKS[chain];
-  if (alchemyNetwork && ALCHEMY_API_KEY) {
-    add(`https://${alchemyNetwork}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`);
-  }
-
-  return urls;
+  return getAlchemyRpcUrlsForChain(chain);
 }
 
 function getAlchemyRpcUrlForChain(chain) {
-  const network = ALCHEMY_NETWORKS[chain];
-  if (!network || !ALCHEMY_API_KEY) return null;
-  return `https://${network}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
+  return getAlchemyRpcUrlsForChain(chain)[0] || null;
 }
 
 async function requestWithRetries(url, options = {}) {
@@ -277,7 +268,7 @@ async function requestWithRetries(url, options = {}) {
 async function rpcCall(chain, method, params) {
   const urls = getRpcUrlsForChain(chain);
   if (!urls.length) {
-    throw new Error(`No RPC URL configured for ${chain}. Set ${chain.toUpperCase()}_RPC or ALCHEMY_API_KEY.`);
+    throw new Error(`No RPC URL configured for ${chain}. Set ALCHEMY_API_KEY or BACKUP_API_KEY.`);
   }
 
   let lastError = null;
@@ -316,34 +307,43 @@ async function rpcCall(chain, method, params) {
 }
 
 async function alchemyCall(chain, method, params) {
-  const url = getAlchemyRpcUrlForChain(chain);
-  if (!url) {
+  const urls = getAlchemyRpcUrlsForChain(chain);
+  if (!urls.length) {
     throw new Error(`Alchemy is not configured for ${chain}`);
   }
 
-  const response = await requestWithRetries(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: Date.now(),
-      method,
-      params,
-    }),
-  });
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const response = await requestWithRetries(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method,
+          params,
+        }),
+      });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Alchemy HTTP ${response.status} ${response.statusText} for ${method}: ${text}`);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Alchemy HTTP ${response.status} ${response.statusText} for ${method} at ${url}: ${text}`);
+      }
+
+      const payload = await response.json();
+      if (payload && payload.error) {
+        const message = payload.error.message || JSON.stringify(payload.error);
+        throw new Error(`Alchemy ${method} error for ${chain} at ${url}: ${message}`);
+      }
+
+      return payload.result;
+    } catch (error) {
+      lastError = error;
+    }
   }
 
-  const payload = await response.json();
-  if (payload && payload.error) {
-    const message = payload.error.message || JSON.stringify(payload.error);
-    throw new Error(`Alchemy ${method} error for ${chain}: ${message}`);
-  }
-
-  return payload.result;
+  throw lastError || new Error(`Alchemy ${method} failed for ${chain}`);
 }
 
 function asRpcHex(blockNumber) {

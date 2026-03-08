@@ -1,7 +1,6 @@
-// Indexer-based updater: sums USDC transfers to/from a pair address
-// Uses blockchain indexer APIs (Etherscan/Polygonscan-compatible v2) first,
-// and falls back to RPC eth_getLogs when indexer access is plan-restricted.
-// Writes increments into public/data/pool_volume.json and updates a checkpoint.
+// Alchemy-backed updater: sums USDC transfers to/from a pair address
+// using RPC block lookups plus eth_getLogs. Writes increments into
+// public/data/pool_volume.json and updates a checkpoint.
 const fs = require('fs');
 const path = require('path');
 
@@ -34,27 +33,14 @@ function loadEnvLocal() {
 
 loadEnvLocal();
 
-// Explorer API keys. ETHERSCAN_API_KEY is the default cross-chain key.
-const API_KEY = process.env.ETHERSCAN_API_KEY;
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
-// chain id defaults and utilities
-const CHAIN_IDS = { ethereum: 1, polygon: 137, base: 8453 };
+const BACKUP_API_KEY = String(process.env.BACKUP_API_KEY || '').trim();
 const DEFAULT_CHAIN = 'polygon';
 const TRANSFER_TOPIC0 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const ALCHEMY_NETWORKS = {
   ethereum: 'eth-mainnet',
   polygon: 'polygon-mainnet',
   base: 'base-mainnet',
-};
-const CHAIN_SCAN_KEY_ENVS = {
-  ethereum: 'ETHERSCAN_API_KEY',
-  polygon: 'POLYGONSCAN_API_KEY',
-  base: 'BASESCAN_API_KEY',
-};
-const CHAIN_SCAN_BASE_DEFAULTS = {
-  ethereum: 'https://api.etherscan.io/api',
-  polygon: 'https://api.polygonscan.com/api',
-  base: 'https://api.basescan.org/api',
 };
 
 const GLOBAL_USDC = (process.env.POLYGON_USDC || '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174').toLowerCase();
@@ -72,15 +58,9 @@ let totalPoolCount = 0;
 let successfulPoolCount = 0;
 let failedPoolCount = 0;
 
-if (!API_KEY && !process.env.POLYGONSCAN_API_KEY && !process.env.BASESCAN_API_KEY) {
-  console.error('At least one explorer API key is required (ETHERSCAN_API_KEY, POLYGONSCAN_API_KEY, or BASESCAN_API_KEY)');
+if (!ALCHEMY_API_KEY && !BACKUP_API_KEY) {
+  console.error('At least one Alchemy API key is required (ALCHEMY_API_KEY or BACKUP_API_KEY)');
   process.exit(2);
-}
-
-async function fetchJson(url) {
-  const res = await requestWithRetries(url);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return res.json();
 }
 
 async function requestWithRetries(url, opts = {}) {
@@ -138,92 +118,6 @@ async function requestWithRetries(url, opts = {}) {
   throw new Error('Unreachable: retries exhausted');
 }
 
-function getIndexerConfig(chain, chainid) {
-  const chainName = (chain || DEFAULT_CHAIN).toLowerCase();
-  const keyEnv = CHAIN_SCAN_KEY_ENVS[chainName] || CHAIN_SCAN_KEY_ENVS[DEFAULT_CHAIN];
-  const defaultBase = CHAIN_SCAN_BASE_DEFAULTS[chainName] || CHAIN_SCAN_BASE_DEFAULTS[DEFAULT_CHAIN];
-  const baseEnv =
-    chainName === 'ethereum'
-      ? process.env.ETHERSCAN_API_BASE_URL
-      : chainName === 'polygon'
-        ? process.env.POLYGONSCAN_API_BASE_URL
-        : process.env.BASESCAN_API_BASE_URL;
-  const chainKey = process.env[keyEnv] || '';
-
-  // Prefer chain-native explorers only when explicitly configured.
-  if (baseEnv || (chainKey && keyEnv !== 'ETHERSCAN_API_KEY')) {
-    return {
-      chain: chainName,
-      keyEnv,
-      mode: 'native',
-      apiKey: chainKey || API_KEY || '',
-      base: (baseEnv || defaultBase).replace(/\/+$/, ''),
-    };
-  }
-
-  return {
-    chain: chainName,
-    keyEnv: 'ETHERSCAN_API_KEY',
-    mode: 'etherscan-v2',
-    apiKey: API_KEY || '',
-    base: `https://api.etherscan.io/v2/api?chainid=${chainid}`,
-  };
-}
-
-function buildIndexerUrl(indexer, params) {
-  const qp = new URLSearchParams(params);
-  if (indexer.apiKey) qp.set('apikey', indexer.apiKey);
-  const sep = indexer.base.includes('?') ? '&' : '?';
-  return `${indexer.base}${sep}${qp.toString()}`;
-}
-
-function indexerErrorText(j) {
-  const parts = [];
-  if (j && typeof j.message === 'string') parts.push(j.message);
-  if (j && typeof j.result === 'string') parts.push(j.result);
-  return parts.join(' ').trim();
-}
-
-function isNoClosestBlockFoundResponse(j) {
-  const txt = indexerErrorText(j).toLowerCase();
-  return txt.includes('no closest block found');
-}
-
-function isNoTransfersFoundResponse(j) {
-  if (!j || j.status !== '0') return false;
-  const msg = String(j.message || '').toLowerCase();
-  const resultTxt = typeof j.result === 'string' ? j.result.toLowerCase() : '';
-  const hasEmptyResultArray = Array.isArray(j.result) && j.result.length === 0;
-  if (msg.includes('no transactions found') || resultTxt.includes('no transactions found')) return true;
-  if (msg.includes('no token transfers found') || resultTxt.includes('no token transfers found')) return true;
-  return hasEmptyResultArray && (msg.includes('no ') || resultTxt.includes('no '));
-}
-
-function classifyIndexerError(j) {
-  const txt = indexerErrorText(j).toLowerCase();
-  if (txt.includes('free api access is not supported for this chain')) return 'CHAIN_PLAN_RESTRICTED';
-  if (txt.includes('invalid api key')) return 'INVALID_API_KEY';
-  if (txt.includes('max rate limit')) return 'TRANSIENT_INDEXER_ERROR';
-  if (txt.includes('rate limit')) return 'TRANSIENT_INDEXER_ERROR';
-  if (txt.includes('max calls per sec')) return 'TRANSIENT_INDEXER_ERROR';
-  if (txt.includes('too many requests')) return 'TRANSIENT_INDEXER_ERROR';
-  if (txt.includes('unexpected exception')) return 'TRANSIENT_INDEXER_ERROR';
-  if (txt.includes('query timeout')) return 'TRANSIENT_INDEXER_ERROR';
-  if (txt.includes('temporarily unavailable')) return 'TRANSIENT_INDEXER_ERROR';
-  if (txt.includes('timeout')) return 'TRANSIENT_INDEXER_ERROR';
-  return 'INDEXER_ERROR';
-}
-
-function isIndexerRateLimitedResponse(j) {
-  const txt = indexerErrorText(j).toLowerCase();
-  return (
-    txt.includes('rate limit') ||
-    txt.includes('max calls per sec') ||
-    txt.includes('too many requests') ||
-    txt.includes('429')
-  );
-}
-
 function classifyRpcErrorMessage(message) {
   const txt = String(message || '').toLowerCase();
   if (txt.includes('limit') || txt.includes('rate')) return 'RPC_RATE_LIMIT';
@@ -231,190 +125,29 @@ function classifyRpcErrorMessage(message) {
   if (txt.includes('too many requests')) return 'RPC_RATE_LIMIT';
   return 'RPC_ERROR';
 }
-
-function makeIndexerError(context, payload, indexer) {
-  const err = new Error(`${context}: ${JSON.stringify(payload)}`);
-  err.code = classifyIndexerError(payload);
-  err.indexer = indexer;
-  return err;
-}
-
-async function fetchIndexerJsonWithBodyRetries(url, context) {
-  const maxAttempts = Number(process.env.INDEXER_BODY_MAX_ATTEMPTS || 5);
-  const baseDelay = Number(process.env.API_BASE_DELAY_MS || 500); // ms
-  const maxDelay = Number(process.env.API_MAX_DELAY_MS || 30000); // ms
-  const rateLimitMinDelay = Number(process.env.INDEXER_RATE_LIMIT_MIN_DELAY_MS || 1200); // ms
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const j = await fetchJson(url);
-    const code = classifyIndexerError(j);
-    if (code === 'TRANSIENT_INDEXER_ERROR' && attempt < maxAttempts) {
-      retryCount += 1;
-      const exp = Math.min(maxDelay, baseDelay * Math.pow(2, attempt - 1));
-      let waitMs = Math.floor(Math.random() * exp);
-      if (isIndexerRateLimitedResponse(j)) {
-        waitMs = Math.max(waitMs, rateLimitMinDelay);
-      }
-      console.warn(`${context} returned transient error; attempt ${attempt}/${maxAttempts}, retrying after ${waitMs}ms`);
-      await new Promise((r) => setTimeout(r, waitMs));
-      continue;
-    }
-    return j;
-  }
-
-  throw new Error(`Unreachable: exhausted ${context} body retries`);
-}
-
-function parseBlockNumberResult(result) {
-  if (result && typeof result === 'object') {
-    const nested = result.blockNumber != null ? result.blockNumber : result.block;
-    return Number(nested);
-  }
-  return Number(result);
-}
-
-async function getBlockByTimestamp(ts, chain = DEFAULT_CHAIN, chainid = CHAIN_IDS.polygon) {
-  const indexer = getIndexerConfig(chain, chainid);
-  const maxSkewSteps = Math.max(0, Number(process.env.BLOCK_BY_TIME_MAX_SKEW_STEPS || 4));
-  const skewStepSeconds = Math.max(1, Number(process.env.BLOCK_BY_TIME_SKEW_SECONDS || 30));
-  let queryTs = Math.floor(Number(ts));
-  let sawNoClosest = false;
-
-  for (let step = 0; step <= maxSkewSteps; step++) {
-    const url = buildIndexerUrl(indexer, {
-      module: 'block',
-      action: 'getblocknobytime',
-      timestamp: String(Math.max(0, queryTs)),
-      closest: 'before',
-    });
-    const j = await fetchIndexerJsonWithBodyRetries(url, 'getblocknobytime');
-
-    if (j.status === '1') {
-      const block = parseBlockNumberResult(j.result);
-      if (Number.isFinite(block) && block >= 0) return Math.floor(block);
-    }
-
-    // Some indexers lag head time briefly and return "No closest block found".
-    // Retry using an earlier timestamp before failing the whole pool.
-    if (isNoClosestBlockFoundResponse(j)) {
-      sawNoClosest = true;
-      if (step < maxSkewSteps) {
-        queryTs = Math.max(0, queryTs - skewStepSeconds);
-        continue;
-      }
-      if (getRpcUrlsForChain(chain).length > 0) {
-        // Break and use RPC lookup instead of throwing away the whole pool.
-        break;
-      }
-    }
-
-    if (j.status !== '1') {
-      throw makeIndexerError('Failed to get block by time', j, indexer);
-    }
-
-    const err = makeIndexerError(`Invalid block number for timestamp ${queryTs}`, j, indexer);
-    err.code = 'INVALID_BLOCK_NUMBER';
-    throw err;
-  }
-
-  if (sawNoClosest && getRpcUrlsForChain(chain).length > 0) {
-    console.warn(`Falling back to RPC for getBlockByTimestamp chain=${chain} ts=${ts}`);
-    return getBlockByTimestampRpc(ts, chain);
-  }
-
-  throw new Error(`Unreachable: exhausted timestamp skew retries for ts=${ts}`);
-}
-
-async function fetchTokenTxs(startBlock, endBlock, pairAddr, usdcAddr, chain = DEFAULT_CHAIN, chainid = CHAIN_IDS.polygon, page = 1, offset = 1000) {
-  if (!Number.isFinite(startBlock) || !Number.isFinite(endBlock)) {
-    const err = new Error(`Invalid block range for tokentx: start=${startBlock}, end=${endBlock}`);
-    err.code = 'INVALID_BLOCK_RANGE';
-    throw err;
-  }
-  const indexer = getIndexerConfig(chain, chainid);
-  const url = buildIndexerUrl(indexer, {
-    module: 'account',
-    action: 'tokentx',
-    contractaddress: usdcAddr,
-    address: pairAddr,
-    startblock: String(Math.floor(startBlock)),
-    endblock: String(Math.floor(endBlock)),
-    page: String(page),
-    offset: String(offset),
-    sort: 'asc',
-  });
-  const j = await fetchIndexerJsonWithBodyRetries(url, 'tokentx');
-  if (isNoTransfersFoundResponse(j)) return [];
-  if (j.status !== '1') throw makeIndexerError('tokentx error', j, indexer);
-  if (!Array.isArray(j.result)) return [];
-  return j.result;
-}
-
-async function sumTokenTransfersViaIndexer(startBlock, endBlock, pairAddr, usdcAddr, chain, chainid) {
-  let page = 1;
-  let totalUsdc = 0;
-  while (true) {
-    const txs = await fetchTokenTxs(startBlock, endBlock, pairAddr, usdcAddr, chain, chainid, page, 1000);
-    if (!txs || txs.length === 0) break;
-    for (const tx of txs) {
-      const dec = Number(tx.tokenDecimal || 6);
-      const val = Number(tx.value || '0') / Math.pow(10, dec);
-      totalUsdc += val;
-    }
-    if (txs.length < 1000) break;
-    page += 1;
-  }
-  return totalUsdc;
-}
-
-function parseRpcListValue(value) {
-  if (!value || typeof value !== 'string') return [];
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) {
-      return parsed.map((v) => String(v || '').trim()).filter(Boolean);
-    }
-  } catch {
-    // ignore JSON parse errors; treat as delimited string
-  }
-  return value
-    .split(/[,\r\n; ]+/)
-    .map((v) => v.trim())
-    .filter(Boolean);
-}
-
-function getAlchemyRpcUrlForChain(chain) {
+function getAlchemyRpcUrlsForChain(chain) {
   const network = ALCHEMY_NETWORKS[(chain || DEFAULT_CHAIN).toLowerCase()];
-  if (!network || !ALCHEMY_API_KEY) return null;
-  return `https://${network}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
+  if (!network) return [];
+
+  const urls = [];
+  const addKey = (key) => {
+    const normalized = String(key || '').trim();
+    if (!normalized) return;
+    const url = `https://${network}.g.alchemy.com/v2/${normalized}`;
+    if (!urls.includes(url)) urls.push(url);
+  };
+
+  addKey(ALCHEMY_API_KEY);
+  addKey(BACKUP_API_KEY);
+  return urls;
 }
 
 function getRpcUrlsForChain(chain) {
-  const c = (chain || DEFAULT_CHAIN).toLowerCase();
-  const urls = [];
-  const add = (v) => {
-    const s = String(v || '').trim();
-    if (!s) return;
-    if (!urls.includes(s)) urls.push(s);
-  };
+  return getAlchemyRpcUrlsForChain(chain);
+}
 
-  add(getAlchemyRpcUrlForChain(c));
-
-  if (c === 'base') {
-    parseRpcListValue(process.env.BASE_RPC_LIST).forEach(add);
-    add(process.env.BASE_RPC);
-    // Public fallback RPC.
-    add('https://mainnet.base.org');
-  } else if (c === 'polygon') {
-    parseRpcListValue(process.env.POLYGON_RPC_LIST).forEach(add);
-    add(process.env.POLYGON_RPC);
-  } else if (c === 'ethereum') {
-    parseRpcListValue(process.env.ETHEREUM_RPC_LIST).forEach(add);
-    add(process.env.ETHEREUM_RPC);
-    add(process.env.ETH_RPC);
-  }
-
-  return urls;
+async function getBlockByTimestamp(ts, chain = DEFAULT_CHAIN) {
+  return getBlockByTimestampRpc(ts, chain);
 }
 
 function asRpcHex(n) {
@@ -687,7 +420,6 @@ async function main() {
       // determine chain and addresses for this pool
       const pool = poolsMap[addr] || {};
       chain = (pool.chain || DEFAULT_CHAIN).toLowerCase();
-      const chainid = CHAIN_IDS[chain] || CHAIN_IDS[DEFAULT_CHAIN];
       const usdcAddr = (pool.usdc || GLOBAL_USDC).toLowerCase();
       const pairAddr = (pool.address || addr || GLOBAL_PAIR).toLowerCase();
       const legacyCheckpointKey = `${addr}-${chain}`;
@@ -723,43 +455,17 @@ async function main() {
       let startBlock;
       let endBlock;
       let totalUsdc = 0;
-      let source = 'indexer';
-      try {
-        startBlock = await getBlockByTimestamp(startTs, chain, chainid);
-        endBlock = await getBlockByTimestamp(endTs, chain, chainid);
-        if (!Number.isFinite(startBlock) || !Number.isFinite(endBlock) || endBlock < startBlock) {
-          const err = new Error(`Invalid block range resolved: start=${startBlock}, end=${endBlock}`);
-          err.code = 'INVALID_BLOCK_RANGE';
-          throw err;
-        }
-        console.log('Block range', startBlock, endBlock);
-        totalUsdc = await sumTokenTransfersViaIndexer(startBlock, endBlock, pairAddr, usdcAddr, chain, chainid);
-      } catch (idxErr) {
-        const recoverableCodes = new Set([
-          'CHAIN_PLAN_RESTRICTED',
-          'INVALID_BLOCK_NUMBER',
-          'INVALID_BLOCK_RANGE',
-          'TRANSIENT_INDEXER_ERROR',
-        ]);
-        if (idxErr && recoverableCodes.has(idxErr.code) && getRpcUrlsForChain(chain).length > 0) {
-          source = 'rpc-fallback';
-          appendAlertReason(
-            `indexer-fallback-rpc: pool=${addr} chain=${chain} code=${idxErr.code} reason=${(idxErr && idxErr.message) || idxErr.code}`
-          );
-          startBlock = await getBlockByTimestampRpc(startTs, chain);
-          endBlock = await getBlockByTimestampRpc(endTs, chain);
-          if (!Number.isFinite(startBlock) || !Number.isFinite(endBlock) || endBlock < startBlock) {
-            const err = new Error(`Invalid RPC block range resolved: start=${startBlock}, end=${endBlock}`);
-            err.code = 'RPC_INVALID_BLOCK_RANGE';
-            throw err;
-          }
-          console.log('RPC block range', startBlock, endBlock);
-          const tokenDecimals = Number(pool.usdc_decimals || pool.decimals || process.env.USDC_DECIMALS || 6);
-          totalUsdc = await sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, tokenDecimals);
-        } else {
-          throw idxErr;
-        }
+      const source = 'alchemy-rpc';
+      startBlock = await getBlockByTimestamp(startTs, chain);
+      endBlock = await getBlockByTimestamp(endTs, chain);
+      if (!Number.isFinite(startBlock) || !Number.isFinite(endBlock) || endBlock < startBlock) {
+        const err = new Error(`Invalid block range resolved: start=${startBlock}, end=${endBlock}`);
+        err.code = 'INVALID_BLOCK_RANGE';
+        throw err;
       }
+      console.log('Block range', startBlock, endBlock);
+      const tokenDecimals = Number(pool.usdc_decimals || pool.decimals || process.env.USDC_DECIMALS || 6);
+      totalUsdc = await sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, tokenDecimals);
 
       console.log(`Total USDC transfers for ${addr} (${source}):`, totalUsdc);
 
@@ -784,18 +490,6 @@ async function main() {
       successfulPoolCount += 1;
     } catch (e) {
       failedPoolCount += 1;
-      if (e && e.code === 'CHAIN_PLAN_RESTRICTED') {
-        const keyHint = CHAIN_SCAN_KEY_ENVS[chain] || 'ETHERSCAN_API_KEY';
-        const reason = `unsupported-chain-plan: pool=${addr} chain=${chain}; configure ${keyHint} or upgrade ETHERSCAN_API_KEY`;
-        console.warn(reason);
-        appendAlertReason(reason, true);
-        // preserve a stable start point so successful future runs can backfill.
-        if (!checkpoint[addr] && Number.isFinite(startTs)) {
-          checkpoint[addr] = { lastTimestamp: startTs, lastBlock: null };
-          fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
-        }
-        continue;
-      }
       appendAlertReason(
         `pool-error: pool=${addr} chain=${chain} code=${(e && e.code) || 'unknown'} msg=${(e && e.message) || String(e)}`,
         false
