@@ -36,10 +36,16 @@ loadEnvLocal();
 
 // Explorer API keys. ETHERSCAN_API_KEY is the default cross-chain key.
 const API_KEY = process.env.ETHERSCAN_API_KEY;
+const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
 // chain id defaults and utilities
 const CHAIN_IDS = { ethereum: 1, polygon: 137, base: 8453 };
 const DEFAULT_CHAIN = 'polygon';
 const TRANSFER_TOPIC0 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+const ALCHEMY_NETWORKS = {
+  ethereum: 'eth-mainnet',
+  polygon: 'polygon-mainnet',
+  base: 'base-mainnet',
+};
 const CHAIN_SCAN_KEY_ENVS = {
   ethereum: 'ETHERSCAN_API_KEY',
   polygon: 'POLYGONSCAN_API_KEY',
@@ -377,6 +383,12 @@ function parseRpcListValue(value) {
     .filter(Boolean);
 }
 
+function getAlchemyRpcUrlForChain(chain) {
+  const network = ALCHEMY_NETWORKS[(chain || DEFAULT_CHAIN).toLowerCase()];
+  if (!network || !ALCHEMY_API_KEY) return null;
+  return `https://${network}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
+}
+
 function getRpcUrlsForChain(chain) {
   const c = (chain || DEFAULT_CHAIN).toLowerCase();
   const urls = [];
@@ -385,6 +397,8 @@ function getRpcUrlsForChain(chain) {
     if (!s) return;
     if (!urls.includes(s)) urls.push(s);
   };
+
+  add(getAlchemyRpcUrlForChain(c));
 
   if (c === 'base') {
     parseRpcListValue(process.env.BASE_RPC_LIST).forEach(add);

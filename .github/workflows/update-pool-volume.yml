@@ -44,6 +44,7 @@ jobs:
 
       - name: Run pool updater
         env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           POLYGON_RPC: ${{ secrets.POLYGON_RPC }}
           POLYGON_RPC_LIST: ${{ secrets.POLYGON_RPC_LIST }}
           BASE_RPC: ${{ secrets.BASE_RPC }}
