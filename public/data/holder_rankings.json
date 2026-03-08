@@ -89,7 +89,7 @@
       "rank": 13,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,716,926.67",
+      "totalIxs": "1,715,457.55",
       "label": "Uniswap V2"
     },
     {
@@ -3055,45 +3055,45 @@
     },
     {
       "rank": 437,
+      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
+      "chainsHolding": 1,
+      "totalIxs": "85,106.96",
+      "label": "Contract"
+    },
+    {
+      "rank": 438,
       "holder": "0x66417269177d8ca5bbd93f422ebf5a8fdaddabf6",
       "chainsHolding": 1,
       "totalIxs": "84,879.11",
       "label": null
     },
     {
-      "rank": 438,
+      "rank": 439,
       "holder": "0x7613315f8d865a9ff50700d9b006566cb82e8c7d",
       "chainsHolding": 1,
       "totalIxs": "84,618.55",
       "label": null
     },
     {
-      "rank": 439,
+      "rank": 440,
       "holder": "0x43f5d2deecc2942ccf92df93d94d6959d24ead19",
       "chainsHolding": 1,
       "totalIxs": "84,247.09",
       "label": "Contract"
     },
     {
-      "rank": 440,
+      "rank": 441,
       "holder": "0x770c825ed22ec078e91649dbeaab7b6fa14570de",
       "chainsHolding": 1,
       "totalIxs": "83,953.75",
       "label": null
     },
     {
-      "rank": 441,
+      "rank": 442,
       "holder": "0xdbb664bd716205debced97ef6ec5bee26fee4072",
       "chainsHolding": 2,
       "totalIxs": "83,897.11",
       "label": null
-    },
-    {
-      "rank": 442,
-      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
-      "chainsHolding": 1,
-      "totalIxs": "83,669.69",
-      "label": "Contract"
     },
     {
       "rank": 443,
@@ -3386,7 +3386,7 @@
       "rank": 484,
       "holder": "0x70cf9c7233deb3eff4c2957dda3e79db82b851d4",
       "chainsHolding": 1,
-      "totalIxs": "71,447.13",
+      "totalIxs": "71,477.99",
       "label": "Contract"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12317,
-  "lastRefreshed": "2026-03-08T17:08:29.948Z",
+  "lastRefreshed": "2026-03-08T18:10:18.649Z",
   "source": "rpc-snapshot"
 }
