@@ -78,7 +78,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - `GET /api/holderRankings` - returns the latest file-backed holder snapshot from `public/data/holder_rankings.json`
 
 ## Updater behavior
-- The pool volume updater uses Alchemy-first JSON-RPC with Infura fallback, exponential backoff, and per-pool checkpoints.
+- The pool volume updater uses Alchemy Asset Transfers first, falls back to JSON-RPC log scans through Infura when needed, and persists per-pool checkpoints.
 - The holder rankings updater uses Alchemy Asset Transfers pagination when available, falls back to standard JSON-RPC if needed, keeps cumulative per-holder balances in `data/holder_rankings_state.json`, and writes a public top-500 snapshot.
 - The public holder ranking excludes zero/dead/token-contract addresses by default and supports extra exclusions through env vars.
 - The first holder rankings run is the expensive bootstrap. Later runs only scan blocks after the last saved checkpoint.

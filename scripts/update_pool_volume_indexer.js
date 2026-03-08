@@ -1,5 +1,6 @@
 // Alchemy-backed updater: sums USDC transfers to/from a pair address
-// using RPC block lookups plus eth_getLogs. Writes increments into
+// using Alchemy Asset Transfers first, then RPC block lookups plus
+// eth_getLogs as fallback. Writes increments into
 // public/data/pool_volume.json and updates a checkpoint.
 const fs = require('fs');
 const path = require('path');
@@ -163,6 +164,53 @@ function getInfuraRpcUrlsForChain(chain) {
 
 function getRpcUrlsForChain(chain) {
   return [...getAlchemyRpcUrlsForChain(chain), ...getInfuraRpcUrlsForChain(chain)];
+}
+
+async function alchemyCall(chain, method, params) {
+  const urls = getAlchemyRpcUrlsForChain(chain);
+  if (!urls.length) {
+    const err = new Error(`Alchemy is not configured for chain=${chain}`);
+    err.code = 'ALCHEMY_MISSING_URL';
+    throw err;
+  }
+
+  let lastErr = null;
+  for (const url of urls) {
+    try {
+      const payload = { jsonrpc: '2.0', id: Date.now(), method, params };
+      const res = await requestWithRetries(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        let responseText = '';
+        try {
+          responseText = (await res.text()).replace(/\s+/g, ' ').trim();
+        } catch {
+          responseText = '';
+        }
+        const err = new Error(
+          `Alchemy HTTP ${res.status} ${res.statusText} at ${url}${responseText ? `: ${responseText}` : ''}`,
+        );
+        err.code = `ALCHEMY_HTTP_${res.status}`;
+        throw err;
+      }
+      const j = await res.json();
+      if (j && j.error) {
+        const msg = j.error.message || JSON.stringify(j.error);
+        const err = new Error(`Alchemy ${method} error at ${url}: ${msg}`);
+        err.code = 'ALCHEMY_ERROR';
+        throw err;
+      }
+      return j.result;
+    } catch (e) {
+      lastErr = e;
+      continue;
+    }
+  }
+
+  throw lastErr || new Error(`Alchemy call failed for ${method}`);
 }
 
 async function getBlockByTimestamp(ts, chain) {
@@ -351,6 +399,101 @@ async function fetchTransferLogsRpc(chain, usdcAddr, fromBlock, endBlock, pairTo
   ];
   const logs = await rpcCall(chain, 'eth_getLogs', params);
   return Array.isArray(logs) ? logs : [];
+}
+
+function getAssetTransferKey(transfer) {
+  if (transfer && typeof transfer.uniqueId === 'string' && transfer.uniqueId) {
+    return transfer.uniqueId;
+  }
+
+  const txHash = String((transfer && transfer.hash) || '').toLowerCase();
+  const logIndex = String(
+    (transfer && transfer.logIndex) ??
+    (transfer && transfer.rawContract && transfer.rawContract.logIndex) ??
+    '',
+  ).toLowerCase();
+  if (txHash) return `${txHash}:${logIndex}`;
+
+  return JSON.stringify({
+    blockNum: transfer && transfer.blockNum,
+    from: transfer && transfer.from,
+    to: transfer && transfer.to,
+    value: transfer && transfer.rawContract && transfer.rawContract.value,
+  });
+}
+
+function getAssetTransferRawValue(transfer) {
+  try {
+    return BigInt(
+      (transfer && transfer.rawContract && transfer.rawContract.value) || '0x0',
+    );
+  } catch {
+    return 0n;
+  }
+}
+
+async function fetchPoolAssetTransfersPage(chain, usdcAddr, pairAddr, fromBlock, toBlock, direction, pageKey) {
+  const params = {
+    fromBlock: asRpcHex(fromBlock),
+    toBlock: asRpcHex(toBlock),
+    category: ['erc20'],
+    contractAddresses: [usdcAddr],
+    withMetadata: false,
+    excludeZeroValue: true,
+    maxCount: asRpcHex(Math.max(1, Number(process.env.POOL_VOLUME_ASSET_TRANSFERS_PAGE_SIZE || 1000))),
+  };
+
+  if (direction === 'outgoing') {
+    params.fromAddress = pairAddr;
+  } else {
+    params.toAddress = pairAddr;
+  }
+
+  if (pageKey) {
+    params.pageKey = pageKey;
+  }
+
+  const result = await alchemyCall(chain, 'alchemy_getAssetTransfers', [params]);
+  return {
+    pageKey: result && typeof result.pageKey === 'string' ? result.pageKey : null,
+    transfers: Array.isArray(result && result.transfers) ? result.transfers : [],
+  };
+}
+
+async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6) {
+  const seen = new Set();
+  let totalRaw = 0n;
+
+  for (const direction of ['outgoing', 'incoming']) {
+    let pageKey = null;
+
+    while (true) {
+      const page = await fetchPoolAssetTransfersPage(
+        chain,
+        usdcAddr,
+        pairAddr,
+        startBlock,
+        endBlock,
+        direction,
+        pageKey,
+      );
+
+      for (const transfer of page.transfers) {
+        const key = getAssetTransferKey(transfer);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        totalRaw += getAssetTransferRawValue(transfer);
+      }
+
+      if (!page.pageKey) {
+        break;
+      }
+
+      pageKey = page.pageKey;
+    }
+  }
+
+  return Number(totalRaw) / Math.pow(10, Number(decimals) || 6);
 }
 
 function inferMaxLogRangeFromError(error) {
@@ -590,7 +733,7 @@ async function main() {
       let startBlock;
       let endBlock;
       let totalUsdc = 0;
-      const source = 'alchemy-rpc';
+      let source = 'alchemy-asset-transfers';
       startBlock = checkpointStartBlock != null ? checkpointStartBlock + 1 : await getBlockByTimestamp(startTs, chain);
       endBlock = await getBlockByTimestamp(endTs, chain);
       if (!Number.isFinite(startBlock) || !Number.isFinite(endBlock)) {
@@ -608,7 +751,24 @@ async function main() {
       }
       console.log('Block range', startBlock, endBlock);
       const tokenDecimals = Number(pool.usdc_decimals || pool.decimals || process.env.USDC_DECIMALS || 6);
-      totalUsdc = await sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, tokenDecimals);
+      try {
+        totalUsdc = await sumTokenTransfersViaAlchemyAssetTransfers(
+          startBlock,
+          endBlock,
+          pairAddr,
+          usdcAddr,
+          chain,
+          tokenDecimals,
+        );
+      } catch (error) {
+        console.warn(
+          `[pool-volume] ${chain}: alchemy_getAssetTransfers failed, falling back to eth_getLogs: ${
+            error && error.message ? error.message : String(error)
+          }`,
+        );
+        source = 'rpc-logs-fallback';
+        totalUsdc = await sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, tokenDecimals);
+      }
 
       console.log(`Total USDC transfers for ${addr} (${source}):`, totalUsdc);
 
