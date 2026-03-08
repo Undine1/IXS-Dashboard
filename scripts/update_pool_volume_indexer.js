@@ -62,6 +62,9 @@ const ALERT_FILE = path.join(__dirname, '..', 'public', 'data', 'pool_volume_ale
 // global counters used by requestWithRetries and persisted to alert file
 let apiCallCount = 0;
 let retryCount = 0;
+let totalPoolCount = 0;
+let successfulPoolCount = 0;
+let failedPoolCount = 0;
 
 if (!API_KEY && !process.env.POLYGONSCAN_API_KEY && !process.env.BASESCAN_API_KEY) {
   console.error('At least one explorer API key is required (ETHERSCAN_API_KEY, POLYGONSCAN_API_KEY, or BASESCAN_API_KEY)');
@@ -440,7 +443,14 @@ async function rpcCall(chain, method, params) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error(`RPC HTTP ${res.status} ${res.statusText} at ${url}`);
+      if (!res.ok) {
+        const err = new Error(`RPC HTTP ${res.status} ${res.statusText} at ${url}`);
+        if (res.status === 403) err.code = 'RPC_FORBIDDEN';
+        else if (res.status === 429) err.code = 'RPC_RATE_LIMIT';
+        else if (res.status === 408 || res.status === 504) err.code = 'RPC_TIMEOUT';
+        else err.code = `RPC_HTTP_${res.status}`;
+        throw err;
+      }
       const j = await res.json();
       if (j && j.error) {
         const msg = j.error.message || JSON.stringify(j.error);
@@ -575,6 +585,9 @@ function appendAlertReason(reason, makeAlert = false) {
     a.ts = new Date().toISOString();
     a.apiCallCount = apiCallCount;
     a.retryCount = retryCount;
+    a.totalPoolCount = totalPoolCount;
+    a.successfulPoolCount = successfulPoolCount;
+    a.failedPoolCount = failedPoolCount;
     fs.writeFileSync(ALERT_FILE, JSON.stringify(a, null, 2));
   } catch (e) {
     console.warn('Unable to append alert reason', e && e.message);
@@ -620,12 +633,29 @@ async function main() {
 
   // initialize alert file
   try {
-    fs.writeFileSync(ALERT_FILE, JSON.stringify({ alert: false, reasons: [], ts: new Date().toISOString(), apiCallCount: 0, retryCount: 0 }, null, 2));
+    fs.writeFileSync(
+      ALERT_FILE,
+      JSON.stringify(
+        {
+          alert: false,
+          reasons: [],
+          ts: new Date().toISOString(),
+          apiCallCount: 0,
+          retryCount: 0,
+          totalPoolCount: 0,
+          successfulPoolCount: 0,
+          failedPoolCount: 0,
+        },
+        null,
+        2,
+      ),
+    );
   } catch (e) {
     console.warn('Unable to initialize alert file', e && e.message);
   }
 
   const MAX_JITTER = Number(process.env.MAX_JITTER || 300); // seconds (default 5 minutes)
+  totalPoolCount = Object.keys(poolsMap).length;
 
   for (const rawAddr of Object.keys(poolsMap)) {
     const addr = (rawAddr || '').toLowerCase();
@@ -658,6 +688,7 @@ async function main() {
         checkpoint[addr] = { lastTimestamp: endTs, lastBlock: poolCheckpoint.lastBlock || null };
         if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
         fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+        successfulPoolCount += 1;
         continue;
       }
 
@@ -671,6 +702,7 @@ async function main() {
         checkpoint[addr] = { lastTimestamp: endTs || now, lastBlock: null };
         if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
         fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+        failedPoolCount += 1;
         continue;
       }
 
@@ -735,7 +767,9 @@ async function main() {
       // persist pool file after each pool to reduce lost work on failures
       fs.writeFileSync(POOL_FILE, JSON.stringify(poolsMap, null, 2));
       fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+      successfulPoolCount += 1;
     } catch (e) {
+      failedPoolCount += 1;
       if (e && e.code === 'CHAIN_PLAN_RESTRICTED') {
         const keyHint = CHAIN_SCAN_KEY_ENVS[chain] || 'ETHERSCAN_API_KEY';
         const reason = `unsupported-chain-plan: pool=${addr} chain=${chain}; configure ${keyHint} or upgrade ETHERSCAN_API_KEY`;
@@ -750,7 +784,7 @@ async function main() {
       }
       appendAlertReason(
         `pool-error: pool=${addr} chain=${chain} code=${(e && e.code) || 'unknown'} msg=${(e && e.message) || String(e)}`,
-        true
+        false
       );
       console.error('Error processing', rawAddr, e);
       // if retries were exhausted earlier, the alert file should already exist.
@@ -770,6 +804,9 @@ async function main() {
             ts: new Date().toISOString(),
             apiCallCount,
             retryCount,
+            totalPoolCount,
+            successfulPoolCount,
+            failedPoolCount,
           },
           null,
           2

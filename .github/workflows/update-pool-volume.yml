@@ -110,7 +110,55 @@ jobs:
           ALERT_INDEXER_CALLS: ${{ env.ALERT_INDEXER_CALLS || '50' }}
           ALERT_PROVIDER_BANS: ${{ env.ALERT_PROVIDER_BANS || '1' }}
         run: |
-          node -e "const fs=require('fs'); const p='public/data/pool_volume_alert.json'; const maxCalls=Number(process.env.ALERT_INDEXER_CALLS||'50'); const maxProvider=Number(process.env.ALERT_PROVIDER_BANS||'1'); if(!fs.existsSync(p)){console.log('No alert file, continuing'); process.exit(0);} const a=JSON.parse(fs.readFileSync(p)); const apiCalls=Number(a.apiCallCount||0); const reasons=Array.isArray(a.reasons)?a.reasons.map(String):[]; const providerSignals=reasons.filter((r)=>/request-failed|429|throttle|ban|forbidden|invalid-address/i.test(r)).length; const overCalls=apiCalls>maxCalls; const overProvider=providerSignals>maxProvider; if(a.alert||overCalls||overProvider){ console.error('Run alert triggered',{alert:a.alert,apiCalls,maxCalls,providerSignals,maxProvider,reasons}); process.exit(1);} console.log('No alerts',{apiCalls,providerSignals,maxCalls,maxProvider});"
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'public/data/pool_volume_alert.json';
+          const maxCalls = Number(process.env.ALERT_INDEXER_CALLS || '50');
+          const maxProvider = Number(process.env.ALERT_PROVIDER_BANS || '1');
+
+          if (!fs.existsSync(p)) {
+            console.log('No alert file, continuing');
+            process.exit(0);
+          }
+
+          const a = JSON.parse(fs.readFileSync(p, 'utf8'));
+          const apiCalls = Number(a.apiCallCount || 0);
+          const reasons = Array.isArray(a.reasons) ? a.reasons.map(String) : [];
+          const providerSignals = reasons.filter((r) => /request-failed|429|throttle|ban|forbidden|invalid-address/i.test(r)).length;
+          const totalPools = Number(a.totalPoolCount || 0);
+          const successfulPools = Number(a.successfulPoolCount || 0);
+          const failedPools = Number(a.failedPoolCount || 0);
+          const overCalls = apiCalls > maxCalls;
+          const overProvider = providerSignals > maxProvider;
+          const allPoolsFailed = totalPools > 0 && successfulPools === 0 && failedPools >= totalPools;
+
+          if (a.alert || overCalls || overProvider || allPoolsFailed) {
+            console.error('Run alert triggered', {
+              alert: a.alert,
+              apiCalls,
+              maxCalls,
+              providerSignals,
+              maxProvider,
+              totalPools,
+              successfulPools,
+              failedPools,
+              allPoolsFailed,
+              reasons,
+            });
+            process.exit(1);
+          }
+
+          console.log('No alerts', {
+            apiCalls,
+            providerSignals,
+            maxCalls,
+            maxProvider,
+            totalPools,
+            successfulPools,
+            failedPools,
+            allPoolsFailed,
+          });
+          NODE
 
       - name: Deploy to Vercel (no commit)
         run: npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy --prod --yes --token "$VERCEL_TOKEN"
