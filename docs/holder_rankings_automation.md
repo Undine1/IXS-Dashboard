@@ -29,7 +29,9 @@ How the updater works
    - Uses `ALCHEMY_API_KEY` for `alchemy_getAssetTransfers`.
    - Falls back to standard JSON-RPC using `ALCHEMY_API_KEY`, then `BACKUP_INFURA_API_KEY` if needed.
    - Pages transfer history with `alchemy_getAssetTransfers`, then falls back to `eth_getLogs` if the Alchemy-specific path is unavailable.
+   - If the Alchemy path fails mid-range, rolls the chain back to its pre-attempt snapshot before falling back to `eth_getLogs`.
    - Applies balance deltas per holder in raw token units.
+   - If a saved checkpoint is inconsistent, clears that chain's balances and rebuilds it once from the saved start block.
 3. Rebuilds the combined top-500 snapshot.
 4. Writes the updated state and public JSON artifacts.
 
@@ -68,7 +70,7 @@ Bootstrap notes
 - The first run is the expensive one because it backfills from the token deployment block to the current head.
 - The script finds the deployment block automatically with `eth_getCode` binary search.
 - If you already know the deployment blocks, setting the `HOLDER_RANKINGS_*_START_BLOCK` variables will shorten the bootstrap.
-- If the script throws a negative-balance error, the saved state is incomplete or the configured start block is too recent.
+- If a negative-balance error appears twice in a row for the same chain, the saved state could not self-heal and the configured start block is likely too recent.
 
 Running locally
 1. Put `ALCHEMY_API_KEY` in `.env.local`.
@@ -100,5 +102,6 @@ Operational notes
 - The app still reads `/api/holderRankings`; only the data source changed.
 - The snapshot file is the only data served publicly.
 - The state file is committed to the repo for persistence between scheduled runs, but it is not served by Next.js.
+- State and snapshot writes use a temp-file replace flow so scheduled runs do not leave partially written JSON behind.
 - On Alchemy Free, `eth_getLogs` is severely block-range limited; the Alchemy Asset Transfers path remains the preferred primary path.
 - By default the public ranking excludes the zero address, `0x...dead`, and the three token contract addresses. Use the exclusion env vars above to add project-specific burn or treasury addresses.

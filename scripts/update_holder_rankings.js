@@ -123,7 +123,28 @@ function readJson(filePath, fallback) {
 function writeJson(filePath, value, spacing = 2) {
   ensureDirectory(path.dirname(filePath));
   const payload = JSON.stringify(value, null, spacing);
-  fs.writeFileSync(filePath, `${payload}\n`);
+  const tempFilePath = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`,
+  );
+
+  fs.writeFileSync(tempFilePath, `${payload}\n`);
+
+  try {
+    fs.renameSync(tempFilePath, filePath);
+  } catch (error) {
+    if (!error || (error.code !== 'EEXIST' && error.code !== 'EPERM')) {
+      try {
+        fs.unlinkSync(tempFilePath);
+      } catch {
+        // Best-effort cleanup for failed atomic writes.
+      }
+      throw error;
+    }
+
+    fs.rmSync(filePath, { force: true });
+    fs.renameSync(tempFilePath, filePath);
+  }
 }
 
 function isValidAddress(address) {
@@ -560,6 +581,80 @@ function normalizeState(rawState) {
   return state;
 }
 
+function isStateIntegrityError(error) {
+  return Boolean(error && typeof error.message === 'string' && error.message.includes('Negative balance computed for'));
+}
+
+function clearChainBalances(state, chain) {
+  for (const [holder, chainBalances] of Object.entries(state.holders || {})) {
+    if (!chainBalances || typeof chainBalances !== 'object') continue;
+    if (!(chain in chainBalances)) continue;
+
+    delete chainBalances[chain];
+    if (Object.keys(chainBalances).length === 0) {
+      delete state.holders[holder];
+    }
+  }
+}
+
+function resetChainForFullResync(state, chainState, chain, contractStartBlock, latestBlock) {
+  clearChainBalances(state, chain);
+  chainState.contractStartBlock = contractStartBlock;
+  chainState.latestBlockAtRun = latestBlock;
+  chainState.processedLogCount = 0;
+  delete chainState.lastScannedBlock;
+  delete chainState.assetTransfersCursor;
+}
+
+function cloneJsonValue(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function snapshotChainState(state, chain) {
+  const balances = {};
+
+  for (const [holder, chainBalances] of Object.entries(state.holders || {})) {
+    if (!chainBalances || typeof chainBalances !== 'object') continue;
+    if (typeof chainBalances[chain] !== 'string') continue;
+    balances[holder] = chainBalances[chain];
+  }
+
+  return {
+    chainState:
+      state.chains[chain] && typeof state.chains[chain] === 'object' ? cloneJsonValue(state.chains[chain]) : null,
+    balances,
+  };
+}
+
+function restoreChainSnapshot(state, chain, snapshot) {
+  clearChainBalances(state, chain);
+
+  if (!snapshot || !snapshot.chainState || typeof snapshot.chainState !== 'object') {
+    delete state.chains[chain];
+  } else {
+    state.chains[chain] = cloneJsonValue(snapshot.chainState);
+  }
+
+  for (const [holder, balance] of Object.entries((snapshot && snapshot.balances) || {})) {
+    const existing = state.holders[holder] && typeof state.holders[holder] === 'object' ? state.holders[holder] : {};
+    existing[chain] = balance;
+    state.holders[holder] = existing;
+  }
+}
+
+function ensureChainState(state, config, latestBlock) {
+  let chainState =
+    state.chains[config.chain] && typeof state.chains[config.chain] === 'object'
+      ? state.chains[config.chain]
+      : {};
+
+  state.chains[config.chain] = chainState;
+  chainState.tokenAddress = config.address;
+  chainState.decimals = config.decimals;
+  chainState.latestBlockAtRun = latestBlock;
+  return chainState;
+}
+
 function persistState(state) {
   writeJson(STATE_FILE, state, 0);
 }
@@ -725,52 +820,7 @@ function buildPublicPayload(state, holderLabels) {
   };
 }
 
-async function processChain(state, config) {
-  if (!isValidAddress(config.address)) {
-    throw new Error(`Invalid token address for ${config.chain}: ${config.address}`);
-  }
-
-  const latestBlock = await getLatestBlockRpc(config.chain);
-  const chainState =
-    state.chains[config.chain] && typeof state.chains[config.chain] === 'object'
-      ? state.chains[config.chain]
-      : {};
-
-  state.chains[config.chain] = chainState;
-  chainState.tokenAddress = config.address;
-  chainState.decimals = config.decimals;
-  chainState.latestBlockAtRun = latestBlock;
-
-  let contractStartBlock =
-    toNonNegativeInteger(chainState.contractStartBlock) ?? toNonNegativeInteger(process.env[config.startBlockEnv]);
-
-  if (getAlchemyRpcUrlForChain(config.chain)) {
-    if (contractStartBlock == null) {
-      contractStartBlock = 0;
-    }
-    chainState.contractStartBlock = contractStartBlock;
-    try {
-      return await processChainViaAlchemyAssetTransfers(
-        state,
-        chainState,
-        config,
-        latestBlock,
-        contractStartBlock,
-      );
-    } catch (error) {
-      console.warn(
-        `[holder-rankings] ${config.chain}: alchemy_getAssetTransfers failed, falling back to standard RPC logs: ${
-          error && error.message ? error.message : String(error)
-        }`,
-      );
-    }
-  }
-
-  if (contractStartBlock == null) {
-    console.log(`[holder-rankings] Resolving deployment block for ${config.chain} ${config.address}`);
-    contractStartBlock = await findContractDeploymentBlock(config.chain, config.address, latestBlock);
-  }
-
+async function processChainViaStandardRpcLogs(state, chainState, config, latestBlock, contractStartBlock) {
   chainState.contractStartBlock = contractStartBlock;
 
   const lastScannedBlock = toNonNegativeInteger(chainState.lastScannedBlock);
@@ -860,6 +910,87 @@ async function processChain(state, config) {
     logsFetched,
     logsApplied,
   };
+}
+
+async function processChain(state, config) {
+  if (!isValidAddress(config.address)) {
+    throw new Error(`Invalid token address for ${config.chain}: ${config.address}`);
+  }
+
+  const latestBlock = await getLatestBlockRpc(config.chain);
+  let chainState = ensureChainState(state, config, latestBlock);
+
+  let contractStartBlock =
+    toNonNegativeInteger(chainState.contractStartBlock) ?? toNonNegativeInteger(process.env[config.startBlockEnv]);
+  let hasRetriedFromScratch = false;
+
+  while (true) {
+    const attemptSnapshot = snapshotChainState(state, config.chain);
+
+    try {
+      if (getAlchemyRpcUrlForChain(config.chain)) {
+        if (contractStartBlock == null) {
+          contractStartBlock = 0;
+        }
+        chainState.contractStartBlock = contractStartBlock;
+
+        try {
+          return await processChainViaAlchemyAssetTransfers(
+            state,
+            chainState,
+            config,
+            latestBlock,
+            contractStartBlock,
+          );
+        } catch (error) {
+          if (isStateIntegrityError(error)) {
+            throw error;
+          }
+
+          const snapshotProcessedLogCount =
+            attemptSnapshot.chainState && typeof attemptSnapshot.chainState === 'object'
+              ? toNonNegativeInteger(attemptSnapshot.chainState.processedLogCount) ?? 0
+              : 0;
+          const currentProcessedLogCount = toNonNegativeInteger(chainState.processedLogCount) ?? 0;
+          const hadPartialAlchemyProgress =
+            currentProcessedLogCount > snapshotProcessedLogCount ||
+            Boolean(
+              chainState.assetTransfersCursor && typeof chainState.assetTransfersCursor.pageKey === 'string',
+            );
+          restoreChainSnapshot(state, config.chain, attemptSnapshot);
+          chainState = ensureChainState(state, config, latestBlock);
+          if (contractStartBlock != null) {
+            chainState.contractStartBlock = contractStartBlock;
+          }
+          persistState(state);
+
+          console.warn(
+            `[holder-rankings] ${config.chain}: alchemy_getAssetTransfers failed${
+              hadPartialAlchemyProgress ? ' after rolling back partial progress' : ''
+            }, falling back to standard RPC logs: ${error && error.message ? error.message : String(error)}`,
+          );
+        }
+      }
+
+      if (contractStartBlock == null) {
+        console.log(`[holder-rankings] Resolving deployment block for ${config.chain} ${config.address}`);
+        contractStartBlock = await findContractDeploymentBlock(config.chain, config.address, latestBlock);
+      }
+
+      return await processChainViaStandardRpcLogs(state, chainState, config, latestBlock, contractStartBlock);
+    } catch (error) {
+      if (!isStateIntegrityError(error) || hasRetriedFromScratch) {
+        throw error;
+      }
+
+      console.warn(
+        `[holder-rankings] ${config.chain}: detected incomplete saved state, clearing ${config.chain} balances and rebuilding from block ${contractStartBlock}`,
+      );
+      resetChainForFullResync(state, chainState, config.chain, contractStartBlock, latestBlock);
+      persistState(state);
+      hasRetriedFromScratch = true;
+    }
+  }
 }
 
 async function main() {
