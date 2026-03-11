@@ -54,7 +54,7 @@
       "rank": 8,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "2,789,656.73",
+      "totalIxs": "2,789,077.81",
       "label": "Uniswap V4"
     },
     {
@@ -96,7 +96,7 @@
       "rank": 14,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,592,243.88",
+      "totalIxs": "1,589,512.17",
       "label": "Uniswap V2"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12339,
-  "lastRefreshed": "2026-03-11T06:21:55.152Z",
+  "lastRefreshed": "2026-03-11T07:22:25.711Z",
   "source": "rpc-snapshot"
 }
