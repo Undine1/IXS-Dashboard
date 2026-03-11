@@ -250,7 +250,7 @@
       "rank": 36,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "655,443.62",
+      "totalIxs": "655,156.36",
       "label": "Contract"
     },
     {
@@ -1125,7 +1125,7 @@
       "rank": 161,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "248,057.93",
+      "totalIxs": "248,345.19",
       "label": "IXS/USDC Base"
     },
     {
@@ -1816,45 +1816,45 @@
     },
     {
       "rank": 260,
-      "holder": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
-      "chainsHolding": 1,
-      "totalIxs": "150,094.17",
-      "label": "Contract"
-    },
-    {
-      "rank": 261,
       "holder": "0x2a1028f97411d203ed11289464f2b8b0b1ef6320",
       "chainsHolding": 1,
       "totalIxs": "150,053.82",
       "label": null
     },
     {
-      "rank": 262,
+      "rank": 261,
       "holder": "0x415f84161e2e4ebbaa41fb094e655b16164ebf49",
       "chainsHolding": 1,
       "totalIxs": "150,000.35",
       "label": null
     },
     {
-      "rank": 263,
+      "rank": 262,
       "holder": "0x4212caf656e190aa13caa6c083570b8b9b540cd6",
       "chainsHolding": 1,
       "totalIxs": "149,844.69",
       "label": null
     },
     {
-      "rank": 264,
+      "rank": 263,
       "holder": "0x8afff255b8548bd97496921b67d007f5d969f68e",
       "chainsHolding": 1,
       "totalIxs": "149,289.39",
       "label": null
     },
     {
-      "rank": 265,
+      "rank": 264,
       "holder": "0xde21042774a2e9fdb376cecc23d3edcfdb8115ef",
       "chainsHolding": 1,
       "totalIxs": "148,989.00",
       "label": null
+    },
+    {
+      "rank": 265,
+      "holder": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
+      "chainsHolding": 1,
+      "totalIxs": "148,890.63",
+      "label": "Contract"
     },
     {
       "rank": 266,
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12338,
-  "lastRefreshed": "2026-03-11T15:20:08.792Z",
+  "lastRefreshed": "2026-03-11T16:22:12.608Z",
   "source": "rpc-snapshot"
 }
