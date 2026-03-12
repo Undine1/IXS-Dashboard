@@ -845,7 +845,7 @@
       "rank": 121,
       "holder": "0xbca34ed5875079cc561840f3409a790769821dbc",
       "chainsHolding": 1,
-      "totalIxs": "299,859.90",
+      "totalIxs": "299,705.49",
       "label": "Coinex 39"
     },
     {
@@ -3237,17 +3237,17 @@
     },
     {
       "rank": 463,
-      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
-      "chainsHolding": 1,
-      "totalIxs": "78,187.12",
-      "label": "Contract"
-    },
-    {
-      "rank": 464,
       "holder": "0x02a5c8afc2d2a96d84e92bd804b2f17059fc022c",
       "chainsHolding": 2,
       "totalIxs": "78,132.45",
       "label": null
+    },
+    {
+      "rank": 464,
+      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
+      "chainsHolding": 1,
+      "totalIxs": "77,903.47",
+      "label": "Contract"
     },
     {
       "rank": 465,
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12335,
-  "lastRefreshed": "2026-03-12T13:31:13.507Z",
+  "lastRefreshed": "2026-03-12T14:22:33.805Z",
   "source": "rpc-snapshot"
 }
