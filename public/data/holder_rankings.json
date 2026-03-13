@@ -12,7 +12,7 @@
       "rank": 2,
       "holder": "0x5a58505a96d1dbf8df91cb21b54419fc36e93fde",
       "chainsHolding": 1,
-      "totalIxs": "6,154,778.91",
+      "totalIxs": "6,155,917.41",
       "label": "Wormhole Bridge"
     },
     {
@@ -96,7 +96,7 @@
       "rank": 14,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,591,845.78",
+      "totalIxs": "1,583,103.94",
       "label": "Uniswap V2"
     },
     {
@@ -250,7 +250,7 @@
       "rank": 36,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "656,570.93",
+      "totalIxs": "656,424.02",
       "label": "Contract"
     },
     {
@@ -1139,7 +1139,7 @@
       "rank": 163,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "242,184.77",
+      "totalIxs": "242,331.68",
       "label": "IXS/USDC Base"
     },
     {
@@ -1634,30 +1634,30 @@
     },
     {
       "rank": 234,
+      "holder": "0x1d869989caf3c815d63b22dd89b30ab6ae1d96b1",
+      "chainsHolding": 1,
+      "totalIxs": "179,645.63",
+      "label": null
+    },
+    {
+      "rank": 235,
       "holder": "0x222f781edccc4a3a8baa71068fbd6aaaf6368fb3",
       "chainsHolding": 2,
       "totalIxs": "175,285.23",
       "label": null
     },
     {
-      "rank": 235,
+      "rank": 236,
       "holder": "0xed8ba1dc254fa8874f9588015f6dca3da6d37f0b",
       "chainsHolding": 1,
       "totalIxs": "175,003.00",
       "label": null
     },
     {
-      "rank": 236,
+      "rank": 237,
       "holder": "0xc0ca1f7a0b26a279043309bd1e6d5192666fcc81",
       "chainsHolding": 1,
       "totalIxs": "174,451.09",
-      "label": null
-    },
-    {
-      "rank": 237,
-      "holder": "0x1d869989caf3c815d63b22dd89b30ab6ae1d96b1",
-      "chainsHolding": 1,
-      "totalIxs": "173,917.00",
       "label": null
     },
     {
@@ -1893,31 +1893,31 @@
     },
     {
       "rank": 271,
-      "holder": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
-      "chainsHolding": 1,
-      "totalIxs": "145,964.68",
-      "label": "Contract"
-    },
-    {
-      "rank": 272,
       "holder": "0x625f0f70b6fce91052f25a5e66e126ab45d41349",
       "chainsHolding": 1,
       "totalIxs": "145,839.00",
       "label": null
     },
     {
-      "rank": 273,
+      "rank": 272,
       "holder": "0x96055ccc2267bda1891003804f01312f5aa58dc5",
       "chainsHolding": 1,
       "totalIxs": "145,321.00",
       "label": null
     },
     {
-      "rank": 274,
+      "rank": 273,
       "holder": "0x761858c383c9a07bfff47180438908e4a02e9c1a",
       "chainsHolding": 1,
       "totalIxs": "145,293.03",
       "label": null
+    },
+    {
+      "rank": 274,
+      "holder": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
+      "chainsHolding": 1,
+      "totalIxs": "144,826.30",
+      "label": "Contract"
     },
     {
       "rank": 275,
@@ -2992,24 +2992,24 @@
     },
     {
       "rank": 428,
-      "holder": "0x70cf9c7233deb3eff4c2957dda3e79db82b851d4",
-      "chainsHolding": 1,
-      "totalIxs": "90,187.56",
-      "label": "Contract"
-    },
-    {
-      "rank": 429,
       "holder": "0x5a546e3f9756626e97cf3ca7f8e49d788324fd18",
       "chainsHolding": 1,
       "totalIxs": "90,108.60",
       "label": null
     },
     {
-      "rank": 430,
+      "rank": 429,
       "holder": "0x15e7972765e8598736d156d9cf7648b10d601490",
       "chainsHolding": 1,
       "totalIxs": "90,085.01",
       "label": null
+    },
+    {
+      "rank": 430,
+      "holder": "0x70cf9c7233deb3eff4c2957dda3e79db82b851d4",
+      "chainsHolding": 1,
+      "totalIxs": "90,051.15",
+      "label": "Contract"
     },
     {
       "rank": 431,
@@ -3288,7 +3288,7 @@
       "rank": 470,
       "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
       "chainsHolding": 1,
-      "totalIxs": "76,353.60",
+      "totalIxs": "76,490.00",
       "label": "Contract"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12331,
-  "lastRefreshed": "2026-03-13T13:29:54.550Z",
+  "lastRefreshed": "2026-03-13T14:20:25.472Z",
   "source": "rpc-snapshot"
 }
