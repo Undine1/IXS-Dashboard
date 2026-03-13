@@ -96,7 +96,7 @@
       "rank": 14,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,597,947.52",
+      "totalIxs": "1,594,601.87",
       "label": "Uniswap V2"
     },
     {
@@ -250,7 +250,7 @@
       "rank": 36,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "656,864.38",
+      "totalIxs": "656,569.36",
       "label": "Contract"
     },
     {
@@ -1132,7 +1132,7 @@
       "rank": 162,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "246,837.32",
+      "totalIxs": "247,132.34",
       "label": "IXS/USDC Base"
     },
     {
@@ -1858,45 +1858,45 @@
     },
     {
       "rank": 266,
-      "holder": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
-      "chainsHolding": 1,
-      "totalIxs": "148,890.63",
-      "label": "Contract"
-    },
-    {
-      "rank": 267,
       "holder": "0xb7ee769990afa80bc83d62be190e79c15d0b814f",
       "chainsHolding": 1,
       "totalIxs": "147,573.92",
       "label": null
     },
     {
-      "rank": 268,
+      "rank": 267,
       "holder": "0xc9a8bb4b39de360e86b9b279575b15fe68315821",
       "chainsHolding": 1,
       "totalIxs": "146,979.78",
       "label": null
     },
     {
-      "rank": 269,
+      "rank": 268,
       "holder": "0xf73cf1e70a706fc2296b7b24f408885aeca88963",
       "chainsHolding": 1,
       "totalIxs": "146,776.00",
       "label": null
     },
     {
-      "rank": 270,
+      "rank": 269,
       "holder": "0x490cb27e7e8defbcedb908c4a4bfd41486335e56",
       "chainsHolding": 1,
       "totalIxs": "146,762.00",
       "label": null
     },
     {
-      "rank": 271,
+      "rank": 270,
       "holder": "0xaf5459bea0af8a3b2c33c45aba0e45eb0ddb1869",
       "chainsHolding": 1,
       "totalIxs": "146,546.00",
       "label": null
+    },
+    {
+      "rank": 271,
+      "holder": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
+      "chainsHolding": 1,
+      "totalIxs": "145,964.68",
+      "label": "Contract"
     },
     {
       "rank": 272,
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12332,
-  "lastRefreshed": "2026-03-13T00:33:10.916Z",
+  "totalRowCount": 12333,
+  "lastRefreshed": "2026-03-13T01:37:41.636Z",
   "source": "rpc-snapshot"
 }
