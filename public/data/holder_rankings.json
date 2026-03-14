@@ -1515,38 +1515,38 @@
     },
     {
       "rank": 217,
+      "holder": "0xe9ee9f2857b559c67dd03576a1c74589a6af6197",
+      "chainsHolding": 1,
+      "totalIxs": "191,134.45",
+      "label": "Bitmart 22"
+    },
+    {
+      "rank": 218,
       "holder": "0x86824a0a22ad3ec3266d26d3574fa899bc85e6fb",
       "chainsHolding": 1,
       "totalIxs": "190,852.75",
       "label": null
     },
     {
-      "rank": 218,
+      "rank": 219,
       "holder": "0xde96e3a1384cf12cc37732cc3f3295f0d58d21dd",
       "chainsHolding": 2,
       "totalIxs": "189,160.01",
       "label": null
     },
     {
-      "rank": 219,
+      "rank": 220,
       "holder": "0xf85095d753ef2f99eb5b6b7454a4a572c0ecef27",
       "chainsHolding": 1,
       "totalIxs": "189,030.00",
       "label": null
     },
     {
-      "rank": 220,
+      "rank": 221,
       "holder": "0x5c1a97cfc5e6e5e351fbf0740ef20e6421a7bdbb",
       "chainsHolding": 1,
       "totalIxs": "188,306.07",
       "label": null
-    },
-    {
-      "rank": 221,
-      "holder": "0xe9ee9f2857b559c67dd03576a1c74589a6af6197",
-      "chainsHolding": 1,
-      "totalIxs": "188,209.13",
-      "label": "Bitmart 22"
     },
     {
       "rank": 222,
@@ -3265,17 +3265,17 @@
     },
     {
       "rank": 467,
-      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
-      "chainsHolding": 1,
-      "totalIxs": "77,006.22",
-      "label": "Contract"
-    },
-    {
-      "rank": 468,
       "holder": "0xd751257c1e18f06df9aa9ff7bd3d8e360c7b63db",
       "chainsHolding": 1,
       "totalIxs": "76,964.34",
       "label": null
+    },
+    {
+      "rank": 468,
+      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
+      "chainsHolding": 1,
+      "totalIxs": "76,892.34",
+      "label": "Contract"
     },
     {
       "rank": 469,
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12331,
-  "lastRefreshed": "2026-03-14T20:08:41.377Z",
+  "totalRowCount": 12330,
+  "lastRefreshed": "2026-03-14T21:09:54.652Z",
   "source": "rpc-snapshot"
 }
