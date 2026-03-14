@@ -96,7 +96,7 @@
       "rank": 14,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,583,025.69",
+      "totalIxs": "1,581,218.80",
       "label": "Uniswap V2"
     },
     {
@@ -250,7 +250,7 @@
       "rank": 36,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "654,657.79",
+      "totalIxs": "654,995.09",
       "label": "Contract"
     },
     {
@@ -1146,7 +1146,7 @@
       "rank": 164,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "243,754.72",
+      "totalIxs": "245,109.88",
       "label": "IXS/USDC Base"
     },
     {
@@ -2985,17 +2985,17 @@
     },
     {
       "rank": 427,
+      "holder": "0x70cf9c7233deb3eff4c2957dda3e79db82b851d4",
+      "chainsHolding": 1,
+      "totalIxs": "90,131.77",
+      "label": "Contract"
+    },
+    {
+      "rank": 428,
       "holder": "0x5a546e3f9756626e97cf3ca7f8e49d788324fd18",
       "chainsHolding": 1,
       "totalIxs": "90,108.60",
       "label": null
-    },
-    {
-      "rank": 428,
-      "holder": "0x70cf9c7233deb3eff4c2957dda3e79db82b851d4",
-      "chainsHolding": 1,
-      "totalIxs": "90,093.55",
-      "label": "Contract"
     },
     {
       "rank": 429,
@@ -3307,17 +3307,17 @@
     },
     {
       "rank": 473,
-      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
-      "chainsHolding": 1,
-      "totalIxs": "75,733.89",
-      "label": "Contract"
-    },
-    {
-      "rank": 474,
       "holder": "0x54330e7c8c49aaea94d70987dd3a581df50e639d",
       "chainsHolding": 2,
       "totalIxs": "75,715.18",
       "label": null
+    },
+    {
+      "rank": 474,
+      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
+      "chainsHolding": 1,
+      "totalIxs": "75,695.67",
+      "label": "Contract"
     },
     {
       "rank": 475,
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12330,
-  "lastRefreshed": "2026-03-14T00:32:03.314Z",
+  "totalRowCount": 12331,
+  "lastRefreshed": "2026-03-14T01:37:41.976Z",
   "source": "rpc-snapshot"
 }
