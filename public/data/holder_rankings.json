@@ -54,7 +54,7 @@
       "rank": 8,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "2,794,573.80",
+      "totalIxs": "2,792,627.42",
       "label": "Uniswap V4"
     },
     {
@@ -180,7 +180,7 @@
       "rank": 26,
       "holder": "0x45784354e739bb0f6bd370f9fc32f77dfec7138b",
       "chainsHolding": 1,
-      "totalIxs": "780,066.15",
+      "totalIxs": "782,012.52",
       "label": null
     },
     {
@@ -250,7 +250,7 @@
       "rank": 36,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "656,223.90",
+      "totalIxs": "656,519.51",
       "label": "Contract"
     },
     {
@@ -1139,7 +1139,7 @@
       "rank": 163,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "247,737.84",
+      "totalIxs": "247,442.23",
       "label": "IXS/USDC Base"
     },
     {
@@ -1487,38 +1487,38 @@
     },
     {
       "rank": 213,
+      "holder": "0xe9ee9f2857b559c67dd03576a1c74589a6af6197",
+      "chainsHolding": 1,
+      "totalIxs": "196,228.49",
+      "label": "Bitmart 22"
+    },
+    {
+      "rank": 214,
       "holder": "0xdac8bf935c9c97dbb186517be507b08418670461",
       "chainsHolding": 1,
       "totalIxs": "196,093.27",
       "label": null
     },
     {
-      "rank": 214,
+      "rank": 215,
       "holder": "0xe0722cbc9b90214217db41ab4f8c09d214eb0f4c",
       "chainsHolding": 1,
       "totalIxs": "196,066.85",
       "label": null
     },
     {
-      "rank": 215,
+      "rank": 216,
       "holder": "0x99617b51d99009bbd1ed9899322fd0f094a10f4a",
       "chainsHolding": 1,
       "totalIxs": "195,323.00",
       "label": null
     },
     {
-      "rank": 216,
+      "rank": 217,
       "holder": "0x699b0d824282e5b0d4d20932ef74e2b67c5a9dcf",
       "chainsHolding": 1,
       "totalIxs": "192,975.65",
       "label": null
-    },
-    {
-      "rank": 217,
-      "holder": "0xe9ee9f2857b559c67dd03576a1c74589a6af6197",
-      "chainsHolding": 1,
-      "totalIxs": "191,134.45",
-      "label": "Bitmart 22"
     },
     {
       "rank": 218,
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12326,
-  "lastRefreshed": "2026-03-15T20:09:15.090Z",
+  "totalRowCount": 12325,
+  "lastRefreshed": "2026-03-15T21:10:19.226Z",
   "source": "rpc-snapshot"
 }
