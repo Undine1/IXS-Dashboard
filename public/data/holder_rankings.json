@@ -54,7 +54,7 @@
       "rank": 8,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "2,823,923.21",
+      "totalIxs": "2,828,908.30",
       "label": "Uniswap V4"
     },
     {
@@ -68,7 +68,7 @@
       "rank": 10,
       "holder": "0x3ee18b2214aff97000d974cf647e7c347e8fa585",
       "chainsHolding": 1,
-      "totalIxs": "2,246,348.35",
+      "totalIxs": "2,245,232.35",
       "label": "Wormhole Bridge"
     },
     {
@@ -87,17 +87,17 @@
     },
     {
       "rank": 13,
-      "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
-      "chainsHolding": 1,
-      "totalIxs": "1,604,654.23",
-      "label": "Uniswap V2"
-    },
-    {
-      "rank": 14,
       "holder": "0x4492b21337f0664829a991da4c8aa7e686e24a23",
       "chainsHolding": 1,
       "totalIxs": "1,600,000.05",
       "label": null
+    },
+    {
+      "rank": 14,
+      "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
+      "chainsHolding": 1,
+      "totalIxs": "1,597,539.58",
+      "label": "Uniswap V2"
     },
     {
       "rank": 15,
@@ -243,7 +243,7 @@
       "rank": 35,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "657,289.02",
+      "totalIxs": "656,606.31",
       "label": "Contract"
     },
     {
@@ -878,23 +878,23 @@
     },
     {
       "rank": 126,
+      "holder": "0xe809e3701830afe33e0fa84ca3cbfab8baddb77d",
+      "chainsHolding": 2,
+      "totalIxs": "295,889.98",
+      "label": null
+    },
+    {
+      "rank": 127,
       "holder": "0x93ea3af5010fd2a10a594ce9d43b46c58962d381",
       "chainsHolding": 1,
       "totalIxs": "295,030.00",
       "label": null
     },
     {
-      "rank": 127,
+      "rank": 128,
       "holder": "0x8ba0d19881b8d7adc26573dff57a1f98d20ae321",
       "chainsHolding": 1,
       "totalIxs": "293,421.00",
-      "label": null
-    },
-    {
-      "rank": 128,
-      "holder": "0xe809e3701830afe33e0fa84ca3cbfab8baddb77d",
-      "chainsHolding": 2,
-      "totalIxs": "293,419.92",
       "label": null
     },
     {
@@ -1018,51 +1018,51 @@
     },
     {
       "rank": 146,
+      "holder": "0x9e500d02f7a497615edf4de6a90b4b2440ac6dae",
+      "chainsHolding": 1,
+      "totalIxs": "270,192.30",
+      "label": null
+    },
+    {
+      "rank": 147,
       "holder": "0xc0f21a34acfc0b23c004b8ad7a40acfa739b80c9",
       "chainsHolding": 1,
       "totalIxs": "268,342.23",
       "label": null
     },
     {
-      "rank": 147,
+      "rank": 148,
       "holder": "0xda51775b039155aaca079f53dcbe159372e771a4",
       "chainsHolding": 1,
       "totalIxs": "267,655.73",
       "label": null
     },
     {
-      "rank": 148,
+      "rank": 149,
       "holder": "0x70031213c95deecfa44a6c438bca25134a292eef",
       "chainsHolding": 1,
       "totalIxs": "267,233.79",
       "label": null
     },
     {
-      "rank": 149,
+      "rank": 150,
       "holder": "0x8ee9405c352ae5d753834ae44570532401ebbf79",
       "chainsHolding": 1,
       "totalIxs": "264,985.00",
       "label": null
     },
     {
-      "rank": 150,
+      "rank": 151,
       "holder": "0x7e5f2a369e5a15ca3bf2be888fb4e769dbfd06f2",
       "chainsHolding": 1,
       "totalIxs": "264,969.00",
       "label": null
     },
     {
-      "rank": 151,
+      "rank": 152,
       "holder": "0x020d522269eb8ba93115519cdb9a4b8ebe469576",
       "chainsHolding": 1,
       "totalIxs": "264,373.00",
-      "label": null
-    },
-    {
-      "rank": 152,
-      "holder": "0x9e500d02f7a497615edf4de6a90b4b2440ac6dae",
-      "chainsHolding": 1,
-      "totalIxs": "262,855.10",
       "label": null
     },
     {
@@ -1146,7 +1146,7 @@
       "rank": 164,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "244,205.34",
+      "totalIxs": "242,535.20",
       "label": "IXS/USDC Base"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12328,
-  "lastRefreshed": "2026-03-16T07:35:49.928Z",
+  "lastRefreshed": "2026-03-16T08:28:22.169Z",
   "source": "rpc-snapshot"
 }
