@@ -66,7 +66,9 @@ jobs:
         run: npm run update:holder-rankings
 
       - name: Commit updated snapshot files
+        id: commit_snapshot
         run: |
+          echo "pushed=false" >> "$GITHUB_OUTPUT"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if git status --porcelain | grep -q "public/data/holder_rankings.json\|data/holder_rankings_state.json"; then
@@ -77,6 +79,7 @@ jobs:
             for attempt in $(seq 1 "$max_attempts"); do
               if git push origin "HEAD:${branch}"; then
                 echo "Push succeeded on attempt ${attempt}"
+                echo "pushed=true" >> "$GITHUB_OUTPUT"
                 break
               fi
 
@@ -106,8 +109,24 @@ jobs:
             public/data/holder_rankings.json
             data/holder_rankings_state.json
 
-      - name: Deploy to Vercel (no commit)
-        run: npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy --prod --yes --token "$VERCEL_TOKEN"
+      - name: Deploy to Vercel (best effort)
+        if: ${{ steps.commit_snapshot.outputs.pushed == 'true' }}
+        shell: bash
+        run: |
+          set -o pipefail
+          deploy_log="$(mktemp)"
+
+          if npx --yes "vercel@${VERCEL_CLI_VERSION}" deploy --prod --yes --token "$VERCEL_TOKEN" 2>&1 | tee "$deploy_log"; then
+            exit 0
+          fi
+
+          if grep -q 'api-deployments-free-per-day' "$deploy_log"; then
+            echo "::warning::Skipping Vercel deploy because the free-tier daily deployment quota is exhausted."
+            exit 0
+          fi
+
+          echo "::error::Vercel deploy failed for a reason other than the daily deployment quota."
+          exit 1
         env:
           NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
           NPM_CONFIG_USERCONFIG: /dev/null
