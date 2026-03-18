@@ -20,7 +20,7 @@ Files of interest
 - `public/data/holder_rankings.json` - public snapshot used by the UI.
 - `data/holder_rankings_state.json` - incremental private state and checkpoints.
 - `data/holder_labels.json` - manual address labels and exclusion rules.
-- `.github/workflows/update-holder-rankings.yml` - hourly automation and deploy flow.
+- `.github/workflows/update-holder-rankings.yml` - hourly automation that commits refreshed artifacts.
 
 How the updater works
 1. Loads the saved state from `data/holder_rankings_state.json` if present.
@@ -86,9 +86,6 @@ Running locally
 GitHub Actions setup
 - Required secrets:
   - `GH_PAT`
-  - `VERCEL_TOKEN`
-  - `VERCEL_ORG_ID`
-  - `VERCEL_PROJECT_ID`
 - RPC secrets:
   - `ALCHEMY_API_KEY`
   - optional `BACKUP_INFURA_API_KEY`
@@ -102,6 +99,7 @@ Operational notes
 - The app still reads `/api/holderRankings`; only the data source changed.
 - The snapshot file is the only data served publicly.
 - The state file is committed to the repo for persistence between scheduled runs, but it is not served by Next.js.
+- Vercel deployment for refreshed data is expected to come from Git integration when the workflow pushes to `main`.
 - State and snapshot writes use a temp-file replace flow so scheduled runs do not leave partially written JSON behind.
 - On Alchemy Free, `eth_getLogs` is severely block-range limited; the Alchemy Asset Transfers path remains the preferred primary path.
 - By default the public ranking excludes the zero address, `0x...dead`, and the three token contract addresses. Use the exclusion env vars above to add project-specific burn or treasury addresses.

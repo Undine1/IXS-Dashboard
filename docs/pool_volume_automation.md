@@ -33,13 +33,14 @@ Files of interest
 - `public/data/pool_volume.json` - persisted totals.
 - `public/data/pool_volume_checkpoint.json` - per-pool checkpoints.
 - `public/data/pool_volume_runs.json` - run history.
-- `.github/workflows/update-pool-volume.yml` - scheduled automation and deploy flow.
+- `.github/workflows/update-pool-volume.yml` - scheduled automation that commits refreshed artifacts.
 
 Operational notes
 - The updater uses `ALCHEMY_API_KEY` first for Ethereum, Polygon, and Base.
 - Pool transfer fetching prefers `alchemy_getAssetTransfers`, which avoids the tight `eth_getLogs` block-range limits on Alchemy Free.
 - `BACKUP_INFURA_API_KEY` is used for the Infura-only `eth_getLogs` fallback.
 - If the Alchemy transfer API path fails, the updater falls back to standard RPC log scanning through Infura.
+- Vercel deployment for refreshed data is expected to come from Git integration when the workflow pushes to `main`.
 - If rate-limited, tune retry settings with:
   - `API_MAX_ATTEMPTS`
   - `API_BASE_DELAY_MS`
