@@ -21,14 +21,14 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout repository (use PAT for push)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: true
           token: ${{ secrets.GH_PAT }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22.15.0'
           cache: 'npm'
@@ -90,7 +90,7 @@ jobs:
             echo "No data changes"
           fi
       - name: Upload run artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pool-volume-artifacts
           path: |
