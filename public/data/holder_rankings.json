@@ -220,17 +220,17 @@
     },
     {
       "rank": 32,
+      "holder": "0x2982bb64bcd07ac3315c32cb2bb7e5e8a2de7d67",
+      "chainsHolding": 2,
+      "totalIxs": "719,328.16",
+      "label": "Bitmart 16"
+    },
+    {
+      "rank": 33,
       "holder": "0x1b3829c89b7f30239f8971ac2118c8ff362a45bb",
       "chainsHolding": 1,
       "totalIxs": "716,005.76",
       "label": null
-    },
-    {
-      "rank": 33,
-      "holder": "0x2982bb64bcd07ac3315c32cb2bb7e5e8a2de7d67",
-      "chainsHolding": 2,
-      "totalIxs": "710,157.38",
-      "label": "Bitmart 16"
     },
     {
       "rank": 34,
@@ -894,7 +894,7 @@
       "rank": 128,
       "holder": "0xbca34ed5875079cc561840f3409a790769821dbc",
       "chainsHolding": 1,
-      "totalIxs": "291,239.36",
+      "totalIxs": "291,085.99",
       "label": "Coinex 39"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12317,
-  "lastRefreshed": "2026-03-18T23:11:34.044Z",
+  "lastRefreshed": "2026-03-19T00:35:27.888Z",
   "source": "rpc-snapshot"
 }
