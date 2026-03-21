@@ -3125,30 +3125,30 @@
     },
     {
       "rank": 447,
+      "holder": "0x2bc8e2271c712d46c25b58a2d0a4b9d10727bd0d",
+      "chainsHolding": 2,
+      "totalIxs": "81,624.25",
+      "label": null
+    },
+    {
+      "rank": 448,
       "holder": "0x26a9bb927cc7eceff0629cad64c3e916f1dc2712",
       "chainsHolding": 1,
       "totalIxs": "81,161.93",
       "label": null
     },
     {
-      "rank": 448,
+      "rank": 449,
       "holder": "0x5948f53797019b13adfe4186d8314277447ffad1",
       "chainsHolding": 1,
       "totalIxs": "80,556.96",
       "label": null
     },
     {
-      "rank": 449,
+      "rank": 450,
       "holder": "0x2e4de43b375b0e7a5ecf4cbadff4481455322187",
       "chainsHolding": 1,
       "totalIxs": "80,212.30",
-      "label": null
-    },
-    {
-      "rank": 450,
-      "holder": "0x2bc8e2271c712d46c25b58a2d0a4b9d10727bd0d",
-      "chainsHolding": 2,
-      "totalIxs": "80,197.37",
       "label": null
     },
     {
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12310,
-  "lastRefreshed": "2026-03-21T17:09:32.678Z",
+  "totalRowCount": 12309,
+  "lastRefreshed": "2026-03-21T18:11:09.806Z",
   "source": "rpc-snapshot"
 }
