@@ -85,8 +85,8 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - The first holder rankings run is the expensive bootstrap. Later runs only scan blocks after the last saved checkpoint.
 
 ## GitHub Actions
-- `.github/workflows/update-pool-volume.yml` runs the pool updater and commits its outputs back to `main`.
-- `.github/workflows/update-holder-rankings.yml` runs the holder updater hourly and commits `public/data/holder_rankings.json` plus `data/holder_rankings_state.json` back to `main`.
+- `.github/workflows/update-pool-volume.yml` runs the pool updater hourly and commits its outputs back to `main`.
+- `.github/workflows/update-holder-rankings.yml` runs after the pool updater workflow completes and commits `public/data/holder_rankings.json` plus `data/holder_rankings_state.json` back to `main`.
 - Production deploys are expected to come from Vercel's Git integration on pushes to `main`, not from the workflows themselves.
 
 ## Data outputs

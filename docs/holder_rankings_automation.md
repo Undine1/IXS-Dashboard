@@ -6,7 +6,7 @@ What it does
 - Pages ERC-20 transfer history for the configured IXS token contracts on Ethereum, Base, and Polygon.
 - Maintains a private incremental state file at `data/holder_rankings_state.json`.
 - Writes the public top-holder snapshot to `public/data/holder_rankings.json`.
-- Runs hourly via GitHub Actions and commits updated artifacts back to the repo.
+- Runs via GitHub Actions after the pool-volume workflow completes and commits updated artifacts back to the repo.
 - Excludes burn/system addresses from the public ranking snapshot while keeping full balances in private state.
 
 Why this replaces Dune
@@ -20,7 +20,7 @@ Files of interest
 - `public/data/holder_rankings.json` - public snapshot used by the UI.
 - `data/holder_rankings_state.json` - incremental private state and checkpoints.
 - `data/holder_labels.json` - manual address labels and exclusion rules.
-- `.github/workflows/update-holder-rankings.yml` - hourly automation that commits refreshed artifacts.
+- `.github/workflows/update-holder-rankings.yml` - automation triggered after the pool-volume workflow that commits refreshed artifacts.
 
 How the updater works
 1. Loads the saved state from `data/holder_rankings_state.json` if present.
@@ -102,6 +102,7 @@ Operational notes
 - The app still reads `/api/holderRankings`; only the data source changed.
 - The snapshot file is the only data served publicly.
 - The state file is committed to the repo for persistence between scheduled runs, but it is not served by Next.js.
+- The workflow is triggered on completion of `Update Pool Volume`, regardless of whether that upstream workflow succeeded or failed, so holder updates are not blocked by pool-update failures.
 - Vercel deployment for refreshed data is expected to come from Git integration when the workflow pushes to `main`.
 - State and snapshot writes use a temp-file replace flow so scheduled runs do not leave partially written JSON behind.
 - On Alchemy Free, `eth_getLogs` is severely block-range limited; the Alchemy Asset Transfers path remains the preferred primary path.

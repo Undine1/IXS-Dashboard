@@ -1,8 +1,10 @@
 name: Update Holder Rankings
 
 on:
-  schedule:
-    - cron: '2 * * * *' # hourly at minute 2 UTC
+  workflow_run:
+    workflows: ["Update Pool Volume"]
+    types:
+      - completed
   workflow_dispatch: {}
 
 permissions:
