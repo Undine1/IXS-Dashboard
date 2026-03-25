@@ -94,17 +94,17 @@
     },
     {
       "rank": 14,
+      "holder": "0x9642b23ed1e01df1092b92641051881a322f5d4e",
+      "chainsHolding": 1,
+      "totalIxs": "1,546,301.07",
+      "label": "MEXC 16"
+    },
+    {
+      "rank": 15,
       "holder": "0xbdd64da092026112957bd7f12f43c57fe4dcdfe2",
       "chainsHolding": 3,
       "totalIxs": "1,529,466.30",
       "label": null
-    },
-    {
-      "rank": 15,
-      "holder": "0x9642b23ed1e01df1092b92641051881a322f5d4e",
-      "chainsHolding": 1,
-      "totalIxs": "1,525,809.18",
-      "label": "MEXC 16"
     },
     {
       "rank": 16,
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12300,
-  "lastRefreshed": "2026-03-25T11:15:25.303Z",
+  "totalRowCount": 12299,
+  "lastRefreshed": "2026-03-25T12:11:20.574Z",
   "source": "rpc-snapshot"
 }
