@@ -24,17 +24,17 @@
     },
     {
       "rank": 4,
+      "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
+      "chainsHolding": 1,
+      "totalIxs": "3,799,770.69",
+      "label": "Uniswap V4"
+    },
+    {
+      "rank": 5,
       "holder": "0x7e6a90091a77bcd49d48c412a54087981f915f7c",
       "chainsHolding": 1,
       "totalIxs": "3,793,637.33",
       "label": "Contract"
-    },
-    {
-      "rank": 5,
-      "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
-      "chainsHolding": 1,
-      "totalIxs": "3,716,770.69",
-      "label": "Uniswap V4"
     },
     {
       "rank": 6,
@@ -47,7 +47,7 @@
       "rank": 7,
       "holder": "0xbb36acf8c156f19e9550d1f66b1cdd2cb003b65d",
       "chainsHolding": 1,
-      "totalIxs": "3,202,630.24",
+      "totalIxs": "3,102,630.24",
       "label": null
     },
     {
@@ -61,7 +61,7 @@
       "rank": 9,
       "holder": "0x3ee18b2214aff97000d974cf647e7c347e8fa585",
       "chainsHolding": 1,
-      "totalIxs": "2,281,612.38",
+      "totalIxs": "2,283,123.59",
       "label": "Wormhole Bridge"
     },
     {
@@ -82,14 +82,14 @@
       "rank": 12,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,762,022.36",
+      "totalIxs": "1,773,384.93",
       "label": "Uniswap V2"
     },
     {
       "rank": 13,
       "holder": "0x9642b23ed1e01df1092b92641051881a322f5d4e",
       "chainsHolding": 1,
-      "totalIxs": "1,628,123.46",
+      "totalIxs": "1,635,809.18",
       "label": "MEXC 16"
     },
     {
@@ -243,7 +243,7 @@
       "rank": 35,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "666,904.48",
+      "totalIxs": "667,812.91",
       "label": "Contract"
     },
     {
@@ -1006,7 +1006,7 @@
       "rank": 144,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "272,502.26",
+      "totalIxs": "273,410.69",
       "label": "IXS/USDC Base"
     },
     {
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12302,
-  "lastRefreshed": "2026-03-25T01:42:55.251Z",
+  "totalRowCount": 12301,
+  "lastRefreshed": "2026-03-25T03:07:36.373Z",
   "source": "rpc-snapshot"
 }
