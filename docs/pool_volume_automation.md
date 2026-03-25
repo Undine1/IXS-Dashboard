@@ -5,10 +5,10 @@ Summary of the updater and automation in this repo.
 What it does
 - Persists per-pool lifetime USD totals to `public/data/pool_volume.json`.
 - Runs an hourly updater (`scripts/update_pool_volume_indexer.js`) via GitHub Actions.
-- Uses Alchemy Asset Transfers with an Infura log-scan fallback to:
+- Uses Alchemy Asset Transfers with authenticated log-scan fallbacks to:
   - Resolve timestamps to blocks via binary search.
   - Fetch ERC-20 transfers via `alchemy_getAssetTransfers`.
-  - Fall back to `eth_getLogs` through Infura when the Alchemy-specific path is unavailable.
+  - Fall back to `eth_getLogs` through Infura, then Chainstack, when the Alchemy-specific path is unavailable.
 - Applies retry logic with backoff/jitter for transient failures.
 - Persists per-pool checkpoints in `public/data/pool_volume_checkpoint.json`.
 - Appends run summaries to `public/data/pool_volume_runs.json`.
@@ -20,6 +20,7 @@ Configuration
 - CI (GitHub Actions): set `ALCHEMY_API_KEY` as a repository secret.
 - Optional:
   - `BACKUP_INFURA_API_KEY` as an Infura project key for fallback when the primary Alchemy key is rate-limited or temporarily blocked.
+  - `BACKUP_CHAINSTACK_BASE_RPC_URL` as the full HTTPS Chainstack Base RPC endpoint for a third fallback provider on Base only.
 - Optional:
   - `POLYGON_USDC` to override the default tracked USDC address.
   - `PAIR_ADDRESS` to override a default pool address.
@@ -38,8 +39,11 @@ Files of interest
 Operational notes
 - The updater uses `ALCHEMY_API_KEY` first for Ethereum, Polygon, and Base.
 - Pool transfer fetching prefers `alchemy_getAssetTransfers`, which avoids the tight `eth_getLogs` block-range limits on Alchemy Free.
-- `BACKUP_INFURA_API_KEY` is used for the Infura-only `eth_getLogs` fallback.
-- If the Alchemy transfer API path fails, the updater falls back to standard RPC log scanning through Infura.
+- `BACKUP_INFURA_API_KEY` is used for the first `eth_getLogs` fallback.
+- `BACKUP_CHAINSTACK_BASE_RPC_URL` provides a Base-only third provider using a full RPC URL.
+- If the Alchemy transfer API path fails, the updater falls back to standard RPC log scanning through Infura and then Chainstack.
+- Providers that return repeated `401`/`403`/`429` responses are disabled for the rest of the run so later calls go straight to the remaining provider instead of burning retry budget on a known-bad endpoint.
+- Fallback `eth_getLogs` chunk shrinking is only used for scan-size pressure; provider quota/access errors fail fast so the alert file keeps the real cause.
 - Vercel deployment for refreshed data is expected to come from Git integration when the workflow pushes to `main`.
 - If rate-limited, tune retry settings with:
   - `API_MAX_ATTEMPTS`

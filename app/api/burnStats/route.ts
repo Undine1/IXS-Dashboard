@@ -3,6 +3,7 @@ import axios from 'axios';
 
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
 const BACKUP_INFURA_API_KEY = String(process.env.BACKUP_INFURA_API_KEY || '').trim();
+const BACKUP_CHAINSTACK_BASE_RPC_URL = String(process.env.BACKUP_CHAINSTACK_BASE_RPC_URL || '').trim();
 const API_TIMEOUT = 15000; // 15 seconds
 
 interface BurnStatsApiResponse {
@@ -70,6 +71,7 @@ function getRpcUrls(network: 'ethereum' | 'polygon' | 'base'): string[] {
 
   addUrl(ALCHEMY_API_KEY && alchemyNetwork ? `https://${alchemyNetwork}.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : null);
   addUrl(BACKUP_INFURA_API_KEY && infuraNetwork ? `https://${infuraNetwork}.infura.io/v3/${BACKUP_INFURA_API_KEY}` : null);
+  addUrl(network === 'base' ? BACKUP_CHAINSTACK_BASE_RPC_URL || null : null);
   return urls;
 }
 
@@ -168,7 +170,7 @@ async function fetchBalancesForNetwork(
 export async function GET(req: Request) {
   try {
     // Validate API key exists (on server side only)
-    if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY) {
+    if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY && !BACKUP_CHAINSTACK_BASE_RPC_URL) {
       console.error('[burnStats API] RPC API keys are not configured');
       return NextResponse.json(
         { error: 'Service misconfiguration' },

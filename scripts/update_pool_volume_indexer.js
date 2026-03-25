@@ -36,6 +36,7 @@ loadEnvLocal();
 
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
 const BACKUP_INFURA_API_KEY = String(process.env.BACKUP_INFURA_API_KEY || '').trim();
+const BACKUP_CHAINSTACK_BASE_RPC_URL = String(process.env.BACKUP_CHAINSTACK_BASE_RPC_URL || '').trim();
 const TRANSFER_TOPIC0 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const ALCHEMY_NETWORKS = {
   ethereum: 'eth-mainnet',
@@ -63,9 +64,12 @@ let totalPoolCount = 0;
 let successfulPoolCount = 0;
 let failedPoolCount = 0;
 const latestBlockCache = new Map();
+const disabledProviders = new Map();
 
-if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY) {
-  console.error('At least one RPC API key is required (ALCHEMY_API_KEY or BACKUP_INFURA_API_KEY)');
+if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY && !BACKUP_CHAINSTACK_BASE_RPC_URL) {
+  console.error(
+    'At least one RPC provider is required (ALCHEMY_API_KEY, BACKUP_INFURA_API_KEY, or BACKUP_CHAINSTACK_BASE_RPC_URL)',
+  );
   process.exit(2);
 }
 
@@ -97,6 +101,29 @@ async function requestWithRetries(url, opts = {}) {
           waitMs = Math.floor(Math.random() * exp);
         }
         retryCount += 1;
+        if (attempt === maxAttempts) {
+          let responseText = '';
+          try {
+            responseText = (await res.text()).replace(/\s+/g, ' ').trim();
+          } catch {
+            responseText = '';
+          }
+          const err = new Error(
+            `Request ${url} returned ${res.status}${res.statusText ? ` ${res.statusText}` : ''}${
+              responseText ? `: ${responseText}` : ''
+            }; retries exhausted after ${maxAttempts} attempts`,
+          );
+          if (res.status === 401) err.code = 'RPC_UNAUTHORIZED';
+          else if (res.status === 403) err.code = 'RPC_FORBIDDEN';
+          else if (res.status === 429) err.code = 'RPC_RATE_LIMIT';
+          else if (res.status === 408 || res.status === 504) err.code = 'RPC_TIMEOUT';
+          else err.code = `RPC_HTTP_${res.status}`;
+          err.status = res.status;
+          err.url = url;
+          err.suppressAlertFile = true;
+          err.retryCountRecorded = true;
+          throw err;
+        }
         console.warn(`Request ${url} returned ${res.status}; attempt ${attempt}/${maxAttempts}, retrying after ${waitMs}ms`);
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
@@ -104,8 +131,13 @@ async function requestWithRetries(url, opts = {}) {
 
       return res;
     } catch (err) {
-      retryCount += 1;
+      if (!(err && err.retryCountRecorded)) {
+        retryCount += 1;
+      }
       if (attempt === maxAttempts) {
+        if (err && err.suppressAlertFile) {
+          throw err;
+        }
         // write alert file before throwing so workflow can detect
         try {
           const a = { alert: true, reasons: [`request-failed: ${url}`, err && err.message], ts: new Date().toISOString(), apiCallCount, retryCount };
@@ -130,6 +162,47 @@ function classifyRpcErrorMessage(message) {
   if (txt.includes('timeout') || txt.includes('timed out')) return 'RPC_TIMEOUT';
   if (txt.includes('too many requests')) return 'RPC_RATE_LIMIT';
   return 'RPC_ERROR';
+}
+
+function shouldDisableProviderForRun(error) {
+  const code = String((error && error.code) || '').toUpperCase();
+  const status = Number((error && error.status) || Number.NaN);
+  const message = String((error && error.message) || '').toLowerCase();
+  if ([401, 403, 429].includes(status)) return true;
+  if (code === 'RPC_RATE_LIMIT' || code === 'RPC_FORBIDDEN' || code === 'RPC_UNAUTHORIZED') return true;
+  return /429|too many requests|rate limit|rate-limited|thrott|quota|forbidden|unauthorized/.test(message);
+}
+
+function disableProviderForRun(url, error) {
+  if (!url || disabledProviders.has(url)) {
+    return disabledProviders.get(url) || null;
+  }
+  if (!shouldDisableProviderForRun(error)) {
+    return null;
+  }
+  const info = {
+    code: String((error && error.code) || 'RPC_PROVIDER_DISABLED'),
+    message: String((error && error.message) || 'Provider disabled for run after repeated access errors'),
+  };
+  disabledProviders.set(url, info);
+  console.warn(
+    `[pool-volume] disabling provider ${getProviderLabel(url)} (${getProviderHost(url)}) for the remainder of this run after ${info.code}: ${info.message}`,
+  );
+  return info;
+}
+
+function getDisabledProviderInfo(url) {
+  return url ? disabledProviders.get(url) || null : null;
+}
+
+function isProviderAccessError(error) {
+  const parts = [
+    (error && error.code) || '',
+    (error && error.message) || '',
+    ...((error && Array.isArray(error.providerErrors)) ? error.providerErrors : []),
+  ];
+  const text = parts.join(' ').toLowerCase();
+  return /rpc_rate_limit|rpc_forbidden|rpc_unauthorized|429|403|401|too many requests|rate limit|rate-limited|thrott|quota|forbidden|unauthorized/.test(text);
 }
 
 function normalizeChain(chain) {
@@ -162,12 +235,22 @@ function getInfuraRpcUrlsForChain(chain) {
   return [`https://${network}.infura.io/v3/${BACKUP_INFURA_API_KEY}`];
 }
 
+function getChainstackRpcUrlsForChain(chain) {
+  const normalizedChain = normalizeChain(chain);
+  if (normalizedChain !== 'base' || !BACKUP_CHAINSTACK_BASE_RPC_URL) return [];
+  return [BACKUP_CHAINSTACK_BASE_RPC_URL];
+}
+
 function getRpcUrlsForChain(chain) {
-  return [...getAlchemyRpcUrlsForChain(chain), ...getInfuraRpcUrlsForChain(chain)];
+  return [
+    ...getAlchemyRpcUrlsForChain(chain),
+    ...getInfuraRpcUrlsForChain(chain),
+    ...getChainstackRpcUrlsForChain(chain),
+  ];
 }
 
 function getLogScanRpcUrlsForChain(chain) {
-  return getInfuraRpcUrlsForChain(chain);
+  return [...getInfuraRpcUrlsForChain(chain), ...getChainstackRpcUrlsForChain(chain)];
 }
 
 async function alchemyCall(chain, method, params) {
@@ -179,7 +262,19 @@ async function alchemyCall(chain, method, params) {
   }
 
   let lastErr = null;
+  const providerErrors = [];
   for (const url of urls) {
+    const providerLabel = getProviderLabel(url);
+    const providerHost = getProviderHost(url);
+    const disabledInfo = getDisabledProviderInfo(url);
+    if (disabledInfo) {
+      const err = new Error(`Provider disabled for run after ${disabledInfo.code}: ${disabledInfo.message}`);
+      err.code = 'RPC_PROVIDER_DISABLED';
+      err.providerCode = disabledInfo.code;
+      providerErrors.push(`${providerLabel}@${providerHost} code=${err.code} msg=${err.message}`);
+      lastErr = err;
+      continue;
+    }
     try {
       const payload = { jsonrpc: '2.0', id: Date.now(), method, params };
       const res = await requestWithRetries(url, {
@@ -209,9 +304,21 @@ async function alchemyCall(chain, method, params) {
       }
       return j.result;
     } catch (e) {
+      providerErrors.push(`${providerLabel}@${providerHost} code=${(e && e.code) || 'unknown'} msg=${(e && e.message) || String(e)}`);
+      console.warn(`[pool-volume] ${chain} ${method}: provider ${providerLabel} (${providerHost}) failed: ${(e && e.message) || String(e)}`);
+      disableProviderForRun(url, e);
       lastErr = e;
       continue;
     }
+  }
+
+  if (providerErrors.length > 0) {
+    const aggregate = new Error(
+      `Alchemy call failed for chain=${chain} method=${method}; providers tried: ${providerErrors.join(' | ')}`,
+    );
+    aggregate.code = (lastErr && lastErr.code) || 'ALCHEMY_ALL_PROVIDERS_FAILED';
+    aggregate.providerErrors = providerErrors;
+    throw aggregate;
   }
 
   throw lastErr || new Error(`Alchemy call failed for ${method}`);
@@ -256,6 +363,7 @@ function getProviderLabel(url) {
   const host = getProviderHost(url).toLowerCase();
   if (host.includes('alchemy')) return 'alchemy';
   if (host.includes('infura')) return 'infura';
+  if (host.includes('chainstack')) return 'chainstack';
   return host || 'unknown';
 }
 
@@ -271,6 +379,15 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
   for (const url of urls) {
     const providerLabel = getProviderLabel(url);
     const providerHost = getProviderHost(url);
+    const disabledInfo = getDisabledProviderInfo(url);
+    if (disabledInfo) {
+      const err = new Error(`Provider disabled for run after ${disabledInfo.code}: ${disabledInfo.message}`);
+      err.code = 'RPC_PROVIDER_DISABLED';
+      err.providerCode = disabledInfo.code;
+      providerErrors.push(`${providerLabel}@${providerHost} code=${err.code} msg=${err.message}`);
+      lastErr = err;
+      continue;
+    }
     try {
       const payload = { jsonrpc: '2.0', id: Date.now(), method, params };
       const res = await requestWithRetries(url, {
@@ -312,6 +429,7 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
       const message = (e && e.message) || String(e);
       providerErrors.push(`${providerLabel}@${providerHost} code=${code} msg=${message}`);
       console.warn(`[pool-volume] ${chain} ${method}: provider ${providerLabel} (${providerHost}) failed: ${message}`);
+      disableProviderForRun(url, e);
       lastErr = e;
       continue;
     }
@@ -410,7 +528,7 @@ async function fetchTransferLogsRpc(chain, usdcAddr, fromBlock, endBlock, pairTo
     params,
     getLogScanRpcUrlsForChain(chain),
     'RPC_LOG_FALLBACK_MISSING_URL',
-    `No Infura log-scan fallback configured for chain=${chain}. Set BACKUP_INFURA_API_KEY.`,
+    `No log-scan fallback configured for chain=${chain}. Set BACKUP_INFURA_API_KEY or BACKUP_CHAINSTACK_BASE_RPC_URL.`,
   );
   return Array.isArray(logs) ? logs : [];
 }
@@ -548,6 +666,13 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
         chunkSize = Math.min(configuredMaxChunk, chunkSize * 2);
       }
     } catch (error) {
+      if (isProviderAccessError(error)) {
+        throw new Error(
+          `Failed eth_getLogs scan for ${chain} blocks ${from}-${to}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
       if (chunkSize <= configuredMinChunk) {
         throw new Error(
           `Failed eth_getLogs scan for ${chain} blocks ${from}-${to}: ${

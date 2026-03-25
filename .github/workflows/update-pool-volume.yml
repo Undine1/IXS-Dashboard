@@ -43,6 +43,7 @@ jobs:
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
+          BACKUP_CHAINSTACK_BASE_RPC_URL: ${{ secrets.BACKUP_CHAINSTACK_BASE_RPC_URL }}
           POLYGON_USDC: ${{ secrets.POLYGON_USDC }}
           BLOCKS_PER_DAY: ${{ env.BLOCKS_PER_DAY }}
           RPC_LOG_BLOCK_CHUNK: '200'
@@ -110,7 +111,7 @@ jobs:
           const a = JSON.parse(fs.readFileSync(p, 'utf8'));
           const apiCalls = Number(a.apiCallCount || 0);
           const reasons = Array.isArray(a.reasons) ? a.reasons.map(String) : [];
-          const providerSignals = reasons.filter((r) => /request-failed|401|429|unauthorized|throttle|ban|forbidden|invalid-address/i.test(r)).length;
+          const providerSignals = reasons.filter((r) => /request-failed|401|403|429|rpc_rate_limit|rpc_forbidden|rpc_unauthorized|unauthorized|throttle|ban|forbidden|invalid-address|quota|provider disabled|retries exhausted/i.test(r)).length;
           const totalPools = Number(a.totalPoolCount || 0);
           const successfulPools = Number(a.successfulPoolCount || 0);
           const failedPools = Number(a.failedPoolCount || 0);

@@ -14,7 +14,7 @@ A production-ready analytics dashboard that tracks IXS token burns, Total Value 
 
 ## Project overview
 - Purpose: Track cumulative token burns, pool TVL (USD), and IXS holder rankings using on-chain derived data where possible.
-- Approach: Use Alchemy as the primary RPC provider, with Infura fallback through `BACKUP_INFURA_API_KEY`. Scripts persist outputs so the Next.js app can serve stable snapshots.
+- Approach: Use Alchemy as the primary RPC provider, with Infura and optional per-chain Chainstack RPC URL fallbacks. Scripts persist outputs so the Next.js app can serve stable snapshots.
 
 ## Tech stack
 - Next.js (App Router) + TypeScript
@@ -39,6 +39,7 @@ Create a `.env.local` in the project root.
 
 - `ALCHEMY_API_KEY` - primary shared RPC credential for Ethereum, Polygon, and Base
 - `BACKUP_INFURA_API_KEY` - optional Infura project key used as fallback
+- `BACKUP_CHAINSTACK_BASE_RPC_URL` - optional full HTTPS Chainstack Base RPC URL used as a third fallback for Base
 - `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` - optional page size for Alchemy transfer pagination
 - `HOLDER_RANKINGS_EXCLUDED_ADDRESSES` - optional comma-separated addresses to hide from the public holder ranking
 - `HOLDER_RANKINGS_LOG_CHUNK` - optional initial `eth_getLogs` block span
@@ -78,7 +79,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - `GET /api/holderRankings` - returns the latest file-backed holder snapshot from `public/data/holder_rankings.json`
 
 ## Updater behavior
-- The pool volume updater uses Alchemy Asset Transfers first, falls back to JSON-RPC log scans through Infura when needed, and persists per-pool checkpoints.
+- The pool volume updater uses Alchemy Asset Transfers first, falls back to JSON-RPC log scans through Infura and then optional Chainstack URLs when needed, and persists per-pool checkpoints.
 - The holder rankings updater uses Alchemy Asset Transfers pagination when available, falls back to standard JSON-RPC if needed, keeps cumulative per-holder balances in `data/holder_rankings_state.json`, and writes a public top-500 snapshot.
 - The public holder ranking excludes zero/dead/token-contract addresses by default and supports extra exclusions through env vars.
 - The first holder rankings run is the expensive bootstrap. Later runs only scan blocks after the last saved checkpoint.

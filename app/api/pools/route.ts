@@ -4,6 +4,7 @@ import { ChainNetwork, Pool } from '@/types';
 
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
 const BACKUP_INFURA_API_KEY = String(process.env.BACKUP_INFURA_API_KEY || '').trim();
+const BACKUP_CHAINSTACK_BASE_RPC_URL = String(process.env.BACKUP_CHAINSTACK_BASE_RPC_URL || '').trim();
 const API_TIMEOUT = 15000;
 const WAIT_BETWEEN_POOLS_MS = 600;
 
@@ -161,6 +162,7 @@ function getRpcUrls(network: ChainNetwork): string[] {
 
   addUrl(ALCHEMY_API_KEY && alchemyNetwork ? `https://${alchemyNetwork}.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : null);
   addUrl(BACKUP_INFURA_API_KEY && infuraNetwork ? `https://${infuraNetwork}.infura.io/v3/${BACKUP_INFURA_API_KEY}` : null);
+  addUrl(network === 'base' ? BACKUP_CHAINSTACK_BASE_RPC_URL || null : null);
   return urls;
 }
 
@@ -339,7 +341,7 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const debugMode = url.searchParams.get('debug') === '1' || url.searchParams.get('debug') === 'true';
 
-    if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY) {
+    if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY && !BACKUP_CHAINSTACK_BASE_RPC_URL) {
       console.warn('[pools API] No RPC API key is set; eth_calls will fail');
     }
 
