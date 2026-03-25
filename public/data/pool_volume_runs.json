@@ -1,26 +1,6 @@
 [
   {
     "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
-    "startTs": 1773489839,
-    "endTs": 1773494288,
-    "startBlock": 43350247,
-    "endBlock": 43352470,
-    "totalUsdc": 0,
-    "source": "alchemy-asset-transfers",
-    "ts": "2026-03-14T13:18:09.175Z"
-  },
-  {
-    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
-    "startTs": 1773494280,
-    "endTs": 1773497203,
-    "startBlock": 84187124,
-    "endBlock": 84188585,
-    "totalUsdc": 0,
-    "source": "alchemy-asset-transfers",
-    "ts": "2026-03-14T14:06:44.071Z"
-  },
-  {
-    "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
     "startTs": 1773494288,
     "endTs": 1773497212,
     "startBlock": 43352471,
@@ -4998,5 +4978,25 @@
     "totalUsdc": 0,
     "source": "infura-rpc-logs-fallback",
     "ts": "2026-03-25T01:35:51.872Z"
+  },
+  {
+    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
+    "startTs": 1774402311,
+    "endTs": 1774407085,
+    "startBlock": 84641139,
+    "endBlock": 84643525,
+    "totalUsdc": 0,
+    "source": "alchemy-asset-transfers",
+    "ts": "2026-03-25T02:51:25.955Z"
+  },
+  {
+    "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
+    "startTs": 1774397432,
+    "endTs": 1774407093,
+    "startBlock": 43804043,
+    "endBlock": 43808873,
+    "totalUsdc": 65.103339,
+    "source": "alchemy-asset-transfers",
+    "ts": "2026-03-25T02:51:34.464Z"
   }
 ]
