@@ -1,15 +1,5 @@
 [
   {
-    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
-    "startTs": 1773489831,
-    "endTs": 1773494280,
-    "startBlock": 84184899,
-    "endBlock": 84187123,
-    "totalUsdc": 0,
-    "source": "alchemy-asset-transfers",
-    "ts": "2026-03-14T13:18:00.659Z"
-  },
-  {
     "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
     "startTs": 1773489839,
     "endTs": 1773494288,
@@ -4998,5 +4988,15 @@
     "totalUsdc": 0,
     "source": "alchemy-asset-transfers",
     "ts": "2026-03-25T00:10:33.167Z"
+  },
+  {
+    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
+    "startTs": 1774397424,
+    "endTs": 1774402311,
+    "startBlock": 84638695,
+    "endBlock": 84641138,
+    "totalUsdc": 0,
+    "source": "infura-rpc-logs-fallback",
+    "ts": "2026-03-25T01:35:51.872Z"
   }
 ]
