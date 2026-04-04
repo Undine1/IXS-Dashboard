@@ -163,6 +163,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   const [holderSearch, setHolderSearch] = useState<string>('');
   const [hideNamedHolders, setHideNamedHolders] = useState<boolean>(false);
   const [holderRows, setHolderRows] = useState<HolderRankingRow[]>([]);
+  const [holderTotalRowCount, setHolderTotalRowCount] = useState<number | null>(null);
   const [holderLoading, setHolderLoading] = useState<boolean>(true);
   const [holderError, setHolderError] = useState<string | null>(null);
   const [copiedHolderAddress, setCopiedHolderAddress] = useState<string | null>(null);
@@ -241,17 +242,21 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
           const message = payload?.error || 'Unable to load holder rankings';
           if (!cancelled) setHolderError(message);
           if (!cancelled) setHolderRows([]);
+          if (!cancelled) setHolderTotalRowCount(null);
           return;
         }
 
         if (!cancelled) {
           const rows = Array.isArray(payload.rows) ? payload.rows : [];
+          const totalRowCount = toFiniteNumberOrNull(payload.totalRowCount);
           setHolderRows(rows);
+          setHolderTotalRowCount(totalRowCount !== null ? Math.max(rows.length, Math.floor(totalRowCount)) : rows.length);
         }
       } catch {
         if (!cancelled) {
           setHolderError('Unable to load holder rankings');
           setHolderRows([]);
+          setHolderTotalRowCount(null);
         }
       } finally {
         if (!cancelled) setHolderLoading(false);
@@ -782,9 +787,16 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                   <CardRail gradientClass="from-red-600 via-red-500 to-orange-400" roundedClass="rounded-t-2xl" />
                   <p className="text-sm font-semibold text-teal-500 dark:text-teal-400 text-center">Holder Rankings</p>
                   <div className="flex-1 flex items-center justify-center">
-                    <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                      {holderLoading ? 'Syncing...' : 'Top 500'}
-                    </span>
+                    <div className="flex flex-col items-center gap-1 text-center">
+                      <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                        {holderLoading ? 'Syncing...' : 'Top 500'}
+                      </span>
+                      {!holderLoading && holderTotalRowCount !== null ? (
+                        <span className="text-xs font-medium uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
+                          {formatNumber(holderTotalRowCount, 0)} Total Holders
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <span className={`absolute left-1/2 -translate-x-1/2 bottom-2 transition-transform duration-300 ${showHolderRankings ? 'rotate-180' : ''}`} aria-hidden>
