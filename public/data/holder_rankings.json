@@ -871,17 +871,17 @@
     },
     {
       "rank": 125,
-      "holder": "0xbca34ed5875079cc561840f3409a790769821dbc",
-      "chainsHolding": 1,
-      "totalIxs": "296,233.37",
-      "label": "Coinex 39"
-    },
-    {
-      "rank": 126,
       "holder": "0x52331cd0188813103efde050a89d87a6e9286a7c",
       "chainsHolding": 1,
       "totalIxs": "295,972.00",
       "label": null
+    },
+    {
+      "rank": 126,
+      "holder": "0xbca34ed5875079cc561840f3409a790769821dbc",
+      "chainsHolding": 1,
+      "totalIxs": "295,908.99",
+      "label": "Coinex 39"
     },
     {
       "rank": 127,
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12309,
-  "lastRefreshed": "2026-04-07T21:15:18.339Z",
+  "lastRefreshed": "2026-04-07T22:11:09.811Z",
   "source": "rpc-snapshot"
 }
