@@ -12,7 +12,7 @@
       "rank": 2,
       "holder": "0x5a58505a96d1dbf8df91cb21b54419fc36e93fde",
       "chainsHolding": 1,
-      "totalIxs": "6,239,159.15",
+      "totalIxs": "6,240,067.18",
       "label": "Wormhole Bridge"
     },
     {
@@ -61,14 +61,14 @@
       "rank": 9,
       "holder": "0x3ee18b2214aff97000d974cf647e7c347e8fa585",
       "chainsHolding": 1,
-      "totalIxs": "2,386,106.71",
+      "totalIxs": "2,385,198.68",
       "label": "Wormhole Bridge"
     },
     {
       "rank": 10,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,861,304.59",
+      "totalIxs": "1,863,836.37",
       "label": "Uniswap V2"
     },
     {
@@ -243,7 +243,7 @@
       "rank": 35,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "675,098.21",
+      "totalIxs": "674,468.32",
       "label": "Contract"
     },
     {
@@ -943,7 +943,7 @@
       "rank": 135,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "284,588.95",
+      "totalIxs": "282,687.06",
       "label": "IXS/USDC Base"
     },
     {
@@ -1734,7 +1734,7 @@
       "rank": 248,
       "holder": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
       "chainsHolding": 1,
-      "totalIxs": "168,230.57",
+      "totalIxs": "167,322.53",
       "label": "Contract"
     },
     {
@@ -3148,7 +3148,7 @@
       "rank": 450,
       "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
       "chainsHolding": 1,
-      "totalIxs": "84,711.76",
+      "totalIxs": "84,737.17",
       "label": "Contract"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12316,
-  "lastRefreshed": "2026-04-08T12:14:44.842Z",
+  "lastRefreshed": "2026-04-08T13:31:06.569Z",
   "source": "rpc-snapshot"
 }
