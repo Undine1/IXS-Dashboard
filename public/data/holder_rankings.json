@@ -61,14 +61,14 @@
       "rank": 9,
       "holder": "0x3ee18b2214aff97000d974cf647e7c347e8fa585",
       "chainsHolding": 1,
-      "totalIxs": "2,385,198.68",
+      "totalIxs": "2,383,706.68",
       "label": "Wormhole Bridge"
     },
     {
       "rank": 10,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,832,586.13",
+      "totalIxs": "1,834,078.13",
       "label": "Uniswap V2"
     },
     {
@@ -3225,7 +3225,7 @@
       "rank": 461,
       "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
       "chainsHolding": 1,
-      "totalIxs": "81,966.48",
+      "totalIxs": "81,986.59",
       "label": "Contract"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12315,
-  "lastRefreshed": "2026-04-09T19:25:58.731Z",
+  "lastRefreshed": "2026-04-09T20:15:50.055Z",
   "source": "rpc-snapshot"
 }
