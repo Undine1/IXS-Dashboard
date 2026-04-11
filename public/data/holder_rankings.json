@@ -75,7 +75,7 @@
       "rank": 11,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,857,891.12",
+      "totalIxs": "1,859,829.06",
       "label": "Uniswap V2"
     },
     {
@@ -2453,128 +2453,128 @@
     },
     {
       "rank": 351,
-      "holder": "0x91c5cc863c43f6716899583fa72c0c3cf03f7c74",
-      "chainsHolding": 1,
-      "totalIxs": "122,136.57",
-      "label": null
-    },
-    {
-      "rank": 352,
       "holder": "0x823558f3ed47d0b24d1d85dc62f417769bdffbce",
       "chainsHolding": 1,
       "totalIxs": "121,777.97",
       "label": null
     },
     {
-      "rank": 353,
+      "rank": 352,
       "holder": "0x839bb496125b3c51c9f28d4e91012917e21239f7",
       "chainsHolding": 1,
       "totalIxs": "121,592.18",
       "label": null
     },
     {
-      "rank": 354,
+      "rank": 353,
       "holder": "0x568fbaf7cbddccc97e625c8959bc4a36b93f2e05",
       "chainsHolding": 1,
       "totalIxs": "121,491.27",
       "label": null
     },
     {
-      "rank": 355,
+      "rank": 354,
       "holder": "0x573bcdb5e308de7b67c1e6b343dacf60ca685f2a",
       "chainsHolding": 1,
       "totalIxs": "121,455.54",
       "label": null
     },
     {
-      "rank": 356,
+      "rank": 355,
       "holder": "0xad58f0f0eb7102ece571d2bb3ea298f7e98f0398",
       "chainsHolding": 2,
       "totalIxs": "120,583.84",
       "label": null
     },
     {
-      "rank": 357,
+      "rank": 356,
       "holder": "0x7ba54a3801055bb305a2f1be5e64f106e255617b",
       "chainsHolding": 1,
       "totalIxs": "120,350.00",
       "label": null
     },
     {
-      "rank": 358,
+      "rank": 357,
       "holder": "0x5c1639f439e45a6ba5387852abf5e5a2b5f7a5a6",
       "chainsHolding": 2,
       "totalIxs": "120,281.31",
       "label": null
     },
     {
-      "rank": 359,
+      "rank": 358,
       "holder": "0x852a76f2efd3d48f0a98cf30fa61b5de075241ec",
       "chainsHolding": 1,
       "totalIxs": "120,053.93",
       "label": null
     },
     {
-      "rank": 360,
+      "rank": 359,
       "holder": "0xd03c18949edb594c59228177c8a82a3fc0747ae3",
       "chainsHolding": 1,
       "totalIxs": "119,999.00",
       "label": null
     },
     {
-      "rank": 361,
+      "rank": 360,
       "holder": "0xf410ca750a5db9bba0e3d03459f8e7b4f2415775",
       "chainsHolding": 1,
       "totalIxs": "119,980.00",
       "label": null
     },
     {
-      "rank": 362,
+      "rank": 361,
       "holder": "0x0b30b574ac616c5408753f9cbc85a22162c60d3d",
       "chainsHolding": 1,
       "totalIxs": "119,360.01",
       "label": null
     },
     {
-      "rank": 363,
+      "rank": 362,
       "holder": "0x603495bc35241c6ced54a24343bef8932388dec6",
       "chainsHolding": 1,
       "totalIxs": "118,907.62",
       "label": null
     },
     {
-      "rank": 364,
+      "rank": 363,
       "holder": "0xdb1ae970a4f11b2e97268208e6943220300cef3e",
       "chainsHolding": 1,
       "totalIxs": "118,888.00",
       "label": null
     },
     {
-      "rank": 365,
+      "rank": 364,
       "holder": "0xbc9271d432d918f912ce0ecfcd0601030d45adb4",
       "chainsHolding": 1,
       "totalIxs": "118,759.50",
       "label": null
     },
     {
-      "rank": 366,
+      "rank": 365,
       "holder": "0x3246ef9a52493aede2cbabd27c6e758b1e360422",
       "chainsHolding": 1,
       "totalIxs": "118,660.11",
       "label": null
     },
     {
-      "rank": 367,
+      "rank": 366,
       "holder": "0xdade072f5a66aad773a022f83423e4941475343d",
       "chainsHolding": 1,
       "totalIxs": "118,660.02",
       "label": null
     },
     {
-      "rank": 368,
+      "rank": 367,
       "holder": "0xe5d5684de89717825b3141d15a814bbf42a43aae",
       "chainsHolding": 1,
       "totalIxs": "118,633.22",
+      "label": null
+    },
+    {
+      "rank": 368,
+      "holder": "0x91c5cc863c43f6716899583fa72c0c3cf03f7c74",
+      "chainsHolding": 1,
+      "totalIxs": "117,763.98",
       "label": null
     },
     {
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 11877,
-  "lastRefreshed": "2026-04-11T03:00:01.276Z",
+  "totalRowCount": 11878,
+  "lastRefreshed": "2026-04-11T04:01:31.530Z",
   "source": "rpc-snapshot"
 }
