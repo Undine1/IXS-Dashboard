@@ -1,26 +1,6 @@
 [
   {
     "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
-    "startTs": 1775077975,
-    "endTs": 1775081372,
-    "startBlock": 84978969,
-    "endBlock": 84980667,
-    "totalUsdc": 0,
-    "source": "alchemy-asset-transfers",
-    "ts": "2026-04-01T22:09:33.256Z"
-  },
-  {
-    "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
-    "startTs": 1775077983,
-    "endTs": 1775081381,
-    "startBlock": 44144319,
-    "endBlock": 44146017,
-    "totalUsdc": 12.911032,
-    "source": "alchemy-asset-transfers",
-    "ts": "2026-04-01T22:09:41.708Z"
-  },
-  {
-    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
     "startTs": 1775081372,
     "endTs": 1775085037,
     "startBlock": 84980668,
@@ -4998,5 +4978,25 @@
     "totalUsdc": 0,
     "source": "alchemy-asset-transfers",
     "ts": "2026-04-12T16:08:35.401Z"
+  },
+  {
+    "pool": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
+    "startTs": 1776010105,
+    "endTs": 1776013790,
+    "startBlock": 85445035,
+    "endBlock": 85446876,
+    "totalUsdc": 0,
+    "source": "alchemy-asset-transfers",
+    "ts": "2026-04-12T17:09:53.103Z"
+  },
+  {
+    "pool": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
+    "startTs": 1776010114,
+    "endTs": 1776013801,
+    "startBlock": 44610384,
+    "endBlock": 44612227,
+    "totalUsdc": 0,
+    "source": "alchemy-asset-transfers",
+    "ts": "2026-04-12T17:10:01.905Z"
   }
 ]
