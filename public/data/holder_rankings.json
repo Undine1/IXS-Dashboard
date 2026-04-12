@@ -19,7 +19,7 @@
       "rank": 3,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "3,965,994.77",
+      "totalIxs": "3,971,080.41",
       "label": "Uniswap V4"
     },
     {
@@ -75,7 +75,7 @@
       "rank": 11,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,850,248.39",
+      "totalIxs": "1,846,463.02",
       "label": "Uniswap V2"
     },
     {
@@ -507,30 +507,30 @@
     },
     {
       "rank": 73,
+      "holder": "0xbfe00ec3f4eaaa8859154c6145c934959f26d7b1",
+      "chainsHolding": 1,
+      "totalIxs": "406,192.39",
+      "label": null
+    },
+    {
+      "rank": 74,
       "holder": "0xb0dd67572bde64156195dec4495b031d07a344fb",
       "chainsHolding": 2,
       "totalIxs": "404,939.74",
       "label": null
     },
     {
-      "rank": 74,
+      "rank": 75,
       "holder": "0x865c40f51e9721f9c77ce06ff91bc8c52f819ea4",
       "chainsHolding": 1,
       "totalIxs": "404,318.00",
       "label": null
     },
     {
-      "rank": 75,
+      "rank": 76,
       "holder": "0x8d986ae5b5c6db28e1b5b062621793b6c3d68e5e",
       "chainsHolding": 1,
       "totalIxs": "403,189.77",
-      "label": null
-    },
-    {
-      "rank": 76,
-      "holder": "0xbfe00ec3f4eaaa8859154c6145c934959f26d7b1",
-      "chainsHolding": 1,
-      "totalIxs": "400,447.70",
       "label": null
     },
     {
@@ -871,17 +871,17 @@
     },
     {
       "rank": 125,
+      "holder": "0xbca34ed5875079cc561840f3409a790769821dbc",
+      "chainsHolding": 1,
+      "totalIxs": "296,192.91",
+      "label": "Coinex 39"
+    },
+    {
+      "rank": 126,
       "holder": "0x52331cd0188813103efde050a89d87a6e9286a7c",
       "chainsHolding": 1,
       "totalIxs": "295,972.00",
       "label": null
-    },
-    {
-      "rank": 126,
-      "holder": "0xbca34ed5875079cc561840f3409a790769821dbc",
-      "chainsHolding": 1,
-      "totalIxs": "295,569.56",
-      "label": "Coinex 39"
     },
     {
       "rank": 127,
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 11881,
-  "lastRefreshed": "2026-04-12T21:08:32.164Z",
+  "totalRowCount": 11880,
+  "lastRefreshed": "2026-04-12T22:07:08.523Z",
   "source": "rpc-snapshot"
 }
