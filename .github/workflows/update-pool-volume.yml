@@ -39,6 +39,68 @@ jobs:
             npm install
           fi
 
+      - name: Ping Chainstack backup RPC
+        env:
+          BACKUP_CHAINSTACK_BASE_RPC_URL: ${{ secrets.BACKUP_CHAINSTACK_BASE_RPC_URL }}
+        run: |
+          node <<'NODE'
+          const url = String(process.env.BACKUP_CHAINSTACK_BASE_RPC_URL || '').trim();
+
+          if (!url) {
+            console.log('Chainstack backup RPC not configured; skipping keepalive');
+            process.exit(0);
+          }
+
+          async function main() {
+            const response = await fetch(url, {
+              method: 'POST',
+              signal: AbortSignal.timeout(15000),
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'eth_blockNumber',
+                params: [],
+                id: 'chainstack-keepalive',
+              }),
+            });
+
+            const text = await response.text();
+
+            if (!response.ok) {
+              console.log(`::warning::Chainstack keepalive returned HTTP ${response.status}`);
+              console.log(text);
+              return;
+            }
+
+            const payload = JSON.parse(text);
+
+            if (payload && payload.error) {
+              console.log(
+                `::warning::Chainstack keepalive RPC error: ${
+                  payload.error.message || JSON.stringify(payload.error)
+                }`,
+              );
+              return;
+            }
+
+            const blockNumber =
+              typeof payload.result === 'string' ? Number.parseInt(payload.result, 16) : Number.NaN;
+
+            if (Number.isFinite(blockNumber)) {
+              console.log(`Chainstack keepalive ok at block ${blockNumber}`);
+              return;
+            }
+
+            console.log('Chainstack keepalive ok');
+          }
+
+          main().catch((error) => {
+            console.log(
+              `::warning::Chainstack keepalive request failed: ${error.message || String(error)}`,
+            );
+          });
+          NODE
+
       - name: Run pool updater
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
