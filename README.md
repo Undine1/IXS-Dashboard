@@ -39,7 +39,7 @@ Create a `.env.local` in the project root.
 
 - `ALCHEMY_API_KEY` - primary shared RPC credential for Ethereum, Polygon, and Base
 - `BACKUP_INFURA_API_KEY` - optional Infura project key used as fallback
-- `BACKUP_CHAINSTACK_BASE_RPC_URL` - optional full HTTPS Chainstack Base RPC URL used as a third fallback for Base
+- `BACKUP_CHAINSTACK_BASE_RPC_URL` - optional full HTTPS Chainstack Base RPC URL used as a third fallback for Base and by the hourly pool workflow keepalive ping
 - `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` - optional page size for Alchemy transfer pagination
 - `HOLDER_RANKINGS_EXCLUDED_ADDRESSES` - optional comma-separated addresses to hide from the public holder ranking
 - `HOLDER_RANKINGS_LOG_CHUNK` - optional initial `eth_getLogs` block span
@@ -85,7 +85,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - The first holder rankings run is the expensive bootstrap. Later runs only scan blocks after the last saved checkpoint.
 
 ## GitHub Actions
-- `.github/workflows/update-pool-volume.yml` runs the pool updater hourly and commits its outputs back to `main`.
+- `.github/workflows/update-pool-volume.yml` runs the pool updater hourly, sends a lightweight `eth_blockNumber` keepalive request to the Chainstack backup Base RPC when configured, and commits its outputs back to `main`.
 - `.github/workflows/update-holder-rankings.yml` runs after the pool updater workflow completes and commits `public/data/holder_rankings.json` plus `data/holder_rankings_state.json` back to `main`.
 - Production deploys are expected to come from Vercel's Git integration on pushes to `main`, not from the workflows themselves.
 
