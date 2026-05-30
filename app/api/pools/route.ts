@@ -8,9 +8,19 @@ const BACKUP_CHAINSTACK_BASE_RPC_URL = String(process.env.BACKUP_CHAINSTACK_BASE
 const API_TIMEOUT = 15000;
 const WAIT_BETWEEN_POOLS_MS = 600;
 
+type PoolMeta = {
+  token0: string;
+  token1: string;
+  decimals0: number;
+  decimals1: number;
+};
+
 type PoolConfig = Omit<Pool, 'value'> & {
   priceSource?: boolean;
   tokenContract?: string;
+  // Immutable pair metadata. When present, the route skips the token0/token1/
+  // decimals eth_calls (constant for a V2 pair) and only reads live reserves.
+  meta?: PoolMeta;
 };
 
 type NetworkPrices = {
@@ -80,24 +90,48 @@ const POOLS: PoolConfig[] = [
     network: 'base',
     priceSource: true,
     tokenContract: '0xfe550bffb51eb645ea3b324d772a19ac449e92c5',
+    meta: {
+      token0: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+      token1: '0xfe550bffb51eb645ea3b324d772a19ac449e92c5',
+      decimals0: 6,
+      decimals1: 18,
+    },
   },
   {
     type: 'Crypto',
     name: 'WIXS-USDC',
     address: '0xd093a031df30f186976a1e2936b16d95ca7919d6',
     network: 'polygon',
+    meta: {
+      token0: '0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8',
+      token1: '0x2791bca1f2de4661ed88a30c99a7a9449aa84174',
+      decimals0: 18,
+      decimals1: 6,
+    },
   },
   {
     type: 'RWA',
     name: 'IXAPE',
     address: '0xfe3d92cf0292a4e44402d1e6a10ae8b575fa61dc',
     network: 'polygon',
+    meta: {
+      token0: '0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8',
+      token1: '0x8fe65d81f5a77732dbcc3878ba93bdeb3e3a8538',
+      decimals0: 18,
+      decimals1: 18,
+    },
   },
   {
     type: 'RWA',
     name: 'TAU',
     address: '0x622efb1fb4a2486b75813aba428639251495eccb',
     network: 'polygon',
+    meta: {
+      token0: '0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8',
+      token1: '0x940a5cc6f3b6d9bf7a710e7e641369685ccaecad',
+      decimals0: 18,
+      decimals1: 18,
+    },
   },
   {
     type: 'RWA',
@@ -105,6 +139,12 @@ const POOLS: PoolConfig[] = [
     address: '0x05b9cd0ec1fe6bb4e61f4437a56e4aa4b442af5a',
     tokenContract: '0xcbe4c86df7bd5076156a790be70b50f2d3570218',
     network: 'polygon',
+    meta: {
+      token0: '0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8',
+      token1: '0xcbe4c86df7bd5076156a790be70b50f2d3570218',
+      decimals0: 18,
+      decimals1: 18,
+    },
   },
   {
     type: 'RWA',
@@ -112,6 +152,12 @@ const POOLS: PoolConfig[] = [
     address: '0xec86ceccd8046ed956060988f91c754e7a13328f',
     tokenContract: '0x47d8608e1adb7d600e038ef995ed3951e4b7ded5',
     network: 'polygon',
+    meta: {
+      token0: '0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8',
+      token1: '0x47d8608e1adb7d600e038ef995ed3951e4b7ded5',
+      decimals0: 18,
+      decimals1: 18,
+    },
   },
 ];
 
@@ -229,30 +275,49 @@ async function fetchPoolValue(pool: PoolConfig, prices: Prices): Promise<FetchPo
   const rpcUrls = getRpcUrls(pool.network);
 
   try {
-    const token0Hex = await alchemyCall(rpcUrls, {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'eth_call',
-      params: [{ to: pool.address, data: '0x0dfe1681' }, 'latest'],
-    });
-    const token1Hex = await alchemyCall(rpcUrls, {
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'eth_call',
-      params: [{ to: pool.address, data: '0xd21220a7' }, 'latest'],
-    });
-    const decimals0Hex = await alchemyCall(rpcUrls, {
-      jsonrpc: '2.0',
-      id: 3,
-      method: 'eth_call',
-      params: [{ to: normalizeAddressFromHex(token0Hex), data: '0x313ce567' }, 'latest'],
-    });
-    const decimals1Hex = await alchemyCall(rpcUrls, {
-      jsonrpc: '2.0',
-      id: 4,
-      method: 'eth_call',
-      params: [{ to: normalizeAddressFromHex(token1Hex), data: '0x313ce567' }, 'latest'],
-    });
+    let token0: string;
+    let token1: string;
+    let decimals0: number;
+    let decimals1: number;
+
+    if (pool.meta) {
+      // token0/token1/decimals are immutable for a V2 pair — reuse the baked-in
+      // values instead of spending four eth_calls per request to rediscover them.
+      token0 = pool.meta.token0.toLowerCase();
+      token1 = pool.meta.token1.toLowerCase();
+      decimals0 = pool.meta.decimals0;
+      decimals1 = pool.meta.decimals1;
+    } else {
+      const token0Hex = await alchemyCall(rpcUrls, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_call',
+        params: [{ to: pool.address, data: '0x0dfe1681' }, 'latest'],
+      });
+      const token1Hex = await alchemyCall(rpcUrls, {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'eth_call',
+        params: [{ to: pool.address, data: '0xd21220a7' }, 'latest'],
+      });
+      const decimals0Hex = await alchemyCall(rpcUrls, {
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'eth_call',
+        params: [{ to: normalizeAddressFromHex(token0Hex), data: '0x313ce567' }, 'latest'],
+      });
+      const decimals1Hex = await alchemyCall(rpcUrls, {
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'eth_call',
+        params: [{ to: normalizeAddressFromHex(token1Hex), data: '0x313ce567' }, 'latest'],
+      });
+      token0 = normalizeAddressFromHex(token0Hex);
+      token1 = normalizeAddressFromHex(token1Hex);
+      decimals0 = parseHexInt(decimals0Hex, 'token0 decimals');
+      decimals1 = parseHexInt(decimals1Hex, 'token1 decimals');
+    }
+
     const reservesHex = await alchemyCall(rpcUrls, {
       jsonrpc: '2.0',
       id: 5,
@@ -264,10 +329,6 @@ async function fetchPoolValue(pool: PoolConfig, prices: Prices): Promise<FetchPo
       throw new Error('invalid reserves result');
     }
 
-    const token0 = normalizeAddressFromHex(token0Hex);
-    const token1 = normalizeAddressFromHex(token1Hex);
-    const decimals0 = parseHexInt(decimals0Hex, 'token0 decimals');
-    const decimals1 = parseHexInt(decimals1Hex, 'token1 decimals');
     const reserve0 = BigInt(`0x${reservesHex.slice(2, 66)}`);
     const reserve1 = BigInt(`0x${reservesHex.slice(66, 130)}`);
 
@@ -336,10 +397,40 @@ async function fetchPoolValue(pool: PoolConfig, prices: Prices): Promise<FetchPo
   }
 }
 
+type PoolsResponseBody = {
+  pools: PoolWithValue[];
+  warnings?: string[];
+  debug?: {
+    prices: Prices;
+    pools: Array<{
+      name: string;
+      address: string;
+      network: ChainNetwork;
+      debug: PoolDebug;
+      derivedIxsPrice: number | null;
+    }>;
+  };
+};
+
+// Best-effort per-instance cache. The durable layer is the CDN (s-maxage below);
+// this avoids re-running the RPC fan-out for repeat hits on a warm instance
+// (e.g. the internal /metrics -> /api/pools call).
+const POOLS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+let cachedBody: PoolsResponseBody | null = null;
+let cachedAtMs = 0;
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const debugMode = url.searchParams.get('debug') === '1' || url.searchParams.get('debug') === 'true';
+    const forceFresh = url.searchParams.get('fresh') === '1' || url.searchParams.get('fresh') === 'true';
+
+    if (!debugMode && !forceFresh && cachedBody && Date.now() - cachedAtMs < POOLS_CACHE_TTL_MS) {
+      return NextResponse.json(cachedBody, {
+        status: 200,
+        headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200' },
+      });
+    }
 
     if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY && !BACKUP_CHAINSTACK_BASE_RPC_URL) {
       console.warn('[pools API] No RPC API key is set; eth_calls will fail');
@@ -382,17 +473,16 @@ export async function GET(req: Request) {
       }
     }
 
-    const body: {
-      pools: PoolWithValue[];
-      warnings?: string[];
-      debug?: {
-        prices: Prices;
-        pools: typeof poolsDebug;
-      };
-    } = { pools: poolsData };
+    const body: PoolsResponseBody = { pools: poolsData };
 
     if (warnings.length > 0) body.warnings = warnings;
     if (debugMode) body.debug = { prices, pools: poolsDebug };
+
+    // Only cache the canonical (non-debug) payload.
+    if (!debugMode) {
+      cachedBody = body;
+      cachedAtMs = Date.now();
+    }
 
     return NextResponse.json(body, {
       status: 200,

@@ -115,11 +115,15 @@ export async function OPTIONS() {
 export async function GET(req: Request) {
   try {
     const origin = new URL(req.url).origin;
-    const nonce = Date.now();
 
+    // Reuse the cached pool/burn responses instead of forcing a fresh RPC
+    // fan-out on every /metrics hit. The underlying data only changes hourly
+    // (the GitHub Actions updaters), and both sub-routes already serve from an
+    // in-memory cache + CDN, so dropping the cache-busting params/headers costs
+    // no real freshness while removing a ~30-call RPC burst per request.
     const [poolsRes, burnRes] = await Promise.all([
-      fetch(`${origin}/api/pools?t=${nonce}`, { cache: 'no-store' }),
-      fetch(`${origin}/api/burnStats?fresh=1&t=${nonce}`, { cache: 'no-store' }),
+      fetch(`${origin}/api/pools`, { next: { revalidate: 3600 } }),
+      fetch(`${origin}/api/burnStats`, { next: { revalidate: 3600 } }),
     ]);
 
     if (!poolsRes.ok || !burnRes.ok) {
@@ -143,7 +147,9 @@ export async function GET(req: Request) {
       },
       {
         status: 200,
-        headers: corsHeaders({ 'Cache-Control': 'no-store' }),
+        headers: corsHeaders({
+          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
+        }),
       }
     );
   } catch (error) {
