@@ -1,0 +1,331 @@
+name: Update Dashboard Data
+
+# Single hourly pipeline for both data updaters. Running them as sequential
+# steps in one job means one commit and one push per run, so Vercel builds the
+# refreshed data once instead of twice. The cron runs off minute 0 because
+# GitHub drops/delays top-of-the-hour schedules under load (this repo was
+# losing roughly every other run at '0 * * * *').
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Run updaters and commit
+    runs-on: ubuntu-latest
+    concurrency:
+      group: dashboard-data-update
+      cancel-in-progress: false
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository (use PAT for push)
+        uses: actions/checkout@v6
+        with:
+          # Check out the live branch tip, not github.sha: that SHA is pinned
+          # when the run is queued, so a run that waited in the concurrency
+          # group would otherwise start from a stale base, recompute data from
+          # old checkpoints, and hit rebase conflicts on push.
+          ref: ${{ github.ref_name }}
+          # Shallow checkout: the push-retry logic below only needs the branch
+          # tip, and the repo accrues hourly data commits that make full
+          # history clones progressively slower.
+          fetch-depth: 1
+          persist-credentials: true
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22.15.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        id: install
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f yarn.lock ]; then
+            npm ci
+          else
+            echo "No lockfile found — running 'npm install' instead of 'npm ci'"
+            npm install
+          fi
+
+      - name: Ping Chainstack backup RPC
+        env:
+          BACKUP_CHAINSTACK_BASE_RPC_URL: ${{ secrets.BACKUP_CHAINSTACK_BASE_RPC_URL }}
+        run: |
+          node <<'NODE'
+          const url = String(process.env.BACKUP_CHAINSTACK_BASE_RPC_URL || '').trim();
+
+          if (!url) {
+            console.log('Chainstack backup RPC not configured; skipping keepalive');
+            process.exit(0);
+          }
+
+          async function main() {
+            const response = await fetch(url, {
+              method: 'POST',
+              signal: AbortSignal.timeout(15000),
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'eth_blockNumber',
+                params: [],
+                id: 'chainstack-keepalive',
+              }),
+            });
+
+            const text = await response.text();
+
+            if (!response.ok) {
+              console.log(`::warning::Chainstack keepalive returned HTTP ${response.status}`);
+              console.log(text);
+              return;
+            }
+
+            const payload = JSON.parse(text);
+
+            if (payload && payload.error) {
+              console.log(
+                `::warning::Chainstack keepalive RPC error: ${
+                  payload.error.message || JSON.stringify(payload.error)
+                }`,
+              );
+              return;
+            }
+
+            const blockNumber =
+              typeof payload.result === 'string' ? Number.parseInt(payload.result, 16) : Number.NaN;
+
+            if (Number.isFinite(blockNumber)) {
+              console.log(`Chainstack keepalive ok at block ${blockNumber}`);
+              return;
+            }
+
+            console.log('Chainstack keepalive ok');
+          }
+
+          main().catch((error) => {
+            console.log(
+              `::warning::Chainstack keepalive request failed: ${error.message || String(error)}`,
+            );
+          });
+          NODE
+
+      - name: Run pool updater
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
+          BACKUP_CHAINSTACK_BASE_RPC_URL: ${{ secrets.BACKUP_CHAINSTACK_BASE_RPC_URL }}
+          POLYGON_USDC: ${{ secrets.POLYGON_USDC }}
+          RPC_LOG_BLOCK_CHUNK: '200'
+          RPC_MIN_LOG_BLOCK_CHUNK: '10'
+          WINDOW_SECONDS: '3600'
+        run: node ./scripts/update_pool_volume_indexer.js
+
+      # The holder rankings incremental state is persisted on the custom ref
+      # refs/data-state (not a branch, so it never triggers Vercel/CI and is
+      # never pulled by a normal clone) as a single orphan commit — durable but
+      # with no growing history. Restore it before the updater so the scan
+      # resumes from the last checkpoint instead of re-scanning from the token
+      # deployment block. Missing ref (first run / lost ref) → updater
+      # bootstraps from scratch (expensive but self-healing).
+      - name: Restore holder rankings state
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          mkdir -p data
+          if git fetch --no-tags --depth 1 origin '+refs/data-state:refs/remotes/origin/data-state' 2>/dev/null \
+             && git cat-file -e refs/remotes/origin/data-state:holder_rankings_state.json 2>/dev/null; then
+            git cat-file -p refs/remotes/origin/data-state:holder_rankings_state.json > data/holder_rankings_state.json
+            echo "Restored holder rankings state ($(wc -c < data/holder_rankings_state.json) bytes) from refs/data-state"
+          else
+            echo "::warning::No refs/data-state state found; holder updater will bootstrap from scratch"
+          fi
+
+      # Pool and holder data are independent products: a pool-updater failure
+      # must not leave holder rankings stale (and vice versa). Run whenever
+      # the job is alive and dependencies installed; the job still reports
+      # failure when any step failed.
+      - name: Run holder rankings updater
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
+          BACKUP_CHAINSTACK_BASE_RPC_URL: ${{ secrets.BACKUP_CHAINSTACK_BASE_RPC_URL }}
+          HOLDER_RANKINGS_LIMIT: ${{ vars.HOLDER_RANKINGS_LIMIT }}
+          HOLDER_RANKINGS_EXCLUDED_ADDRESSES: ${{ vars.HOLDER_RANKINGS_EXCLUDED_ADDRESSES }}
+          HOLDER_RANKINGS_ETHEREUM_EXCLUDED_ADDRESSES: ${{ vars.HOLDER_RANKINGS_ETHEREUM_EXCLUDED_ADDRESSES }}
+          HOLDER_RANKINGS_BASE_EXCLUDED_ADDRESSES: ${{ vars.HOLDER_RANKINGS_BASE_EXCLUDED_ADDRESSES }}
+          HOLDER_RANKINGS_POLYGON_EXCLUDED_ADDRESSES: ${{ vars.HOLDER_RANKINGS_POLYGON_EXCLUDED_ADDRESSES }}
+          NEXT_PUBLIC_ETH_BURN_ADDRESSES: ${{ vars.NEXT_PUBLIC_ETH_BURN_ADDRESSES }}
+          NEXT_PUBLIC_BASE_BURN_ADDRESSES: ${{ vars.NEXT_PUBLIC_BASE_BURN_ADDRESSES }}
+          NEXT_PUBLIC_POLYGON_BURN_ADDRESSES: ${{ vars.NEXT_PUBLIC_POLYGON_BURN_ADDRESSES }}
+          HOLDER_RANKINGS_LOG_CHUNK: ${{ vars.HOLDER_RANKINGS_LOG_CHUNK }}
+          HOLDER_RANKINGS_MIN_LOG_CHUNK: ${{ vars.HOLDER_RANKINGS_MIN_LOG_CHUNK }}
+          HOLDER_RANKINGS_SAVE_EVERY_BATCHES: ${{ vars.HOLDER_RANKINGS_SAVE_EVERY_BATCHES }}
+          HOLDER_RANKINGS_ETHEREUM_TOKEN_ADDRESS: ${{ vars.HOLDER_RANKINGS_ETHEREUM_TOKEN_ADDRESS }}
+          HOLDER_RANKINGS_BASE_TOKEN_ADDRESS: ${{ vars.HOLDER_RANKINGS_BASE_TOKEN_ADDRESS }}
+          HOLDER_RANKINGS_POLYGON_TOKEN_ADDRESS: ${{ vars.HOLDER_RANKINGS_POLYGON_TOKEN_ADDRESS }}
+          HOLDER_RANKINGS_ETHEREUM_START_BLOCK: ${{ vars.HOLDER_RANKINGS_ETHEREUM_START_BLOCK }}
+          HOLDER_RANKINGS_BASE_START_BLOCK: ${{ vars.HOLDER_RANKINGS_BASE_START_BLOCK }}
+          HOLDER_RANKINGS_POLYGON_START_BLOCK: ${{ vars.HOLDER_RANKINGS_POLYGON_START_BLOCK }}
+        run: npm run update:holder-rankings
+
+      # Persist the (possibly partially updated) state back to refs/data-state
+      # as a fresh parentless commit, so the ref always holds exactly one
+      # commit — durable with zero history growth. Runs whenever the updater
+      # could have written progress, mirroring the commit step's philosophy.
+      - name: Persist holder rankings state
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          state='data/holder_rankings_state.json'
+          if [ ! -f "$state" ]; then
+            echo "::warning::No holder rankings state file to persist"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          blob=$(git hash-object -w "$state")
+          tree=$(printf '100644 blob %s\tholder_rankings_state.json\n' "$blob" | git mktree)
+          commit=$(git commit-tree "$tree" -m "holder rankings state $(date -u +%FT%TZ)")
+          for attempt in 1 2 3; do
+            if git push -f origin "$commit:refs/data-state"; then
+              echo "Persisted holder rankings state to refs/data-state ($commit)"
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Failed to persist holder rankings state after 3 attempts"
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+
+      # Snapshots the on-demand chain reads (pool reserve valuations, burn
+      # balances) so the Vercel routes serve a deployment-baked file instead
+      # of fanning out RPC calls per request. Sections that fail to refresh
+      # keep their last good data in the file; the step still fails so the
+      # run surfaces it.
+      - name: Update on-chain snapshot
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
+          BACKUP_CHAINSTACK_BASE_RPC_URL: ${{ secrets.BACKUP_CHAINSTACK_BASE_RPC_URL }}
+          NEXT_PUBLIC_ETH_TOKEN_ADDRESS: ${{ vars.NEXT_PUBLIC_ETH_TOKEN_ADDRESS }}
+          NEXT_PUBLIC_POLYGON_TOKEN_ADDRESS: ${{ vars.NEXT_PUBLIC_POLYGON_TOKEN_ADDRESS }}
+          NEXT_PUBLIC_BASE_TOKEN_ADDRESS: ${{ vars.NEXT_PUBLIC_BASE_TOKEN_ADDRESS }}
+          NEXT_PUBLIC_ETH_BURN_ADDRESSES: ${{ vars.NEXT_PUBLIC_ETH_BURN_ADDRESSES }}
+          NEXT_PUBLIC_POLYGON_BURN_ADDRESSES: ${{ vars.NEXT_PUBLIC_POLYGON_BURN_ADDRESSES }}
+          NEXT_PUBLIC_BASE_BURN_ADDRESSES: ${{ vars.NEXT_PUBLIC_BASE_BURN_ADDRESSES }}
+        run: npm run update:onchain-snapshot
+
+      # Commits whatever the updaters managed to produce, even when one of
+      # them failed: both write valid JSON incrementally after each unit of
+      # work, and committing partial progress is what lets the next run
+      # resume from checkpoints instead of redoing the window.
+      - name: Commit updated data files
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git status --porcelain | grep -qE "public/data/(pool_volume|pool_volume_checkpoint|holder_rankings|onchain_snapshot)\.json"; then
+            git add public/data/pool_volume.json public/data/pool_volume_checkpoint.json public/data/holder_rankings.json public/data/onchain_snapshot.json || true
+            git commit -m "data: update pool volume and holder rankings [skip ci]" || echo "No changes to commit"
+            branch="${GITHUB_REF_NAME:-main}"
+            max_attempts=5
+            for attempt in $(seq 1 "$max_attempts"); do
+              if git push origin "HEAD:${branch}"; then
+                echo "Push succeeded on attempt ${attempt}"
+                break
+              fi
+
+              if [ "$attempt" -eq "$max_attempts" ]; then
+                echo "::error::Push failed after ${max_attempts} attempts"
+                exit 1
+              fi
+
+              echo "Push failed on attempt ${attempt}; rebasing and retrying..."
+              sleep $((attempt * 5))
+              git fetch origin "${branch}"
+              git rebase "origin/${branch}" || {
+                git rebase --abort || true
+                echo "::warning::Rebase failed while retrying push"
+                exit 1
+              }
+            done
+          else
+            echo "No data changes"
+          fi
+
+      - name: Upload run artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: dashboard-data-artifacts
+          retention-days: 7
+          path: |
+            public/data/pool_volume_runs.json
+            public/data/pool_volume_alert.json
+            public/data/holder_rankings.json
+            public/data/onchain_snapshot.json
+            data/holder_rankings_state.json
+
+      - name: Check run alerts and fail if thresholds exceeded
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          ALERT_INDEXER_CALLS: ${{ vars.ALERT_INDEXER_CALLS || '200' }}
+          ALERT_PROVIDER_BANS: ${{ vars.ALERT_PROVIDER_BANS || '1' }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = 'public/data/pool_volume_alert.json';
+          const maxCalls = Number(process.env.ALERT_INDEXER_CALLS || '200');
+          const maxProvider = Number(process.env.ALERT_PROVIDER_BANS || '1');
+
+          if (!fs.existsSync(p)) {
+            console.log('No alert file, continuing');
+            process.exit(0);
+          }
+
+          const a = JSON.parse(fs.readFileSync(p, 'utf8'));
+          const apiCalls = Number(a.apiCallCount || 0);
+          const reasons = Array.isArray(a.reasons) ? a.reasons.map(String) : [];
+          const providerSignals = reasons.filter((r) => /request-failed|401|403|429|rpc_rate_limit|rpc_forbidden|rpc_unauthorized|unauthorized|throttle|ban|forbidden|invalid-address|quota|provider disabled|retries exhausted/i.test(r)).length;
+          const totalPools = Number(a.totalPoolCount || 0);
+          const successfulPools = Number(a.successfulPoolCount || 0);
+          const failedPools = Number(a.failedPoolCount || 0);
+          const overCalls = apiCalls > maxCalls;
+          const overProvider = providerSignals > maxProvider;
+          const allPoolsFailed = totalPools > 0 && successfulPools === 0 && failedPools >= totalPools;
+
+          if (a.alert || overCalls || overProvider || allPoolsFailed) {
+            console.error('Run alert triggered', {
+              alert: a.alert,
+              apiCalls,
+              maxCalls,
+              providerSignals,
+              maxProvider,
+              totalPools,
+              successfulPools,
+              failedPools,
+              allPoolsFailed,
+              reasons,
+            });
+            process.exit(1);
+          }
+
+          console.log('No alerts', {
+            apiCalls,
+            providerSignals,
+            maxCalls,
+            maxProvider,
+            totalPools,
+            successfulPools,
+            failedPools,
+            allPoolsFailed,
+          });
+          NODE

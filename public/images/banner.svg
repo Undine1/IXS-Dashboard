@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="240" viewBox="0 0 1600 240" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="neonGrad" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="45%" stop-color="#00f0ff" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+  </defs>
+
+  <!-- Title text with strong neon gradient (no background plaque) -->
+  <text x="50%" y="120" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial" font-weight="800" font-size="72" fill="url(#neonGrad)" style="letter-spacing:-1px">
+    IXS Dashboard
+  </text>
+</svg>

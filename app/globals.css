@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* The dashboard is dark-only: dark values are the base styles. */
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: Arial, Helvetica, sans-serif;
+}
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.modern-scrollbar {
+  scrollbar-width: auto;
+  scrollbar-color: #94a3b8 rgba(51, 65, 85, 0.35);
+  scrollbar-gutter: stable;
+}
+
+.modern-scrollbar::-webkit-scrollbar {
+  width: 22px;
+  height: 22px;
+}
+
+.modern-scrollbar::-webkit-scrollbar-track {
+  background: linear-gradient(180deg, rgba(51, 65, 85, 0.55), rgba(30, 41, 59, 0.45));
+  border-radius: 9999px;
+  border: 1px solid rgba(100, 116, 139, 0.28);
+  /* Inset the pill track clear of the container's 12px rounded corners so its
+     squared ends never poke into them. */
+  margin-block: 12px;
+}
+
+.modern-scrollbar::-webkit-scrollbar-thumb {
+  min-height: 68px;
+  background: linear-gradient(180deg, #cbd5e1, #94a3b8);
+  border-radius: 9999px;
+  border: 5px solid transparent;
+  background-clip: padding-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(15, 23, 42, 0.22),
+    0 0 0 1px rgba(100, 116, 139, 0.18);
+}
+
+.modern-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #e2e8f0, #cbd5e1);
+  background-clip: padding-box;
+}
+
+.modern-scrollbar::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #e2e8f0, #cbd5e1);
+  background-clip: padding-box;
+}

@@ -1,0 +1,56 @@
+name: CodeQL
+
+# Replaces GitHub's CodeQL default setup (same languages and query suite).
+# Advanced setup so the hourly data commits stop triggering analysis: those
+# commits only touch JSON snapshots (paths-ignore below) and carry [skip ci],
+# which regular workflows honor but default setup ignored.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'public/data/**'
+      - 'data/**'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - 'public/data/**'
+      - 'data/**'
+  schedule:
+    - cron: '41 3 * * 1' # weekly, off-peak
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: actions
+            build-mode: none
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: '/language:${{ matrix.language }}'

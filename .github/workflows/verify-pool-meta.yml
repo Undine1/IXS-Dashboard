@@ -1,0 +1,42 @@
+name: Verify Pool Metadata
+
+# The pools API route trusts hardcoded token0/token1/decimals in
+# lib/poolsConfig.ts (immutable for a V2 pair) to skip RPC calls. Those only go
+# stale if a pool's address is swapped for a different pair — a config edit — so
+# this check runs when that file changes, not on a schedule. ~24 RPC calls, only
+# when relevant.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/poolsConfig.ts'
+      - 'scripts/verify_pool_meta.ts'
+  pull_request:
+    paths:
+      - 'lib/poolsConfig.ts'
+      - 'scripts/verify_pool_meta.ts'
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    name: Validate baked pool metadata against chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22.15.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify baked pool metadata
+        env:
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+        run: npm run verify:pool-meta

@@ -1,0 +1,234 @@
+{
+  "addresses": {
+    "0x0000000000000000000000000000000000000000": {
+      "label": "Zero Address",
+      "category": "system",
+      "excludeFromRanking": true
+    },
+    "0x000000000000000000000000000000000000dead": {
+      "label": "Burn Address",
+      "category": "burn",
+      "excludeFromRanking": true
+    },
+    "0x73d7c860998ca3c01ce8c808f5577d94d545d1b4": {
+      "label": "IXS Contract (Ethereum)",
+      "category": "contract",
+      "excludeFromRanking": true
+    },
+    "0xfe550bffb51eb645ea3b324d772a19ac449e92c5": {
+      "label": "IXS Contract (Base)",
+      "category": "contract",
+      "excludeFromRanking": true
+    },
+    "0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8": {
+      "label": "IXS Contract (Polygon)",
+      "category": "contract",
+      "excludeFromRanking": true
+    },
+    "0xec36cffd536fac67513871e114df58470696734b": {
+      "label": "IXS Burn Wallet (Ethereum)",
+      "category": "burn",
+      "excludeFromRanking": true
+    },
+    "0x3ee18b2214aff97000d974cf647e7c347e8fa585": {
+      "label": "Wormhole Bridge",
+      "category": "bridge"
+    },
+    "0x000000000004444c5dc75cb358380d2e3de08a90": {
+      "label": "Uniswap V4",
+      "category": "protocol"
+    },
+    "0x3cc936b795a188f0e246cbb2d74c5bd190aecf18": {
+      "label": "MEXC 3",
+      "category": "exchange"
+    },
+    "0x9642b23ed1e01df1092b92641051881a322f5d4e": {
+      "label": "MEXC 16",
+      "category": "exchange"
+    },
+    "0xc09bf2b1bc8725903c509e8caeef9190857215a8": {
+      "label": "Uniswap V2",
+      "category": "protocol"
+    },
+    "0x2982bb64bcd07ac3315c32cb2bb7e5e8a2de7d67": {
+      "label": "Bitmart 16",
+      "category": "exchange"
+    },
+    "0x29065a4c1f2f20d1e263930088890d6f49fe715a": {
+      "label": "Poloniex 10",
+      "category": "exchange"
+    },
+    "0xbca34ed5875079cc561840f3409a790769821dbc": {
+      "label": "Coinex 39",
+      "category": "exchange"
+    },
+    "0x13ca6daab84af2a452f86ea437bb90c6217a220c": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x7c01aa3783577e15fd7e272443d44b92d5b21056": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xcf8ce57fa442ba50acbc57147a62ad03873ffa73": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xc56d93dd1d48f93814901cf685c3cd0eac0e849d": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x43f5d2deecc2942ccf92df93d94d6959d24ead19": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x0bcaebeeee604443feb6d5314a726626a858ebd3": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xd22a820dc52f1cacea7a5c86da16757f434f43c6": {
+      "label": "IXS/USDC Base",
+      "category": "pool"
+    },
+    "0x778e810917991b73c557730969792a3542f57ca5": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x2f22b3d8f033bee8e9b6b2d1a85d26bf6ce8097c": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xe14e1aa79c5fa4abb470290da7154822ec3081f8": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xf70c13221237333b01abf7c4519450abfa548b83": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x776d9977b73f3a70facf5f0a67741a3af933f508": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xbfa599f2318633ca1b2d4c397c1c6cfeceeb66d0": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x3f4e516079d564ef04bebfe86865c99fd8a16ef2": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xeeab54a7764fd5a296d7a9a3c58fb42d64720439": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x4254ff86632e28d83670dcb124ef635a1085d6fe": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x9478c156f97f322139ecd3750e5ba9d6c14e0b01": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xe0a45dbb30dc072cdb3ecdc7371bfd9af4f69085": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x72c346f1885d3f7e14874a482bde241c50446038": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x53ffbcf72b20f05a36b07fb1e0aa2ef7a57dd314": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xa6d5b246342e8ab4b9023a512b100d9a4b2cb0ac": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x5a58505a96d1dbf8df91cb21b54419fc36e93fde": {
+      "label": "Wormhole Bridge",
+      "category": "bridge"
+    },
+    "0xad644f3cc768bc6dcef97096790e2210d5191cec": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xec1e6e048c6875e9f4a51a5ec74b63da05d1f803": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xfe3d92cf0292a4e44402d1e6a10ae8b575fa61dc": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xe9ee9f2857b559c67dd03576a1c74589a6af6197": {
+      "label": "Bitmart 22",
+      "category": "exchange"
+    },
+    "0xd093a031df30f186976a1e2936b16d95ca7919d6": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x065a27ae088ed1ffd0f24fe3116b9697bbbc748e": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x12beec2c7158c2eae0bbcabdec4932e7741abaca": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x622efb1fb4a2486b75813aba428639251495eccb": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x51b0a97fda08e83c973fb8471c332747549a5cd5": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x51abfe75d012f312ae52a571b0946d121caa478d": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x70cf9c7233deb3eff4c2957dda3e79db82b851d4": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xdb6476671ffd6a2130a0cca2729fd49c73816464": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x05b9cd0ec1fe6bb4e61f4437a56e4aa4b442af5a": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0xdba994154bbd628deff3a8137c384eb8134ba0f4": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x2b516bb9a034dd3cd3a9e4435a310311c58ef375": {
+      "label": "Deployer Polygon",
+      "category": "deployer"
+    },
+    "0xec86ceccd8046ed956060988f91c754e7a13328f": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x21dd761cac8461a68344f40d2f12e172a18a297f": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x7e6a90091a77bcd49d48c412a54087981f915f7c": {
+      "label": "Contract",
+      "category": "contract"
+    },
+    "0x9beb276cbf89a02b295911d059dd0db2243dc952": {
+      "label": "Contract",
+      "category": "contract"
+    }
+  }
+}

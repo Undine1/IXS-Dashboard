@@ -1,0 +1,32 @@
+{
+  "name": "blockchain-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:delayed": "node ./scripts/dev-delay.js",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "verify:pool-meta": "tsx ./scripts/verify_pool_meta.ts",
+    "update:holder-rankings": "node ./scripts/update_holder_rankings.js",
+    "update:onchain-snapshot": "tsx ./scripts/update_onchain_snapshot.ts"
+  },
+  "dependencies": {
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "tsx": "^4.22.3",
+    "typescript": "^5"
+  }
+}
