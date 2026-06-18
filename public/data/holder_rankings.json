@@ -54,7 +54,7 @@
       "rank": 8,
       "holder": "0x9642b23ed1e01df1092b92641051881a322f5d4e",
       "chainsHolding": 1,
-      "totalIxs": "1,887,560.73",
+      "totalIxs": "1,876,527.01",
       "label": "MEXC 16"
     },
     {
@@ -75,7 +75,7 @@
       "rank": 11,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,735,425.39",
+      "totalIxs": "1,736,160.91",
       "label": "Uniswap V2"
     },
     {
@@ -250,7 +250,7 @@
       "rank": 36,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "669,292.67",
+      "totalIxs": "668,872.02",
       "label": "Contract"
     },
     {
@@ -271,7 +271,7 @@
       "rank": 39,
       "holder": "0xce90767d34d7090e809bbec8f5213b1c0865eb0a",
       "chainsHolding": 1,
-      "totalIxs": "609,114.07",
+      "totalIxs": "609,534.72",
       "label": null
     },
     {
@@ -3281,7 +3281,7 @@
       "rank": 469,
       "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
       "chainsHolding": 1,
-      "totalIxs": "80,387.85",
+      "totalIxs": "80,311.05",
       "label": "Contract"
     },
     {
@@ -3951,16 +3951,16 @@
     },
     {
       "rank": 565,
-      "holder": "0x3cadefd4c1761c2bf37711b6e48bbc6966658f93",
-      "chainsHolding": 2,
-      "totalIxs": "58,383.20",
+      "holder": "0xf4c63ad7c6dbe99d88ef9da5be0df935ec47acc7",
+      "chainsHolding": 1,
+      "totalIxs": "58,376.81",
       "label": null
     },
     {
       "rank": 566,
-      "holder": "0xf4c63ad7c6dbe99d88ef9da5be0df935ec47acc7",
-      "chainsHolding": 1,
-      "totalIxs": "58,376.81",
+      "holder": "0x3cadefd4c1761c2bf37711b6e48bbc6966658f93",
+      "chainsHolding": 2,
+      "totalIxs": "58,305.20",
       "label": null
     },
     {
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12054,
-  "lastRefreshed": "2026-06-18T03:36:41.465Z",
+  "totalRowCount": 12056,
+  "lastRefreshed": "2026-06-18T06:04:37.197Z",
   "source": "rpc-snapshot"
 }
