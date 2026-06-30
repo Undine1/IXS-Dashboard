@@ -60,9 +60,16 @@ test('applyTransferDelta tracks running balances across mint and transfers', () 
   assert.equal(state.holders[B].ethereum, '1000');
 });
 
-test('applyTransferDelta throws when a balance would go negative', () => {
+test('applyTransferDelta clamps (not throws) when a balance would go negative', () => {
+  // IXS is not a vanilla ERC-20 (balanceOf is changed by non-Transfer
+  // mechanics), so event sums can legitimately go negative for high-volume
+  // addresses. Instead of failing the run, the sender is clamped to 0 (and
+  // flagged for on-chain balanceOf reconciliation), while the recipient is
+  // still credited.
   const state = createDefaultState();
-  assert.throws(() => applyTransferDelta(state, 'ethereum', C, A, 100n), /Negative balance/);
+  assert.doesNotThrow(() => applyTransferDelta(state, 'ethereum', C, A, 100n));
+  assert.equal(state.holders[C], undefined); // clamped to 0 -> entry removed
+  assert.equal(state.holders[A].ethereum, '100'); // recipient still credited
 });
 
 test('addThousandsSeparators groups digits', () => {

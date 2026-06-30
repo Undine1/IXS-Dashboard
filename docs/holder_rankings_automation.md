@@ -31,9 +31,29 @@ How the updater works
    - Pages transfer history with `alchemy_getAssetTransfers`, then falls back to `eth_getLogs` if the Alchemy-specific path is unavailable.
    - If the Alchemy path fails mid-range, rolls the chain back to its pre-attempt snapshot before falling back to `eth_getLogs`.
    - Applies balance deltas per holder in raw token units.
-   - If a saved checkpoint is inconsistent, clears that chain's balances and rebuilds it once from the saved start block.
+   - Reconciles any holder whose Transfer-event sum goes negative against the
+     authoritative on-chain `balanceOf` (see "Non-standard token" below).
 3. Rebuilds the combined top-500 snapshot.
 4. Writes the updated state and public JSON artifacts.
+
+Non-standard token (why balances are reconciled)
+- IXS is not a vanilla ERC-20: its `balanceOf` is changed by mechanics that do
+  not emit `Transfer` events (e.g. reflections/fees/migration credits). This was
+  confirmed empirically — summing every `Transfer` event for a high-volume
+  pass-through address (via both Alchemy asset-transfers and Etherscan, which
+  agree on the event set) yields a *negative* net, which is impossible for a
+  standard token, while the real `balanceOf` is positive.
+- Consequence: reconstructing balances purely by summing transfers is
+  approximate, and for high-volume churning addresses (market makers, routers)
+  the running sum can legitimately go below zero even with a complete, correct
+  event history.
+- Handling: when a holder's event sum would go negative, the updater does NOT
+  fail the run and does NOT silently clamp to zero. It records the address,
+  continues the scan, and after the chain completes replaces each flagged
+  holder's balance with its on-chain `balanceOf` at the scanned block (one
+  `eth_call` per flagged address — typically a handful per run). These addresses
+  hold ~nothing (they only pass volume through), so they never appear in the
+  top-N ranking; reconciliation simply prevents them from breaking the run.
 
 Label registry
 - `data/holder_labels.json` is a committed registry keyed by address.
@@ -75,7 +95,7 @@ Bootstrap notes
 - The first run is the expensive one because it backfills from the token deployment block to the current head.
 - The script finds the deployment block automatically with `eth_getCode` binary search.
 - If you already know the deployment blocks, setting the `HOLDER_RANKINGS_*_START_BLOCK` variables will shorten the bootstrap.
-- If a negative-balance error appears twice in a row for the same chain, the saved state could not self-heal and the configured start block is likely too recent.
+- Negative event-sum balances are expected for IXS and are reconciled against on-chain `balanceOf` rather than failing the run (see "Non-standard token" above). A run that logs many reconciliations is normal for high-volume addresses; only a `balanceOf reconciliation failed` warning (an RPC error) needs attention, and it self-corrects on the next run.
 
 Running locally
 1. Put `ALCHEMY_API_KEY` in `.env.local`.

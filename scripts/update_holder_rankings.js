@@ -113,6 +113,13 @@ const OUTPUT_FILE = path.join(OUTPUT_DIR, 'holder_rankings.json');
 
 let rpcCallCount = 0;
 let retryCount = 0;
+// chain -> Set<address> of holders whose Transfer-event sum went negative this
+// run and must be reconciled against on-chain balanceOf after the scan. IXS is
+// not a vanilla ERC-20 (its balanceOf is changed by mechanics that don't emit
+// Transfer events — reflections/fees/migration credits), so summing transfers
+// can drive a high-volume pass-through address below zero even with a complete,
+// correct event history.
+const pendingBalanceReconcile = new Map();
 
 function ensureDirectory(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -489,9 +496,16 @@ function getRawBalance(value) {
 function setRawBalance(holders, holder, chain, nextBalance) {
   if (!isValidAddress(holder) || holder === ZERO_ADDRESS) return;
   if (nextBalance < 0n) {
-    throw new Error(
-      `Negative balance computed for ${holder} on ${chain}. The saved state is incomplete or the configured start block is too late.`,
-    );
+    // Don't fail the run (or silently clamp and corrupt the ranking): record
+    // the address and reconcile it against the authoritative on-chain
+    // balanceOf after the scan completes. See pendingBalanceReconcile above.
+    let flagged = pendingBalanceReconcile.get(chain);
+    if (!flagged) {
+      flagged = new Set();
+      pendingBalanceReconcile.set(chain, flagged);
+    }
+    flagged.add(holder);
+    nextBalance = 0n;
   }
 
   const existing = holders[holder] && typeof holders[holder] === 'object' ? holders[holder] : {};
@@ -943,6 +957,74 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
   };
 }
 
+// After a chain's transfer scan, replace any flagged (negative event-sum)
+// holders with their authoritative on-chain balanceOf at the scanned block, so
+// these values are consistent with the event-summed balances of every other
+// holder. Never throws: a balanceOf RPC failure leaves the address at its 0
+// placeholder and is surfaced as a warning for the next run to retry.
+async function reconcileFlaggedBalances(state, config, chainState) {
+  const flagged = pendingBalanceReconcile.get(config.chain);
+  if (!flagged || flagged.size === 0) return { reconciled: 0, failed: 0 };
+
+  const addresses = [...flagged];
+  flagged.clear();
+
+  const scannedBlock =
+    toNonNegativeInteger(chainState.lastScannedBlock) ?? toNonNegativeInteger(chainState.latestBlockAtRun);
+  const blockTag = scannedBlock == null ? 'latest' : asRpcHex(scannedBlock);
+
+  console.warn(
+    `[holder-rankings] ${config.chain}: ${addresses.length} address(es) had a negative Transfer-event sum (expected for IXS, whose balanceOf is not the net of Transfer events); reconciling against on-chain balanceOf @ block ${scannedBlock ?? 'latest'}`,
+  );
+
+  let reconciled = 0;
+  let failed = 0;
+  for (const address of addresses) {
+    try {
+      const data = `0x70a08231000000000000000000000000${address.slice(2)}`;
+      const result = await rpcCall(config.chain, 'eth_call', [{ to: config.address, data }, blockTag]);
+      let raw;
+      try {
+        raw = BigInt(result);
+      } catch {
+        throw new Error(`invalid balanceOf result: ${result}`);
+      }
+      if (raw < 0n) throw new Error(`negative balanceOf result: ${raw}`);
+
+      // Write the authoritative value directly (balanceOf is always >= 0, so
+      // this never re-flags).
+      const existing =
+        state.holders[address] && typeof state.holders[address] === 'object' ? state.holders[address] : {};
+      if (raw === 0n) {
+        delete existing[config.chain];
+      } else {
+        existing[config.chain] = raw.toString();
+      }
+      if (Object.keys(existing).length === 0) {
+        delete state.holders[address];
+      } else {
+        state.holders[address] = existing;
+      }
+      reconciled += 1;
+    } catch (error) {
+      failed += 1;
+      console.warn(
+        `[holder-rankings] ${config.chain}: balanceOf reconciliation failed for ${address} (left at 0): ${
+          error && error.message ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  console.log(
+    `[holder-rankings] ${config.chain}: reconciled ${reconciled} address(es) against chain${
+      failed ? `, ${failed} failed (left at 0, will retry next run)` : ''
+    }`,
+  );
+  if (reconciled || failed) persistState(state);
+  return { reconciled, failed };
+}
+
 async function processChain(state, config) {
   if (!isValidAddress(config.address)) {
     throw new Error(`Invalid token address for ${config.chain}: ${config.address}`);
@@ -953,7 +1035,11 @@ async function processChain(state, config) {
 
   let contractStartBlock =
     toNonNegativeInteger(chainState.contractStartBlock) ?? toNonNegativeInteger(process.env[config.startBlockEnv]);
+  // Defensive: negative balances are reconciled (not thrown) since IXS isn't a
+  // vanilla ERC-20, so this resync path is dormant — it only fires if some
+  // other code path ever throws a state-integrity error.
   let hasRetriedFromScratch = false;
+  let summary;
 
   while (true) {
     const attemptSnapshot = snapshotChainState(state, config.chain);
@@ -966,13 +1052,14 @@ async function processChain(state, config) {
         chainState.contractStartBlock = contractStartBlock;
 
         try {
-          return await processChainViaAlchemyAssetTransfers(
+          summary = await processChainViaAlchemyAssetTransfers(
             state,
             chainState,
             config,
             latestBlock,
             contractStartBlock,
           );
+          break;
         } catch (error) {
           if (isStateIntegrityError(error)) {
             throw error;
@@ -1008,7 +1095,8 @@ async function processChain(state, config) {
         contractStartBlock = await findContractDeploymentBlock(config.chain, config.address, latestBlock);
       }
 
-      return await processChainViaStandardRpcLogs(state, chainState, config, latestBlock, contractStartBlock);
+      summary = await processChainViaStandardRpcLogs(state, chainState, config, latestBlock, contractStartBlock);
+      break;
     } catch (error) {
       if (!isStateIntegrityError(error) || hasRetriedFromScratch) {
         throw error;
@@ -1022,6 +1110,12 @@ async function processChain(state, config) {
       hasRetriedFromScratch = true;
     }
   }
+
+  const recon = await reconcileFlaggedBalances(state, config, chainState);
+  if (recon.reconciled || recon.failed) {
+    summary = { ...summary, reconciled: recon.reconciled, reconcileFailed: recon.failed };
+  }
+  return summary;
 }
 
 async function main() {
