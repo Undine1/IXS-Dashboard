@@ -727,10 +727,19 @@ async function fetchAssetTransfersPage(chain, tokenAddress, fromBlock, toBlock, 
 }
 
 async function processChainViaAlchemyAssetTransfers(state, chainState, config, latestBlock, contractStartBlock) {
-  const saveEveryBatches = Math.max(
+  // Checkpoint by block number, never by Alchemy pageKey. Alchemy pageKeys are
+  // session-scoped: persisting one and replaying it in a later run silently
+  // RESTARTS pagination from fromBlock, re-applying the whole history on top of
+  // the existing balances (doubling them). Instead we scan bounded block
+  // windows, fully paginating each window within THIS run (pageKey used only in
+  // memory), and advance lastScannedBlock — a durable checkpoint — per window.
+  const windowSize = Math.max(
     1,
-    Number(process.env.HOLDER_RANKINGS_SAVE_EVERY_BATCHES || DEFAULT_SAVE_EVERY_BATCHES),
+    Number(process.env.HOLDER_RANKINGS_ASSET_TRANSFERS_BLOCK_WINDOW || 1_000_000),
   );
+  // Drop any legacy pageKey cursor left by older versions of this script.
+  if (chainState.assetTransfersCursor) delete chainState.assetTransfersCursor;
+
   const lastScannedBlock = toNonNegativeInteger(chainState.lastScannedBlock);
   const startBlock = lastScannedBlock == null ? contractStartBlock : lastScannedBlock + 1;
 
@@ -741,73 +750,51 @@ async function processChainViaAlchemyAssetTransfers(state, chainState, config, l
     return { startBlock, latestBlock, logsFetched: 0, logsApplied: 0, mode: 'alchemy_getAssetTransfers' };
   }
 
-  const existingCursor =
-    chainState.assetTransfersCursor && typeof chainState.assetTransfersCursor === 'object'
-      ? chainState.assetTransfersCursor
-      : null;
-  const cursorState = existingCursor || {
-    fromBlock: startBlock,
-    toBlock: latestBlock,
-    pageKey: null,
-  };
+  // A from-scratch scan (no durable checkpoint) must start from empty balances,
+  // or it would re-add the full history on top of whatever is already present.
+  if (lastScannedBlock == null) {
+    clearChainBalances(state, config.chain);
+    chainState.processedLogCount = 0;
+  }
 
-  if (toNonNegativeInteger(cursorState.fromBlock) == null) cursorState.fromBlock = startBlock;
-  if (toNonNegativeInteger(cursorState.toBlock) == null) cursorState.toBlock = latestBlock;
-  if (typeof cursorState.pageKey !== 'string') cursorState.pageKey = null;
-
-  chainState.assetTransfersCursor = cursorState;
+  console.log(
+    `[holder-rankings] ${config.chain}: scanning transfers ${startBlock}-${latestBlock} via alchemy_getAssetTransfers (window ${windowSize})`,
+  );
 
   let logsFetched = 0;
   let logsApplied = 0;
-  let batchesSinceSave = 0;
-  let currentPageKey = cursorState.pageKey;
-  const queryFromBlock = toNonNegativeInteger(cursorState.fromBlock) ?? startBlock;
-  const queryToBlock = toNonNegativeInteger(cursorState.toBlock) ?? latestBlock;
 
-  console.log(
-    `[holder-rankings] ${config.chain}: paging transfers ${queryFromBlock}-${queryToBlock} via alchemy_getAssetTransfers`,
-  );
+  for (let from = startBlock; from <= latestBlock; ) {
+    const to = Math.min(latestBlock, from + windowSize - 1);
 
-  while (true) {
-    const page = await fetchAssetTransfersPage(
-      config.chain,
-      config.address,
-      queryFromBlock,
-      queryToBlock,
-      currentPageKey,
-    );
-
-    for (const transfer of page.transfers) {
-      if (applyAssetTransfer(state, config.chain, transfer)) {
-        logsApplied += 1;
+    // Paginate this window to completion within this run. pageKey lives only in
+    // memory here and is never persisted.
+    let pageKey = null;
+    do {
+      const page = await fetchAssetTransfersPage(config.chain, config.address, from, to, pageKey);
+      for (const transfer of page.transfers) {
+        if (applyAssetTransfer(state, config.chain, transfer)) {
+          logsApplied += 1;
+        }
       }
-    }
+      logsFetched += page.transfers.length;
+      const processedLogCount = toNonNegativeInteger(chainState.processedLogCount) ?? 0;
+      chainState.processedLogCount = processedLogCount + page.transfers.length;
+      pageKey = page.pageKey;
+    } while (pageKey);
 
-    logsFetched += page.transfers.length;
-    const processedLogCount = toNonNegativeInteger(chainState.processedLogCount) ?? 0;
-    chainState.processedLogCount = processedLogCount + page.transfers.length;
+    // Window complete: advance the durable checkpoint and persist. If the run is
+    // interrupted between windows, the next run resumes from lastScannedBlock+1
+    // (a block number), so nothing is ever re-applied.
+    chainState.lastScannedBlock = to;
     chainState.latestBlockAtRun = latestBlock;
-    currentPageKey = page.pageKey;
-    chainState.assetTransfersCursor.pageKey = currentPageKey;
-
-    batchesSinceSave += 1;
-    if (batchesSinceSave >= saveEveryBatches) {
-      persistState(state);
-      batchesSinceSave = 0;
-    }
-
-    if (!currentPageKey) {
-      chainState.lastScannedBlock = queryToBlock;
-      delete chainState.assetTransfersCursor;
-      break;
-    }
+    from = to + 1;
+    persistState(state);
   }
 
-  persistState(state);
-
   return {
-    startBlock: queryFromBlock,
-    latestBlock: queryToBlock,
+    startBlock,
+    latestBlock,
     logsFetched,
     logsApplied,
     mode: 'alchemy_getAssetTransfers',
@@ -876,6 +863,14 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
       `[holder-rankings] ${config.chain}: already synced at block ${lastScannedBlock} (latest ${latestBlock})`,
     );
     return { startBlock, latestBlock, logsFetched: 0, logsApplied: 0 };
+  }
+
+  // A from-scratch scan must start from empty balances, or it would re-add the
+  // full history on top of whatever is already present (this path checkpoints
+  // per block chunk, so an interrupted scan resumes incrementally instead).
+  if (lastScannedBlock == null) {
+    clearChainBalances(state, config.chain);
+    chainState.processedLogCount = 0;
   }
 
   const maxChunk = Math.max(

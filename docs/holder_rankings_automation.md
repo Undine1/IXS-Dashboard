@@ -29,6 +29,7 @@ How the updater works
    - Uses `ALCHEMY_API_KEY` for `alchemy_getAssetTransfers`.
    - Falls back to standard JSON-RPC using `ALCHEMY_API_KEY`, then `BACKUP_INFURA_API_KEY`, then `BACKUP_CHAINSTACK_BASE_RPC_URL` on Base if needed.
    - Pages transfer history with `alchemy_getAssetTransfers`, then falls back to `eth_getLogs` if the Alchemy-specific path is unavailable.
+   - Checkpoints strictly by block number: it scans bounded block windows and advances `lastScannedBlock` per completed window. It never persists an Alchemy `pageKey` between runs — those are session-scoped, and replaying a stale one silently restarts pagination from the token's first block, re-applying the whole history on top of existing balances (which doubles them). A from-scratch scan (no `lastScannedBlock`) first clears that chain's balances so a rebuild can never stack on top of stale data.
    - If the Alchemy path fails mid-range, rolls the chain back to its pre-attempt snapshot before falling back to `eth_getLogs`.
    - Applies balance deltas per holder in raw token units.
    - Reconciles any holder whose Transfer-event sum goes negative against the
