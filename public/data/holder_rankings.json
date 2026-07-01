@@ -26,14 +26,14 @@
       "rank": 4,
       "holder": "0x5a58505a96d1dbf8df91cb21b54419fc36e93fde",
       "chainsHolding": 1,
-      "totalIxs": "7,028,376.65",
+      "totalIxs": "7,026,666.00",
       "label": "Wormhole Bridge"
     },
     {
       "rank": 5,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "6,140,636.70",
+      "totalIxs": "6,138,926.05",
       "label": "Uniswap V4"
     },
     {
@@ -54,7 +54,7 @@
       "rank": 8,
       "holder": "0x3ee18b2214aff97000d974cf647e7c347e8fa585",
       "chainsHolding": 1,
-      "totalIxs": "4,947,821.02",
+      "totalIxs": "4,952,267.43",
       "label": "Wormhole Bridge"
     },
     {
@@ -89,7 +89,7 @@
       "rank": 13,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "3,321,634.62",
+      "totalIxs": "3,319,555.42",
       "label": "Uniswap V2"
     },
     {
@@ -621,7 +621,7 @@
       "rank": 89,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "674,294.77",
+      "totalIxs": "673,592.87",
       "label": "Contract"
     },
     {
@@ -705,7 +705,7 @@
       "rank": 101,
       "holder": "0xce90767d34d7090e809bbec8f5213b1c0865eb0a",
       "chainsHolding": 1,
-      "totalIxs": "630,462.11",
+      "totalIxs": "630,893.38",
       "label": null
     },
     {
@@ -1720,7 +1720,7 @@
       "rank": 246,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "314,719.36",
+      "totalIxs": "315,054.95",
       "label": "IXS/USDC Base"
     },
     {
@@ -2889,7 +2889,7 @@
       "rank": 413,
       "holder": "0x65229d343dbb63fe9826fcf9586965b7a13cb5a0",
       "chainsHolding": 1,
-      "totalIxs": "188,863.79",
+      "totalIxs": "188,207.22",
       "label": null
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12784,
-  "lastRefreshed": "2026-06-30T23:47:17.240Z",
+  "lastRefreshed": "2026-07-01T01:27:29.712Z",
   "source": "rpc-snapshot"
 }
