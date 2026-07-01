@@ -107,7 +107,9 @@ const EXCLUSION_ENV_KEYS = [
 
 const STATE_DIR = path.join(__dirname, '..', 'data');
 const OUTPUT_DIR = path.join(__dirname, '..', 'public', 'data');
-const STATE_FILE = path.join(STATE_DIR, 'holder_rankings_state.json');
+// Overridable so tests can point persistence at a temp file instead of the
+// real data dir.
+const STATE_FILE = process.env.HOLDER_RANKINGS_STATE_FILE || path.join(STATE_DIR, 'holder_rankings_state.json');
 const LABELS_FILE = path.join(STATE_DIR, 'holder_labels.json');
 const OUTPUT_FILE = path.join(OUTPUT_DIR, 'holder_rankings.json');
 
@@ -726,7 +728,11 @@ async function fetchAssetTransfersPage(chain, tokenAddress, fromBlock, toBlock, 
   };
 }
 
-async function processChainViaAlchemyAssetTransfers(state, chainState, config, latestBlock, contractStartBlock) {
+async function processChainViaAlchemyAssetTransfers(state, chainState, config, latestBlock, contractStartBlock, deps = {}) {
+  // deps.fetchPage / deps.persist are injectable for tests; production uses the
+  // real Alchemy fetcher and the disk persister.
+  const fetchPage = deps.fetchPage || fetchAssetTransfersPage;
+  const persist = deps.persist || persistState;
   // Checkpoint by block number, never by Alchemy pageKey. Alchemy pageKeys are
   // session-scoped: persisting one and replaying it in a later run silently
   // RESTARTS pagination from fromBlock, re-applying the whole history on top of
@@ -771,7 +777,7 @@ async function processChainViaAlchemyAssetTransfers(state, chainState, config, l
     // memory here and is never persisted.
     let pageKey = null;
     do {
-      const page = await fetchAssetTransfersPage(config.chain, config.address, from, to, pageKey);
+      const page = await fetchPage(config.chain, config.address, from, to, pageKey);
       for (const transfer of page.transfers) {
         if (applyAssetTransfer(state, config.chain, transfer)) {
           logsApplied += 1;
@@ -789,7 +795,7 @@ async function processChainViaAlchemyAssetTransfers(state, chainState, config, l
     chainState.lastScannedBlock = to;
     chainState.latestBlockAtRun = latestBlock;
     from = to + 1;
-    persistState(state);
+    persist(state);
   }
 
   return {
@@ -852,7 +858,10 @@ function buildPublicPayload(state, holderLabels) {
   };
 }
 
-async function processChainViaStandardRpcLogs(state, chainState, config, latestBlock, contractStartBlock) {
+async function processChainViaStandardRpcLogs(state, chainState, config, latestBlock, contractStartBlock, deps = {}) {
+  // deps.fetchLogs / deps.persist are injectable for tests.
+  const fetchLogs = deps.fetchLogs || fetchTransferLogs;
+  const persist = deps.persist || persistState;
   chainState.contractStartBlock = contractStartBlock;
 
   const lastScannedBlock = toNonNegativeInteger(chainState.lastScannedBlock);
@@ -900,7 +909,7 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
     const endBlock = Math.min(latestBlock, cursor + chunkSize - 1);
 
     try {
-      const logs = await fetchTransferLogs(config.chain, config.address, cursor, endBlock);
+      const logs = await fetchLogs(config.chain, config.address, cursor, endBlock);
       logsFetched += logs.length;
 
       for (const log of logs) {
@@ -916,7 +925,7 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
 
       batchesSinceSave += 1;
       if (batchesSinceSave >= saveEveryBatches) {
-        persistState(state);
+        persist(state);
         batchesSinceSave = 0;
       }
 
@@ -942,7 +951,7 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
     }
   }
 
-  persistState(state);
+  persist(state);
 
   return {
     startBlock,
@@ -1164,4 +1173,8 @@ module.exports = {
   addThousandsSeparators,
   formatTokenAmount,
   createDefaultState,
+  ensureChainState,
+  clearChainBalances,
+  processChainViaAlchemyAssetTransfers,
+  processChainViaStandardRpcLogs,
 };
