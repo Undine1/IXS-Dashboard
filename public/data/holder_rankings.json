@@ -68,7 +68,7 @@
       "rank": 10,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,719,577.99",
+      "totalIxs": "1,717,845.24",
       "label": "Uniswap V2"
     },
     {
@@ -1263,23 +1263,23 @@
     },
     {
       "rank": 181,
+      "holder": "0xedcdead92fa4e1c80428b852af3f1fad90cc43cf",
+      "chainsHolding": 1,
+      "totalIxs": "225,752.65",
+      "label": null
+    },
+    {
+      "rank": 182,
       "holder": "0x8c0676a336b9e2a7b8622737a0bf33f11451622a",
       "chainsHolding": 1,
       "totalIxs": "225,481.25",
       "label": null
     },
     {
-      "rank": 182,
+      "rank": 183,
       "holder": "0x1e82bcb7219de24beb6954a709895c0c7f9a4096",
       "chainsHolding": 2,
       "totalIxs": "224,390.61",
-      "label": null
-    },
-    {
-      "rank": 183,
-      "holder": "0xedcdead92fa4e1c80428b852af3f1fad90cc43cf",
-      "chainsHolding": 1,
-      "totalIxs": "224,021.43",
       "label": null
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12081,
-  "lastRefreshed": "2026-07-01T18:04:35.403Z",
+  "lastRefreshed": "2026-07-01T19:04:11.966Z",
   "source": "rpc-snapshot"
 }
