@@ -1,6 +1,8 @@
 // Alchemy-backed updater: sums USDC transfers to/from a pair address
 // using Alchemy Asset Transfers first, then RPC block lookups plus
-// Infura-backed eth_getLogs as fallback. Writes increments into
+// eth_getLogs as fallback (Infura, then Chainstack, then Alchemy as a
+// last resort — Alchemy's enhanced APIs can be rate-limited while its
+// core JSON-RPC still serves). Writes increments into
 // public/data/pool_volume.json and updates a checkpoint.
 const fs = require('fs');
 const path = require('path');
@@ -86,6 +88,14 @@ async function paceRpcRequests() {
   lastRpcRequestAt = Date.now();
 }
 
+// Equal jitter: half the exponential step is a guaranteed floor, the other
+// half is randomized. Full jitter (random 0..exp) can roll near-zero waits
+// that burn retry attempts inside the same provider throttle window.
+function computeRetryDelayMs(attempt, baseDelayMs, maxDelayMs) {
+  const exp = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt - 1));
+  return Math.floor(exp / 2 + Math.random() * (exp / 2));
+}
+
 async function requestWithRetries(url, opts = {}) {
   const maxAttempts = Number(process.env.API_MAX_ATTEMPTS || 5);
   const baseDelay = Number(process.env.API_BASE_DELAY_MS || 500); // ms
@@ -110,9 +120,7 @@ async function requestWithRetries(url, opts = {}) {
           }
         }
         if (waitMs <= 0) {
-          const exp = Math.min(maxDelay, baseDelay * Math.pow(2, attempt - 1));
-          // full jitter up to exp
-          waitMs = Math.floor(Math.random() * exp);
+          waitMs = computeRetryDelayMs(attempt, baseDelay, maxDelay);
         }
         retryCount += 1;
         if (attempt === maxAttempts) {
@@ -161,8 +169,7 @@ async function requestWithRetries(url, opts = {}) {
         }
         throw err;
       }
-      const exp = Math.min(maxDelay, baseDelay * Math.pow(2, attempt - 1));
-      const waitMs = Math.floor(Math.random() * exp);
+      const waitMs = computeRetryDelayMs(attempt, baseDelay, maxDelay);
       console.warn(`Request error for ${url}; attempt ${attempt}/${maxAttempts}, retrying after ${waitMs}ms`, err && err.message);
       await new Promise((r) => setTimeout(r, waitMs));
     }
@@ -187,9 +194,18 @@ function shouldDisableProviderForRun(error) {
   return /429|too many requests|rate limit|rate-limited|thrott|quota|forbidden|unauthorized/.test(message);
 }
 
-function disableProviderForRun(url, error) {
-  if (!url || disabledProviders.has(url)) {
-    return disabledProviders.get(url) || null;
+// Disabling is scoped to (provider URL, RPC method), not the whole URL:
+// Alchemy's enhanced APIs (alchemy_getAssetTransfers) rate-limit
+// independently of its core JSON-RPC, so a 429 on one method must not
+// poison the others for the rest of the run.
+function providerDisableKey(url, method) {
+  return `${String(method || '')} ${String(url || '')}`;
+}
+
+function disableProviderForRun(url, method, error) {
+  const key = providerDisableKey(url, method);
+  if (!url || disabledProviders.has(key)) {
+    return disabledProviders.get(key) || null;
   }
   if (!shouldDisableProviderForRun(error)) {
     return null;
@@ -198,15 +214,15 @@ function disableProviderForRun(url, error) {
     code: String((error && error.code) || 'RPC_PROVIDER_DISABLED'),
     message: String((error && error.message) || 'Provider disabled for run after repeated access errors'),
   };
-  disabledProviders.set(url, info);
+  disabledProviders.set(key, info);
   console.warn(
-    `[pool-volume] disabling provider ${getProviderLabel(url)} (${getProviderHost(url)}) for the remainder of this run after ${info.code}: ${info.message}`,
+    `[pool-volume] disabling provider ${getProviderLabel(url)} (${getProviderHost(url)}) for ${method} for the remainder of this run after ${info.code}: ${info.message}`,
   );
   return info;
 }
 
-function getDisabledProviderInfo(url) {
-  return url ? disabledProviders.get(url) || null : null;
+function getDisabledProviderInfo(url, method) {
+  return url ? disabledProviders.get(providerDisableKey(url, method)) || null : null;
 }
 
 function isProviderAccessError(error) {
@@ -264,7 +280,15 @@ function getRpcUrlsForChain(chain) {
 }
 
 function getLogScanRpcUrlsForChain(chain) {
-  return [...getInfuraRpcUrlsForChain(chain), ...getChainstackRpcUrlsForChain(chain)];
+  // Infura and Chainstack first so chunked log scans don't spend the Alchemy
+  // key's throughput; Alchemy last as the rescue path — its core JSON-RPC has
+  // stayed up during Asset Transfers rate-limit events, and by the time this
+  // list is consulted the primary Alchemy path has already failed anyway.
+  return [
+    ...getInfuraRpcUrlsForChain(chain),
+    ...getChainstackRpcUrlsForChain(chain),
+    ...getAlchemyRpcUrlsForChain(chain),
+  ];
 }
 
 async function alchemyCall(chain, method, params) {
@@ -280,7 +304,7 @@ async function alchemyCall(chain, method, params) {
   for (const url of urls) {
     const providerLabel = getProviderLabel(url);
     const providerHost = getProviderHost(url);
-    const disabledInfo = getDisabledProviderInfo(url);
+    const disabledInfo = getDisabledProviderInfo(url, method);
     if (disabledInfo) {
       const err = new Error(`Provider disabled for run after ${disabledInfo.code}: ${disabledInfo.message}`);
       err.code = 'RPC_PROVIDER_DISABLED';
@@ -320,7 +344,7 @@ async function alchemyCall(chain, method, params) {
     } catch (e) {
       providerErrors.push(`${providerLabel}@${providerHost} code=${(e && e.code) || 'unknown'} msg=${(e && e.message) || String(e)}`);
       console.warn(`[pool-volume] ${chain} ${method}: provider ${providerLabel} (${providerHost}) failed: ${(e && e.message) || String(e)}`);
-      disableProviderForRun(url, e);
+      disableProviderForRun(url, method, e);
       lastErr = e;
       continue;
     }
@@ -393,7 +417,7 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
   for (const url of urls) {
     const providerLabel = getProviderLabel(url);
     const providerHost = getProviderHost(url);
-    const disabledInfo = getDisabledProviderInfo(url);
+    const disabledInfo = getDisabledProviderInfo(url, method);
     if (disabledInfo) {
       const err = new Error(`Provider disabled for run after ${disabledInfo.code}: ${disabledInfo.message}`);
       err.code = 'RPC_PROVIDER_DISABLED';
@@ -443,7 +467,7 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
       const message = (e && e.message) || String(e);
       providerErrors.push(`${providerLabel}@${providerHost} code=${code} msg=${message}`);
       console.warn(`[pool-volume] ${chain} ${method}: provider ${providerLabel} (${providerHost}) failed: ${message}`);
-      disableProviderForRun(url, e);
+      disableProviderForRun(url, method, e);
       lastErr = e;
       continue;
     }
@@ -999,4 +1023,11 @@ module.exports = {
   pruneCheckpoint,
   getAssetTransferKey,
   getAssetTransferRawValue,
+  computeRetryDelayMs,
+  providerDisableKey,
+  disableProviderForRun,
+  getDisabledProviderInfo,
+  getLogScanRpcUrlsForChain,
+  alchemyCall,
+  sumTokenTransfersViaRpc,
 };
