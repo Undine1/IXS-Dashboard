@@ -550,6 +550,33 @@ async function getBlockByTimestampRpc(ts, chain) {
   return best;
 }
 
+// Free-tier eth_getLogs providers cap the block span per request (Alchemy's
+// free plan is 10 blocks) and report the ceiling in the error body, e.g.
+// "you can make eth_getLogs requests with up to a 10 block range. Based on
+// your parameters, this block range should work: [0x.., 0x..]". Parse that
+// ceiling so the scan can drop straight to a compliant chunk instead of
+// blindly halving. Returns null when no range hint is present.
+function inferMaxLogRangeFromError(error) {
+  const message = error instanceof Error ? error.message : String(error || '');
+
+  const rangeMatch = message.match(/up to a (\d+) block range/i);
+  if (rangeMatch) {
+    const parsed = Number(rangeMatch[1]);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+  }
+
+  const suggestedRangeMatch = message.match(/should work:\s*\[(0x[0-9a-f]+),\s*(0x[0-9a-f]+)\]/i);
+  if (suggestedRangeMatch) {
+    const start = fromRpcHex(suggestedRangeMatch[1]);
+    const end = fromRpcHex(suggestedRangeMatch[2]);
+    if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+      return Math.floor(end - start + 1);
+    }
+  }
+
+  return null;
+}
+
 async function fetchTransferLogsRpc(chain, usdcAddr, fromBlock, endBlock, pairTopic, incoming) {
   const topics = incoming ? [TRANSFER_TOPIC0, null, pairTopic] : [TRANSFER_TOPIC0, pairTopic];
   const params = [
@@ -679,6 +706,11 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
   const seen = new Set();
   let totalRaw = 0n;
   let chunkSize = configuredMaxChunk;
+  // Ceiling learned from a provider's "range too large" error (e.g. Alchemy
+  // free tier = 10). Once known, the empty-window grow-back never exceeds it,
+  // so we stop oscillating chunk-size against the same cap for the rest of the
+  // scan — which keeps the fallback's request count bounded.
+  let learnedMaxChunk = configuredMaxChunk;
 
   for (let from = startBlock; from <= endBlock;) {
     const to = Math.min(endBlock, from + chunkSize - 1);
@@ -700,11 +732,22 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
 
       from = to + 1;
 
-      if (merged.length === 0 && chunkSize < configuredMaxChunk) {
-        chunkSize = Math.min(configuredMaxChunk, chunkSize * 2);
+      const growCeiling = Math.min(configuredMaxChunk, learnedMaxChunk);
+      if (merged.length === 0 && chunkSize < growCeiling) {
+        chunkSize = Math.min(growCeiling, chunkSize * 2);
       }
     } catch (error) {
-      if (isProviderAccessError(error)) {
+      const inferredMaxChunk = inferMaxLogRangeFromError(error);
+      if (inferredMaxChunk != null) {
+        learnedMaxChunk = Math.min(learnedMaxChunk, inferredMaxChunk);
+      }
+
+      // A "range too large" error is recoverable by shrinking, even when the
+      // aggregate also carries a rate-limited provider (Infura 429 riding
+      // alongside Alchemy's 10-block 400): retrying the smaller span lets the
+      // range-capped provider serve the scan. Only give up on a pure access
+      // error, where no smaller chunk would help.
+      if (inferredMaxChunk == null && isProviderAccessError(error)) {
         throw new Error(
           `Failed eth_getLogs scan for ${chain} blocks ${from}-${to}: ${
             error instanceof Error ? error.message : String(error)
@@ -719,7 +762,9 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
         );
       }
 
-      const nextChunkSize = Math.max(configuredMinChunk, Math.floor(chunkSize / 2));
+      const nextChunkSize = inferredMaxChunk != null
+        ? Math.max(configuredMinChunk, Math.min(chunkSize - 1, inferredMaxChunk))
+        : Math.max(configuredMinChunk, Math.floor(chunkSize / 2));
 
       if (nextChunkSize === chunkSize) {
         throw new Error(
@@ -730,7 +775,7 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
       }
 
       console.warn(
-        `[pool-volume] ${chain}: reducing Infura log chunk ${chunkSize} -> ${nextChunkSize} after eth_getLogs error`,
+        `[pool-volume] ${chain}: reducing log chunk ${chunkSize} -> ${nextChunkSize} after eth_getLogs error`,
       );
       chunkSize = nextChunkSize;
     }
@@ -1030,4 +1075,5 @@ module.exports = {
   getLogScanRpcUrlsForChain,
   alchemyCall,
   sumTokenTransfersViaRpc,
+  inferMaxLogRangeFromError,
 };
