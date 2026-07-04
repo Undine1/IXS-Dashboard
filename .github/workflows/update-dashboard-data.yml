@@ -276,21 +276,23 @@ jobs:
 
       # ALERT_INDEXER_CALLS is a runaway-guard, not a health signal (health is
       # allPoolsFailed + providerSignals). When Alchemy's alchemy_getAssetTransfers
-      # is throttled, the pool scan legitimately falls back to eth_getLogs at a
-      # ~10-block chunk (free-tier cap), which is call-heavy — a full hourly delta
-      # across both pools can run several hundred calls. Keep the ceiling well
-      # above that (1500) so a handled fallback run doesn't false-alarm, while a
-      # true runaway still trips it.
+      # is throttled, BOTH pools fall back to eth_getLogs at a ~10-block chunk
+      # (free-tier cap), which is call-heavy. Worst realistic legitimate case is
+      # both pools on that fallback with a multi-hour delta (a dropped cron slot
+      # can make the gap 3-5h → ~9k blocks/pool → ~3600 calls). A genuine runaway
+      # would be 10k+. 5000 separates the two: a handled double-fallback backfill
+      # stays green, a real loop still trips. (Observed 2026-07-04: a 2h-gap
+      # double-fallback run hit 1570 and false-failed the old 1500 ceiling.)
       - name: Check run alerts and fail if thresholds exceeded
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
-          ALERT_INDEXER_CALLS: ${{ vars.ALERT_INDEXER_CALLS || '1500' }}
+          ALERT_INDEXER_CALLS: ${{ vars.ALERT_INDEXER_CALLS || '5000' }}
           ALERT_PROVIDER_BANS: ${{ vars.ALERT_PROVIDER_BANS || '1' }}
         run: |
           node <<'NODE'
           const fs = require('fs');
           const p = 'public/data/pool_volume_alert.json';
-          const maxCalls = Number(process.env.ALERT_INDEXER_CALLS || '1500');
+          const maxCalls = Number(process.env.ALERT_INDEXER_CALLS || '5000');
           const maxProvider = Number(process.env.ALERT_PROVIDER_BANS || '1');
 
           if (!fs.existsSync(p)) {
