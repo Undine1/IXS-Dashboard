@@ -657,7 +657,7 @@ async function fetchPoolAssetTransfersPage(chain, usdcAddr, pairAddr, fromBlock,
   };
 }
 
-async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6) {
+async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6, onProgress) {
   const seen = new Set();
   let totalRaw = 0n;
 
@@ -690,10 +690,16 @@ async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, p
     }
   }
 
+  // Asset Transfers paginates the whole range in memory, so it commits
+  // atomically once the full range is summed: a mid-scan failure throws
+  // before this call and commits nothing, leaving the eth_getLogs fallback a
+  // clean range to rescan (no partial double-count).
+  if (typeof onProgress === 'function') onProgress(endBlock, totalRaw);
+
   return Number(totalRaw) / Math.pow(10, Number(decimals) || 6);
 }
 
-async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6) {
+async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6, onProgress) {
   const configuredMaxChunk = Math.max(
     10,
     Number(process.env.RPC_LOG_BLOCK_CHUNK || process.env.LOG_CHUNK || 500),
@@ -716,6 +722,7 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
     const to = Math.min(endBlock, from + chunkSize - 1);
 
     try {
+      const beforeChunkRaw = totalRaw;
       const outgoing = await fetchTransferLogsRpc(chain, usdcAddr, from, to, pairTopic, false);
       const incoming = await fetchTransferLogsRpc(chain, usdcAddr, from, to, pairTopic, true);
       const merged = outgoing.concat(incoming);
@@ -731,6 +738,13 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
       }
 
       from = to + 1;
+
+      // Commit this window (its volume delta + a checkpoint at `to`) before
+      // advancing, so an interrupted scan of a large backlog keeps its
+      // progress: the next run resumes from `to`+1 instead of rescanning
+      // (double-count) or dropping the window. Chunks are disjoint block
+      // ranges, so the per-chunk delta is exactly this window's contribution.
+      if (typeof onProgress === 'function') onProgress(to, totalRaw - beforeChunkRaw);
 
       const growCeiling = Math.min(configuredMaxChunk, learnedMaxChunk);
       if (merged.length === 0 && chunkSize < growCeiling) {
@@ -844,8 +858,33 @@ function pruneCheckpoint(checkpoint, poolsMap) {
   return pruned;
 }
 
+// Write to a temp file then rename, so a process killed mid-write can't leave a
+// truncated JSON file (readJson would fall back to {} and wipe the accumulated
+// total_usd on the next run). This matters now that incremental checkpointing
+// rewrites the pool file and checkpoint once per scanned window. POSIX rename is
+// atomic-replace; the EEXIST/EPERM branch covers Windows (dev only — the updater
+// runs on Linux CI), mirroring update_holder_rankings.js's writeJson.
+function writeFileAtomic(filePath, content) {
+  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, content);
+  try {
+    fs.renameSync(tmp, filePath);
+  } catch (error) {
+    if (!error || (error.code !== 'EEXIST' && error.code !== 'EPERM')) {
+      try {
+        fs.unlinkSync(tmp);
+      } catch {
+        // best-effort cleanup of the failed temp file
+      }
+      throw error;
+    }
+    fs.rmSync(filePath, { force: true });
+    fs.renameSync(tmp, filePath);
+  }
+}
+
 function persistPoolFile(poolsMap) {
-  fs.writeFileSync(
+  writeFileAtomic(
     POOL_FILE,
     JSON.stringify({ pools: poolsMap, lastUpdated: new Date().toISOString() }, null, 2),
   );
@@ -901,7 +940,7 @@ async function main() {
   const prunedCheckpointKeys = pruneCheckpoint(checkpoint, poolsMap);
   if (prunedCheckpointKeys > 0) {
     console.log(`Pruned ${prunedCheckpointKeys} stale checkpoint entries`);
-    fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+    writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
   }
 
   for (const rawAddr of Object.keys(poolsMap)) {
@@ -928,7 +967,7 @@ async function main() {
         console.log(`Skipping ${addr}: checkpoint start (${startTs}) is not before end (${endTs})`);
         checkpoint[addr] = { lastTimestamp: endTs, lastBlock: poolCheckpoint.lastBlock || null };
         if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
-        fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+        writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
         successfulPoolCount += 1;
         continue;
       }
@@ -942,14 +981,13 @@ async function main() {
         // save checkpoint to avoid reprocessing this bad entry repeatedly
         checkpoint[addr] = { lastTimestamp: endTs || now, lastBlock: null };
         if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
-        fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+        writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
         failedPoolCount += 1;
         continue;
       }
 
       let startBlock;
       let endBlock;
-      let totalUsdc = 0;
       let source = 'alchemy-asset-transfers';
       startBlock = checkpointStartBlock != null ? checkpointStartBlock + 1 : await getBlockByTimestamp(startTs, chain);
       endBlock = await getBlockByTimestamp(endTs, chain);
@@ -962,20 +1000,46 @@ async function main() {
         console.log(`Skipping ${addr}: no new blocks since checkpoint (start=${startBlock}, end=${endBlock})`);
         checkpoint[addr] = { lastTimestamp: endTs, lastBlock: endBlock };
         if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
-        fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+        writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
         successfulPoolCount += 1;
         continue;
       }
       console.log('Block range', startBlock, endBlock);
       const tokenDecimals = Number(pool.usdc_decimals || pool.decimals || process.env.USDC_DECIMALS || 6);
+
+      if (!poolsMap[addr]) {
+        poolsMap[addr] = { address: addr, total_usd: 0, lastUpdated: null };
+      }
+
+      // Commit each scanned window incrementally: add its volume delta AND
+      // advance the checkpoint to its last block in the same persist, so a
+      // scan interrupted partway through a large backlog (e.g. the free-tier
+      // eth_getLogs fallback rate-limiting mid-run) keeps its progress. The
+      // next run resumes from lastBlock+1, so no window is rescanned (which
+      // would double-count) or lost. Volume and checkpoint move together, so a
+      // crash between windows can only lose the *uncommitted* tail, which the
+      // next run re-scans cleanly.
+      let runTotalUsdc = 0;
+      const commitProgress = (windowEndBlock, windowRaw) => {
+        const increment = Number(windowRaw) / Math.pow(10, tokenDecimals);
+        poolsMap[addr].total_usd = Number(poolsMap[addr].total_usd || 0) + increment;
+        poolsMap[addr].lastUpdated = new Date().toISOString();
+        runTotalUsdc += increment;
+        checkpoint[addr] = { lastTimestamp: endTs, lastBlock: windowEndBlock };
+        if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
+        persistPoolFile(poolsMap);
+        writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+      };
+
       try {
-        totalUsdc = await sumTokenTransfersViaAlchemyAssetTransfers(
+        await sumTokenTransfersViaAlchemyAssetTransfers(
           startBlock,
           endBlock,
           pairAddr,
           usdcAddr,
           chain,
           tokenDecimals,
+          commitProgress,
         );
       } catch (error) {
         console.warn(
@@ -984,31 +1048,19 @@ async function main() {
           }`,
         );
         source = 'infura-rpc-logs-fallback';
-        totalUsdc = await sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, tokenDecimals);
+        await sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, tokenDecimals, commitProgress);
       }
 
-      console.log(`Total USDC transfers for ${addr} (${source}):`, totalUsdc);
+      console.log(`Total USDC transfers for ${addr} (${source}):`, runTotalUsdc);
 
-      if (!poolsMap[addr]) {
-        poolsMap[addr] = { address: addr, total_usd: 0, lastUpdated: null };
-      }
-      poolsMap[addr].total_usd = Number(poolsMap[addr].total_usd || 0) + totalUsdc;
-      poolsMap[addr].lastUpdated = new Date().toISOString();
-
-      // Append per-pool run summary
+      // Append per-pool run summary (only on full completion; partial progress
+      // was already persisted incrementally above).
       const runs = readJson(RUNS_FILE, []);
-      runs.push({ pool: addr, startTs, endTs, startBlock, endBlock, totalUsdc, source, ts: new Date().toISOString() });
+      runs.push({ pool: addr, startTs, endTs, startBlock, endBlock, totalUsdc: runTotalUsdc, source, ts: new Date().toISOString() });
       // ~100 entries (~2 days at hourly cadence) is plenty for the committed,
       // publicly served history; CI artifacts retain full runs for a week.
       fs.writeFileSync(RUNS_FILE, JSON.stringify(runs.slice(-100), null, 2));
 
-      // Save per-pool checkpoint
-      checkpoint[addr] = { lastTimestamp: endTs, lastBlock: endBlock };
-      if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
-
-      // persist pool file after each pool to reduce lost work on failures
-      persistPoolFile(poolsMap);
-      fs.writeFileSync(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
       successfulPoolCount += 1;
     } catch (e) {
       failedPoolCount += 1;
@@ -1075,5 +1127,6 @@ module.exports = {
   getLogScanRpcUrlsForChain,
   alchemyCall,
   sumTokenTransfersViaRpc,
+  sumTokenTransfersViaAlchemyAssetTransfers,
   inferMaxLogRangeFromError,
 };
