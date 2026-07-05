@@ -271,22 +271,49 @@ function getChainstackRpcUrlsForChain(chain) {
   return [BACKUP_CHAINSTACK_BASE_RPC_URL];
 }
 
+// Keyless public endpoints, added as an extra fallback that doesn't share the
+// keyed providers' throttling. Only Base has a viable one: mainnet.base.org is
+// Coinbase's canonical node — authoritative, complete (validated against the
+// pool's known transfers), reliable, and serves up to a 10k-block eth_getLogs
+// range with no API key. No comparable free public endpoint exists for Polygon
+// (all surveyed ones are key-walled, tiny-quota, tiny-range, or offline), so
+// Polygon deliberately has none — an unverified aggregator must never feed the
+// cumulative volume total. Override/extend via POOL_VOLUME_PUBLIC_<CHAIN>_RPCS
+// (comma-separated) if a trusted endpoint becomes available.
+const PUBLIC_RPCS = {
+  base: ['https://mainnet.base.org'],
+};
+function getPublicRpcUrlsForChain(chain) {
+  const normalized = normalizeChain(chain);
+  const envOverride = String(process.env[`POOL_VOLUME_PUBLIC_${normalized.toUpperCase()}_RPCS`] || '').trim();
+  if (envOverride) {
+    return envOverride.split(',').map((u) => u.trim()).filter(Boolean);
+  }
+  return (PUBLIC_RPCS[normalized] || []).slice();
+}
+
 function getRpcUrlsForChain(chain) {
   return [
     ...getAlchemyRpcUrlsForChain(chain),
     ...getInfuraRpcUrlsForChain(chain),
     ...getChainstackRpcUrlsForChain(chain),
+    // Public endpoints last for block lookups: the keyed providers serve these
+    // cheap calls fine; this is just a rescue if they're all throttled.
+    ...getPublicRpcUrlsForChain(chain),
   ];
 }
 
 function getLogScanRpcUrlsForChain(chain) {
   // Infura and Chainstack first so chunked log scans don't spend the Alchemy
-  // key's throughput; Alchemy last as the rescue path — its core JSON-RPC has
-  // stayed up during Asset Transfers rate-limit events, and by the time this
-  // list is consulted the primary Alchemy path has already failed anyway.
+  // key's throughput. Then the keyless public endpoint (Base only) — it's
+  // reliable, independent of the keyed providers' throttling, and serves large
+  // ranges, so it rescues a scan when the keyed providers are all rate-limited
+  // WITHOUT the Alchemy free-tier 10-block grind. Alchemy stays the final
+  // last-resort (its core RPC has survived Asset Transfers throttling events).
   return [
     ...getInfuraRpcUrlsForChain(chain),
     ...getChainstackRpcUrlsForChain(chain),
+    ...getPublicRpcUrlsForChain(chain),
     ...getAlchemyRpcUrlsForChain(chain),
   ];
 }
@@ -1125,6 +1152,7 @@ module.exports = {
   disableProviderForRun,
   getDisabledProviderInfo,
   getLogScanRpcUrlsForChain,
+  getPublicRpcUrlsForChain,
   alchemyCall,
   sumTokenTransfersViaRpc,
   sumTokenTransfersViaAlchemyAssetTransfers,

@@ -28,7 +28,7 @@ const modulePath = requireCjs.resolve('../scripts/update_pool_volume_indexer.js'
 delete requireCjs.cache[modulePath];
 const poolVolume = requireCjs(modulePath);
 
-const { inferMaxLogRangeFromError, sumTokenTransfersViaRpc, getLogScanRpcUrlsForChain } = poolVolume;
+const { inferMaxLogRangeFromError, sumTokenTransfersViaRpc, getLogScanRpcUrlsForChain, getPublicRpcUrlsForChain } = poolVolume;
 
 interface FakeResponse {
   ok: boolean;
@@ -60,29 +60,35 @@ test('inferMaxLogRangeFromError parses Alchemy free-tier range hints', () => {
   assert.equal(inferMaxLogRangeFromError(new Error('generic rate limit, no hint')), null);
 });
 
-test('log-scan list includes chainstack (base) and alchemy last for base', () => {
-  const urls = getLogScanRpcUrlsForChain('base');
-  assert.ok(urls[0].includes('infura.io'), `infura first: ${urls[0]}`);
-  assert.ok(urls.some((u: string) => u.includes('chainstack')), 'chainstack present for base');
-  assert.ok(urls[urls.length - 1].includes('alchemy.com'), `alchemy last: ${urls[urls.length - 1]}`);
+test('base log-scan order is [infura, chainstack, public base.org, alchemy]; polygon has no public endpoint', () => {
+  const base = getLogScanRpcUrlsForChain('base');
+  assert.ok(base[0].includes('infura.io'), `infura first: ${base[0]}`);
+  assert.ok(base.some((u: string) => u.includes('chainstack')), 'chainstack present for base');
+  const baseOrgIdx = base.findIndex((u: string) => u.includes('mainnet.base.org'));
+  const alchemyIdx = base.findIndex((u: string) => u.includes('alchemy.com'));
+  assert.ok(baseOrgIdx !== -1, 'public base.org present in base log-scan');
+  assert.ok(alchemyIdx === base.length - 1, `alchemy last: ${base[base.length - 1]}`);
+  assert.ok(baseOrgIdx < alchemyIdx, 'public base.org comes before the Alchemy 10-block last-resort');
+
+  assert.deepEqual(getPublicRpcUrlsForChain('base'), ['https://mainnet.base.org']);
+  assert.deepEqual(getPublicRpcUrlsForChain('polygon'), [], 'no unverified public endpoint feeds polygon');
+  assert.ok(!getLogScanRpcUrlsForChain('polygon').some((u: string) => u.includes('base.org')));
 });
 
-test('base scan recovers via 10-block Alchemy when Infura 429s and Chainstack 403s', async () => {
+test('polygon scan recovers via 10-block Alchemy shrink when Infura 429s (no public endpoint)', async () => {
   const pair = `0x${'d'.repeat(40)}`;
   const usdc = `0x${'c'.repeat(40)}`;
   const alchemyRanges: number[] = [];
   const providersHit = new Set<string>();
-  // 1_000_000 raw at 6 decimals = 1.0, placed once in the very first 10-block window.
   const transferLog = { transactionHash: `0x${'1'.repeat(64)}`, logIndex: '0x0', data: '0x0f4240' };
 
   globalThis.fetch = (async (url: string | URL, opts?: { body?: string }) => {
     const host = String(url);
     const body = JSON.parse(String((opts && opts.body) || '{}'));
-    const provider = host.includes('alchemy.com') ? 'alchemy' : host.includes('infura.io') ? 'infura' : host.includes('chainstack') ? 'chainstack' : 'other';
+    const provider = host.includes('alchemy.com') ? 'alchemy' : host.includes('infura.io') ? 'infura' : 'other';
     providersHit.add(provider);
 
     if (provider === 'infura') return status(429, 'Too Many Requests', '{"code":-32005,"message":"Too Many Requests"}');
-    if (provider === 'chainstack') return status(403, 'Forbidden', '{"error":{"code":-32002,"message":"Archive, Debug and Trace requests are not available on your current plan."}}');
 
     // Alchemy core RPC: enforce the free-tier 10-block eth_getLogs cap.
     const p = body.params && body.params[0];
@@ -93,18 +99,56 @@ test('base scan recovers via 10-block Alchemy when Infura 429s and Chainstack 40
       return status(400, 'Bad Request', `{"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Under the Free tier plan, you can make eth_getLogs requests with up to a 10 block range. Based on your parameters, this block range should work: [${p.fromBlock}, 0x${(from + 9).toString(16)}]."}}`);
     }
     alchemyRanges.push(span);
-    const hit = from <= 100 && 100 <= to; // the one transfer sits at block 100
+    const hit = from <= 100 && 100 <= to;
     return ok({ jsonrpc: '2.0', id: 1, result: hit ? [transferLog] : [] });
   }) as unknown as typeof fetch;
 
-  // 25-block range on base; 200-block chunk 400s on Alchemy, must shrink to 10.
-  const total = await sumTokenTransfersViaRpc(100, 124, pair, usdc, 'base', 6);
+  const total = await sumTokenTransfersViaRpc(100, 124, pair, usdc, 'polygon', 6);
 
   assert.equal(total, 1, 'summed the single 1.0 transfer after recovering via Alchemy');
   assert.ok(providersHit.has('alchemy'), 'Alchemy core RPC was used for the scan');
-  assert.ok(alchemyRanges.length > 0, 'at least one Alchemy eth_getLogs call succeeded');
-  assert.ok(
-    alchemyRanges.every((s) => s <= 10),
-    `every successful Alchemy call stayed within the 10-block cap: ${JSON.stringify(alchemyRanges)}`,
-  );
+  assert.ok(alchemyRanges.every((s) => s <= 10), `every successful Alchemy call stayed within 10 blocks: ${JSON.stringify(alchemyRanges)}`);
+});
+
+test('base scan rescues via public base.org (large range) before the Alchemy 10-block grind', async () => {
+  const pair = `0x${'d'.repeat(40)}`;
+  const usdc = `0x${'c'.repeat(40)}`;
+  const providersHit = new Set<string>();
+  const baseOrgRanges: number[] = [];
+  const transferLog = { transactionHash: `0x${'2'.repeat(64)}`, logIndex: '0x0', data: '0x0f4240' };
+
+  globalThis.fetch = (async (url: string | URL, opts?: { body?: string }) => {
+    const host = String(url);
+    const body = JSON.parse(String((opts && opts.body) || '{}'));
+    const provider = host.includes('alchemy.com')
+      ? 'alchemy'
+      : host.includes('infura.io')
+        ? 'infura'
+        : host.includes('chainstack')
+          ? 'chainstack'
+          : host.includes('mainnet.base.org')
+            ? 'base.org'
+            : 'other';
+    providersHit.add(provider);
+
+    if (provider === 'infura') return status(429, 'Too Many Requests', '{"code":-32005,"message":"Too Many Requests"}');
+    if (provider === 'chainstack') return status(403, 'Forbidden', '{"error":{"code":-32002,"message":"Archive not on plan"}}');
+    if (provider === 'alchemy') return status(429, 'Too Many Requests', '{"error":{"code":429,"message":"rate limited"}}');
+
+    // base.org: Coinbase's node serves the full 200-block chunk (no 10-block cap).
+    const p = body.params && body.params[0];
+    const from = parseInt(p.fromBlock, 16);
+    const to = parseInt(p.toBlock, 16);
+    baseOrgRanges.push(to - from + 1);
+    const hit = from <= 100 && 100 <= to;
+    return ok({ jsonrpc: '2.0', id: 1, result: hit ? [transferLog] : [] });
+  }) as unknown as typeof fetch;
+
+  // 200-block range on base: base.org should serve it in one chunk after
+  // infura(429)/chainstack(403), without falling to the Alchemy 10-block path.
+  const total = await sumTokenTransfersViaRpc(100, 299, pair, usdc, 'base', 6);
+
+  assert.equal(total, 1, 'summed the transfer via base.org');
+  assert.ok(providersHit.has('base.org'), 'public base.org served the scan');
+  assert.ok(baseOrgRanges.some((s) => s > 10), `base.org served a >10-block range (no free-tier grind): ${JSON.stringify(baseOrgRanges)}`);
 });
