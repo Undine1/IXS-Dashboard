@@ -33,7 +33,7 @@
       "rank": 5,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "3,745,357.33",
+      "totalIxs": "3,789,247.33",
       "label": "Uniswap V4"
     },
     {
@@ -68,7 +68,7 @@
       "rank": 10,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,810,218.18",
+      "totalIxs": "1,813,095.84",
       "label": "Uniswap V2"
     },
     {
@@ -250,7 +250,7 @@
       "rank": 36,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "674,172.50",
+      "totalIxs": "672,504.50",
       "label": "Contract"
     },
     {
@@ -381,65 +381,65 @@
     },
     {
       "rank": 55,
-      "holder": "0x8f222973701f3d6121573a541c1f309ff2cd68b9",
-      "chainsHolding": 1,
-      "totalIxs": "500,000.00",
-      "label": null
-    },
-    {
-      "rank": 56,
       "holder": "0x6c1aa670b13f4f5de35d65085a68e30e491aa82e",
       "chainsHolding": 1,
       "totalIxs": "495,208.33",
       "label": null
     },
     {
-      "rank": 57,
+      "rank": 56,
       "holder": "0x7f1599aa3962cd1a3baad00a240a71d4d6d0e49a",
       "chainsHolding": 1,
       "totalIxs": "487,973.00",
       "label": null
     },
     {
-      "rank": 58,
+      "rank": 57,
       "holder": "0x29e11b59598eab70227b03ce04bdcf0c091d859b",
       "chainsHolding": 1,
       "totalIxs": "481,985.00",
       "label": null
     },
     {
-      "rank": 59,
+      "rank": 58,
       "holder": "0xc8ca838b93d1be3e3e72906416dcb316badb8166",
       "chainsHolding": 1,
       "totalIxs": "480,000.00",
       "label": null
     },
     {
-      "rank": 60,
+      "rank": 59,
       "holder": "0x29065a4c1f2f20d1e263930088890d6f49fe715a",
       "chainsHolding": 1,
       "totalIxs": "478,150.00",
       "label": "Poloniex 10"
     },
     {
-      "rank": 61,
+      "rank": 60,
       "holder": "0x70c5bc0bcb6f5adcae1258cc9364fe8ac806921b",
       "chainsHolding": 1,
       "totalIxs": "471,907.85",
       "label": null
     },
     {
-      "rank": 62,
+      "rank": 61,
       "holder": "0xa525bfb7d5c06f0554b99853fd551d18326d563e",
       "chainsHolding": 1,
       "totalIxs": "462,985.00",
       "label": null
     },
     {
-      "rank": 63,
+      "rank": 62,
       "holder": "0xbeafe511648f191bde137df69a02604fa1a8bb64",
       "chainsHolding": 2,
       "totalIxs": "459,053.75",
+      "label": null
+    },
+    {
+      "rank": 63,
+      "holder": "0x8f222973701f3d6121573a541c1f309ff2cd68b9",
+      "chainsHolding": 1,
+      "totalIxs": "450,000.00",
       "label": null
     },
     {
@@ -845,7 +845,7 @@
       "rank": 121,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "308,127.87",
+      "totalIxs": "307,942.84",
       "label": "IXS/USDC Base"
     },
     {
@@ -1347,30 +1347,30 @@
     },
     {
       "rank": 193,
+      "holder": "0xc8263acbbc8dd873ccdf1d68bdba2b47246e2d20",
+      "chainsHolding": 1,
+      "totalIxs": "213,076.99",
+      "label": null
+    },
+    {
+      "rank": 194,
       "holder": "0x98411e6d808208d3c349d766194492b376af7e49",
       "chainsHolding": 1,
       "totalIxs": "211,686.44",
       "label": null
     },
     {
-      "rank": 194,
+      "rank": 195,
       "holder": "0x14341ec6442c19bf2a79c4251368287dd24a8f82",
       "chainsHolding": 2,
       "totalIxs": "211,312.44",
       "label": null
     },
     {
-      "rank": 195,
+      "rank": 196,
       "holder": "0x8c5bfd8173bf0ee01af612eb4a582502ac478b72",
       "chainsHolding": 1,
       "totalIxs": "210,897.00",
-      "label": null
-    },
-    {
-      "rank": 196,
-      "holder": "0xc8263acbbc8dd873ccdf1d68bdba2b47246e2d20",
-      "chainsHolding": 1,
-      "totalIxs": "209,974.07",
       "label": null
     },
     {
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12115,
-  "lastRefreshed": "2026-07-05T22:18:01.917Z",
+  "totalRowCount": 12116,
+  "lastRefreshed": "2026-07-05T23:33:49.276Z",
   "source": "rpc-snapshot"
 }
