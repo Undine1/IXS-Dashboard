@@ -11,6 +11,7 @@ const {
   addrToTopic,
   isValidAddress,
   toEpochSeconds,
+  clampCheckpointBlock,
   pruneCheckpoint,
   getAssetTransferRawValue,
 } = poolVolume;
@@ -57,6 +58,16 @@ test('toEpochSeconds normalizes seconds and milliseconds', () => {
   assert.equal(toEpochSeconds(1_700_000_000_000), 1_700_000_000); // ms -> s
   assert.equal(toEpochSeconds(0), null);
   assert.equal(toEpochSeconds('nope'), null);
+});
+
+test('clampCheckpointBlock never moves the checkpoint backward', () => {
+  // A lagging provider's head must not regress lastBlock (rescanning
+  // already-summed blocks would double-count into total_usd).
+  assert.equal(clampCheckpointBlock(48233100, 48233095), 48233100);
+  assert.equal(clampCheckpointBlock(48233100, 48233200), 48233200);
+  assert.equal(clampCheckpointBlock(null, 48233095), 48233095); // no prior checkpoint
+  assert.equal(clampCheckpointBlock(undefined, 7), 7);
+  assert.equal(clampCheckpointBlock('48233100', 48233095), 48233100); // string-typed legacy value
 });
 
 test('pruneCheckpoint drops stale keys and keeps tracked pools', () => {

@@ -122,6 +122,9 @@ async function requestWithRetries(url, opts = {}) {
         if (waitMs <= 0) {
           waitMs = computeRetryDelayMs(attempt, baseDelay, maxDelay);
         }
+        // Cap header-derived waits: a large/hostile Retry-After must not stall
+        // the run past the job timeout.
+        waitMs = Math.min(waitMs, maxDelay);
         retryCount += 1;
         if (attempt === maxAttempts) {
           let responseText = '';
@@ -861,6 +864,17 @@ function isValidAddress(a) {
   return /^0x[0-9a-fA-F]{40}$/.test(a);
 }
 
+// The checkpoint must never move backward: `endBlock` is whichever provider
+// answered eth_blockNumber THIS run, and load-balanced/failover providers can
+// report a head lagging the provider that served the previous run. Regressing
+// lastBlock would make the next run rescan blocks whose volume is already in
+// total_usd — a silent, permanent double-count.
+function clampCheckpointBlock(previousLastBlock, candidateBlock) {
+  const prev = Number(previousLastBlock);
+  if (!Number.isFinite(prev)) return candidateBlock;
+  return Math.max(Math.floor(prev), candidateBlock);
+}
+
 // Drop checkpoint entries that no longer correspond to a tracked pool: legacy
 // `<addr>-<chain>` keys whose suffix never matched the pool's chain, root-level
 // scalar leftovers from old formats, and pools removed from the pool file.
@@ -1025,7 +1039,10 @@ async function main() {
       }
       if (startBlock > endBlock) {
         console.log(`Skipping ${addr}: no new blocks since checkpoint (start=${startBlock}, end=${endBlock})`);
-        checkpoint[addr] = { lastTimestamp: endTs, lastBlock: endBlock };
+        checkpoint[addr] = {
+          lastTimestamp: endTs,
+          lastBlock: clampCheckpointBlock(checkpointStartBlock, endBlock),
+        };
         if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
         writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
         successfulPoolCount += 1;
@@ -1144,6 +1161,7 @@ module.exports = {
   addrToTopic,
   isValidAddress,
   toEpochSeconds,
+  clampCheckpointBlock,
   pruneCheckpoint,
   getAssetTransferKey,
   getAssetTransferRawValue,

@@ -288,12 +288,34 @@ jobs:
         env:
           ALERT_INDEXER_CALLS: ${{ vars.ALERT_INDEXER_CALLS || '5000' }}
           ALERT_PROVIDER_BANS: ${{ vars.ALERT_PROVIDER_BANS || '1' }}
+          # A single pool failing run after run never trips allPoolsFailed or
+          # the providerSignals threshold (1 reason = 1 signal, not > 1), so one
+          # pool could go stale indefinitely while runs stay green. Checkpoint
+          # age is the direct signal for that: alert when any pool's checkpoint
+          # is older than this many hours (cron drops slots, so runs can be
+          # 2-4h apart legitimately; 12h means many consecutive failures).
+          ALERT_MAX_CHECKPOINT_AGE_HOURS: ${{ vars.ALERT_MAX_CHECKPOINT_AGE_HOURS || '12' }}
         run: |
           node <<'NODE'
           const fs = require('fs');
           const p = 'public/data/pool_volume_alert.json';
           const maxCalls = Number(process.env.ALERT_INDEXER_CALLS || '5000');
           const maxProvider = Number(process.env.ALERT_PROVIDER_BANS || '1');
+          const maxAgeHours = Number(process.env.ALERT_MAX_CHECKPOINT_AGE_HOURS || '12');
+
+          const stalePools = [];
+          try {
+            const cp = JSON.parse(fs.readFileSync('public/data/pool_volume_checkpoint.json', 'utf8'));
+            const nowSec = Math.floor(Date.now() / 1000);
+            for (const [pool, entry] of Object.entries(cp)) {
+              const ts = Number((entry && entry.lastTimestamp) || 0);
+              if (ts > 0 && nowSec - ts > maxAgeHours * 3600) {
+                stalePools.push(`${pool} (${((nowSec - ts) / 3600).toFixed(1)}h stale)`);
+              }
+            }
+          } catch {
+            // no checkpoint file (fresh repo) — nothing to age-check
+          }
 
           if (!fs.existsSync(p)) {
             console.log('No alert file, continuing');
@@ -311,7 +333,7 @@ jobs:
           const overProvider = providerSignals > maxProvider;
           const allPoolsFailed = totalPools > 0 && successfulPools === 0 && failedPools >= totalPools;
 
-          if (a.alert || overCalls || overProvider || allPoolsFailed) {
+          if (a.alert || overCalls || overProvider || allPoolsFailed || stalePools.length > 0) {
             console.error('Run alert triggered', {
               alert: a.alert,
               apiCalls,
@@ -322,6 +344,7 @@ jobs:
               successfulPools,
               failedPools,
               allPoolsFailed,
+              stalePools,
               reasons,
             });
             process.exit(1);
@@ -336,5 +359,6 @@ jobs:
             successfulPools,
             failedPools,
             allPoolsFailed,
+            stalePools,
           });
           NODE
