@@ -81,7 +81,13 @@ Configuration
   - `HOLDER_RANKINGS_POLYGON_EXCLUDED_ADDRESSES`
   - `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` (default `1000`)
   - `HOLDER_RANKINGS_LOG_CHUNK` (default `20000`)
-  - `HOLDER_RANKINGS_MIN_LOG_CHUNK` (default `500`)
+  - `HOLDER_RANKINGS_MIN_LOG_CHUNK` (default `500`; an explicit provider range
+    hint may lower this floor for that run)
+  - `HOLDER_RANKINGS_MAX_FALLBACK_LOG_WINDOWS` (default `2000`) â€” shared
+    cross-chain budget that bounds a small-range standard-RPC fallback; saved
+    state lets the next run resume if the budget is exhausted
+  - `API_RATE_LIMIT_MAX_ATTEMPTS` (default `2`) â€” attempts allowed for a 429
+    response path; `Retry-After` is honored before the one bounded retry
   - `HOLDER_RANKINGS_SAVE_EVERY_BATCHES` (default `10`)
 - Optional token overrides:
   - `HOLDER_RANKINGS_ETHEREUM_TOKEN_ADDRESS`

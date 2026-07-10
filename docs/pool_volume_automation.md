@@ -10,7 +10,9 @@ What it does
   - Fetch ERC-20 transfers via `alchemy_getAssetTransfers`.
   - Fall back to `eth_getLogs` through Infura, then Chainstack, when the Alchemy-specific path is unavailable.
 - Applies retry logic with backoff/jitter for transient failures.
-- Persists per-pool checkpoints in `public/data/pool_volume_checkpoint.json`.
+- Persists totals and their authoritative per-pool checkpoints atomically in
+  `public/data/pool_volume.json`; `public/data/pool_volume_checkpoint.json` is
+  retained as a derived compatibility and monitoring mirror.
 - Appends run summaries to `public/data/pool_volume_runs.json` (gitignored; captured as a per-run CI artifact, not committed).
 - Writes `public/data/pool_volume_alert.json` when retry budgets are exhausted.
 
@@ -31,8 +33,8 @@ Configuration
 
 Files of interest
 - `scripts/update_pool_volume_indexer.js` - primary updater.
-- `public/data/pool_volume.json` - persisted totals.
-- `public/data/pool_volume_checkpoint.json` - per-pool checkpoints.
+- `public/data/pool_volume.json` - persisted totals plus authoritative checkpoints.
+- `public/data/pool_volume_checkpoint.json` - derived checkpoint mirror.
 - `public/data/pool_volume_runs.json` - run history (gitignored; CI artifact only, not committed).
 - `.github/workflows/update-dashboard-data.yml` - scheduled automation that runs this updater, then the holder rankings updater, and commits all refreshed artifacts in one push.
 

@@ -14,6 +14,10 @@ const {
   clampCheckpointBlock,
   pruneCheckpoint,
   getAssetTransferRawValue,
+  selectAuthoritativeCheckpoint,
+  buildPoolState,
+  getLatestBlockNumberForRun,
+  commitPoolProgress,
 } = poolVolume;
 
 test('classifyRpcErrorMessage buckets known failure shapes', () => {
@@ -92,4 +96,83 @@ test('getAssetTransferRawValue parses hex value and defaults to 0n', () => {
   assert.equal(getAssetTransferRawValue({ rawContract: { value: '0x0a' } }), 10n);
   assert.equal(getAssetTransferRawValue({}), 0n);
   assert.equal(getAssetTransferRawValue({ rawContract: { value: 'bad' } }), 0n);
+});
+
+test('embedded checkpoints are authoritative over a stale compatibility mirror', () => {
+  const embedded = { pool: { lastTimestamp: 20, lastBlock: 200 } };
+  const staleMirror = { pool: { lastTimestamp: 10, lastBlock: 100 } };
+
+  assert.equal(
+    selectAuthoritativeCheckpoint({ pools: {}, checkpoints: embedded }, staleMirror),
+    embedded,
+  );
+  assert.equal(selectAuthoritativeCheckpoint({ pools: {} }, staleMirror), staleMirror);
+});
+
+test('pool state stores totals and checkpoints in the same atomic payload', () => {
+  const pools = { pool: { total_usd: 12.5 } };
+  const checkpoints = { pool: { lastTimestamp: 20, lastBlock: 200 } };
+  const state = buildPoolState(pools, checkpoints, '2026-01-01T00:00:00.000Z');
+
+  assert.deepEqual(state, {
+    pools,
+    checkpoints,
+    lastUpdated: '2026-01-01T00:00:00.000Z',
+  });
+});
+
+test('latest block number is fetched once per chain per run', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: { get: () => null },
+      json: async () => ({ jsonrpc: '2.0', id: 1, result: '0x2a' }),
+      text: async () => '',
+    };
+  }) as unknown as typeof fetch;
+
+  try {
+    assert.equal(await getLatestBlockNumberForRun('ethereum'), 42);
+    assert.equal(await getLatestBlockNumberForRun('ethereum'), 42);
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('failed canonical state writes roll back in-memory pool progress', () => {
+  const addr = `0x${'c'.repeat(40)}`;
+  const legacyKey = `${addr}-polygon`;
+  const pools = { [addr]: { total_usd: 10, lastUpdated: 'old' } };
+  const checkpoint = {
+    [addr]: { lastTimestamp: 1, lastBlock: 1 },
+    [legacyKey]: { lastTimestamp: 0, lastBlock: 0 },
+  };
+
+  assert.throws(
+    () => commitPoolProgress(
+      pools,
+      checkpoint,
+      {
+        addr,
+        legacyCheckpointKey: legacyKey,
+        endTs: 2,
+        windowEndBlock: 2,
+        increment: 5,
+      },
+      () => {
+        throw new Error('disk full');
+      },
+    ),
+    (error: unknown) => error instanceof Error &&
+      (error as Error & { code?: string }).code === 'POOL_STATE_PERSIST_FAILED',
+  );
+  assert.deepEqual(pools[addr], { total_usd: 10, lastUpdated: 'old' });
+  assert.deepEqual(checkpoint[addr], { lastTimestamp: 1, lastBlock: 1 });
+  assert.deepEqual(checkpoint[legacyKey], { lastTimestamp: 0, lastBlock: 0 });
 });

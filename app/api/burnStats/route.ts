@@ -1,16 +1,24 @@
 import { NextResponse } from 'next/server';
+import { isLiveRpcRequestAuthorized } from '@/lib/liveRpcAccess';
 import { hasAnyRpcConfigured } from '@/lib/rpc';
 import { getBurnStatsBody } from '@/lib/burnStatsService';
 
 export async function GET(req: Request) {
   try {
-    if (!hasAnyRpcConfigured()) {
+    const url = new URL(req.url);
+    const forceFresh = url.searchParams.get('fresh') === '1' || url.searchParams.get('fresh') === 'true';
+
+    if (forceFresh && !isLiveRpcRequestAuthorized(req)) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+
+    if (forceFresh && !hasAnyRpcConfigured()) {
       console.error('[burnStats API] RPC API keys are not configured');
       return NextResponse.json({ error: 'Service misconfiguration' }, { status: 500 });
     }
-
-    const url = new URL(req.url);
-    const forceFresh = url.searchParams.get('fresh') === '1' || url.searchParams.get('fresh') === 'true';
 
     const { payload, healthy } = await getBurnStatsBody({ forceFresh });
 

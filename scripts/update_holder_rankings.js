@@ -47,6 +47,7 @@ const DEFAULT_LIMIT = 600;
 const DEFAULT_LOG_CHUNK = 20000;
 const DEFAULT_MIN_LOG_CHUNK = 500;
 const DEFAULT_SAVE_EVERY_BATCHES = 10;
+const DEFAULT_MAX_FALLBACK_LOG_WINDOWS = 2000;
 
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
 const BACKUP_INFURA_API_KEY = String(process.env.BACKUP_INFURA_API_KEY || '').trim();
@@ -115,6 +116,7 @@ const OUTPUT_FILE = path.join(OUTPUT_DIR, 'holder_rankings.json');
 
 let rpcCallCount = 0;
 let retryCount = 0;
+const disabledProviders = new Map();
 // chain -> Set<address> of holders whose Transfer-event sum went negative this
 // run and must be reconciled against on-chain balanceOf after the scan. IXS is
 // not a vanilla ERC-20 (its balanceOf is changed by mechanics that don't emit
@@ -293,10 +295,62 @@ async function paceRpcRequests() {
   lastRpcRequestAt = Date.now();
 }
 
+function computeRetryDelayMs(attempt, baseDelayMs, maxDelayMs) {
+  const exponential = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt - 1));
+  return Math.floor(exponential / 2 + Math.random() * (exponential / 2));
+}
+
+function parseRetryAfterMs(value, maxDelayMs, nowMs = Date.now()) {
+  if (value == null || value === '') return null;
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(maxDelayMs, Math.max(0, seconds * 1000));
+  }
+
+  const dateMs = Date.parse(String(value));
+  if (!Number.isFinite(dateMs)) return null;
+  return Math.min(maxDelayMs, Math.max(0, dateMs - nowMs));
+}
+
+function providerDisableKey(url, method) {
+  return `${String(method || '')} ${String(url || '')}`;
+}
+
+function shouldDisableProviderForRun(error) {
+  const status = Number((error && error.status) || Number.NaN);
+  const code = String((error && error.code) || '').toUpperCase();
+  const message = String((error && error.message) || '').toLowerCase();
+  if ([401, 403, 429].includes(status)) return true;
+  if (['RPC_UNAUTHORIZED', 'RPC_FORBIDDEN', 'RPC_RATE_LIMIT'].includes(code)) return true;
+  return /429|too many requests|rate limit|rate-limited|thrott|quota|forbidden|unauthorized/.test(message);
+}
+
+function disableProviderForRun(url, method, error) {
+  if (!shouldDisableProviderForRun(error)) return false;
+  const key = providerDisableKey(url, method);
+  if (!disabledProviders.has(key)) {
+    disabledProviders.set(key, {
+      code: String((error && error.code) || 'RPC_PROVIDER_DISABLED'),
+      message: String((error && error.message) || 'provider disabled for this run'),
+    });
+  }
+  return true;
+}
+
+function getDisabledProviderInfo(url, method) {
+  return disabledProviders.get(providerDisableKey(url, method)) || null;
+}
+
 async function requestWithRetries(url, options = {}) {
   const maxAttempts = Math.max(1, Number(process.env.API_MAX_ATTEMPTS || 5));
+  const maxRateLimitAttempts = Math.max(
+    1,
+    Math.min(maxAttempts, Number(process.env.API_RATE_LIMIT_MAX_ATTEMPTS || 2)),
+  );
   const baseDelayMs = Math.max(50, Number(process.env.API_BASE_DELAY_MS || 500));
   const maxDelayMs = Math.max(baseDelayMs, Number(process.env.API_MAX_DELAY_MS || 30000));
+  let rateLimitAttempts = 0;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
@@ -304,10 +358,21 @@ async function requestWithRetries(url, options = {}) {
       rpcCallCount += 1;
       const response = await fetch(url, options);
       if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
-        if (attempt === maxAttempts) return response;
+        if (response.status === 429) {
+          rateLimitAttempts += 1;
+          if (rateLimitAttempts >= maxRateLimitAttempts) return response;
+        } else if (attempt === maxAttempts) {
+          return response;
+        }
 
         retryCount += 1;
-        const waitMs = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt - 1));
+        const retryAfterMs = parseRetryAfterMs(
+          response.headers && response.headers.get('retry-after'),
+          maxDelayMs,
+        );
+        const waitMs = retryAfterMs != null && retryAfterMs > 0
+          ? retryAfterMs
+          : computeRetryDelayMs(attempt, baseDelayMs, maxDelayMs);
         await new Promise((resolve) => setTimeout(resolve, waitMs));
         continue;
       }
@@ -317,7 +382,7 @@ async function requestWithRetries(url, options = {}) {
       if (attempt === maxAttempts) throw error;
 
       retryCount += 1;
-      const waitMs = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt - 1));
+      const waitMs = computeRetryDelayMs(attempt, baseDelayMs, maxDelayMs);
       await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
   }
@@ -336,6 +401,14 @@ async function rpcCall(chain, method, params) {
   let lastError = null;
 
   for (const url of urls) {
+    const disabledInfo = getDisabledProviderInfo(url, method);
+    if (disabledInfo) {
+      lastError = new Error(
+        `Provider disabled for ${method} after ${disabledInfo.code}: ${disabledInfo.message}`,
+      );
+      continue;
+    }
+
     try {
       const response = await requestWithRetries(url, {
         method: 'POST',
@@ -350,7 +423,12 @@ async function rpcCall(chain, method, params) {
 
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(`RPC HTTP ${response.status} ${response.statusText} at ${url}: ${text}`);
+        const error = new Error(`RPC HTTP ${response.status} ${response.statusText} at ${url}: ${text}`);
+        error.status = response.status;
+        if (response.status === 401) error.code = 'RPC_UNAUTHORIZED';
+        else if (response.status === 403) error.code = 'RPC_FORBIDDEN';
+        else if (response.status === 429) error.code = 'RPC_RATE_LIMIT';
+        throw error;
       }
 
       const payload = await response.json();
@@ -361,6 +439,7 @@ async function rpcCall(chain, method, params) {
 
       return payload.result;
     } catch (error) {
+      disableProviderForRun(url, method, error);
       lastError = error;
     }
   }
@@ -376,6 +455,14 @@ async function alchemyCall(chain, method, params) {
 
   let lastError = null;
   for (const url of urls) {
+    const disabledInfo = getDisabledProviderInfo(url, method);
+    if (disabledInfo) {
+      lastError = new Error(
+        `Provider disabled for ${method} after ${disabledInfo.code}: ${disabledInfo.message}`,
+      );
+      continue;
+    }
+
     try {
       const response = await requestWithRetries(url, {
         method: 'POST',
@@ -390,7 +477,14 @@ async function alchemyCall(chain, method, params) {
 
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(`Alchemy HTTP ${response.status} ${response.statusText} for ${method} at ${url}: ${text}`);
+        const error = new Error(
+          `Alchemy HTTP ${response.status} ${response.statusText} for ${method} at ${url}: ${text}`,
+        );
+        error.status = response.status;
+        if (response.status === 401) error.code = 'RPC_UNAUTHORIZED';
+        else if (response.status === 403) error.code = 'RPC_FORBIDDEN';
+        else if (response.status === 429) error.code = 'RPC_RATE_LIMIT';
+        throw error;
       }
 
       const payload = await response.json();
@@ -401,6 +495,7 @@ async function alchemyCall(chain, method, params) {
 
       return payload.result;
     } catch (error) {
+      disableProviderForRun(url, method, error);
       lastError = error;
     }
   }
@@ -421,6 +516,62 @@ function fromRpcHex(value) {
     return Number.NaN;
   }
 }
+
+// Providers commonly include their permitted eth_getLogs span in the error.
+// Learning that exact ceiling avoids a long sequence of guaranteed failures
+// while halving from the configured 20k window.
+function inferMaxLogRangeFromError(error) {
+  const message = error instanceof Error ? error.message : String(error || '');
+
+  const rangeMatch = message.match(/up to a (\d+) block range/i);
+  if (rangeMatch) {
+    const parsed = Number(rangeMatch[1]);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+  }
+
+  const suggestedRangeMatch = message.match(
+    /should work:\s*\[(0x[0-9a-f]+),\s*(0x[0-9a-f]+)\]/i,
+  );
+  if (suggestedRangeMatch) {
+    const start = fromRpcHex(suggestedRangeMatch[1]);
+    const end = fromRpcHex(suggestedRangeMatch[2]);
+    if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+      return Math.floor(end - start + 1);
+    }
+  }
+
+  return null;
+}
+
+function createFallbackLogBudget(limitValue = process.env.HOLDER_RANKINGS_MAX_FALLBACK_LOG_WINDOWS) {
+  const parsed = Number(limitValue || DEFAULT_MAX_FALLBACK_LOG_WINDOWS);
+  const limit = Number.isFinite(parsed) && parsed > 0
+    ? Math.floor(parsed)
+    : DEFAULT_MAX_FALLBACK_LOG_WINDOWS;
+  let used = 0;
+
+  return {
+    consume(chain, fromBlock, toBlock) {
+      if (used >= limit) {
+        const error = new Error(
+          `[holder-rankings] fallback eth_getLogs budget exhausted after ${used} windows; ` +
+          `next unscanned range is ${chain} ${fromBlock}-${toBlock}`,
+        );
+        error.code = 'HOLDER_LOG_BUDGET_EXHAUSTED';
+        throw error;
+      }
+      used += 1;
+    },
+    get used() {
+      return used;
+    },
+    limit,
+  };
+}
+
+// Shared by all three chains so a provider-wide fallback incident has one
+// bounded request-window budget for the entire updater process.
+const fallbackLogBudget = createFallbackLogBudget();
 
 async function getLatestBlockRpc(chain) {
   const value = await rpcCall(chain, 'eth_blockNumber', []);
@@ -862,6 +1013,7 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
   // deps.fetchLogs / deps.persist are injectable for tests.
   const fetchLogs = deps.fetchLogs || fetchTransferLogs;
   const persist = deps.persist || persistState;
+  const logBudget = deps.logBudget || fallbackLogBudget;
   chainState.contractStartBlock = contractStartBlock;
 
   const lastScannedBlock = toNonNegativeInteger(chainState.lastScannedBlock);
@@ -897,6 +1049,8 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
 
   let cursor = startBlock;
   let chunkSize = maxChunk;
+  let learnedMaxChunk = maxChunk;
+  let effectiveMinChunk = minChunk;
   let logsFetched = 0;
   let logsApplied = 0;
   let batchesSinceSave = 0;
@@ -909,6 +1063,7 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
     const endBlock = Math.min(latestBlock, cursor + chunkSize - 1);
 
     try {
+      logBudget.consume(config.chain, cursor, endBlock);
       const logs = await fetchLogs(config.chain, config.address, cursor, endBlock);
       logsFetched += logs.length;
 
@@ -931,11 +1086,25 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
 
       cursor = endBlock + 1;
 
-      if (logs.length === 0 && chunkSize < maxChunk) {
-        chunkSize = Math.min(maxChunk, chunkSize * 2);
+      const growCeiling = Math.min(maxChunk, learnedMaxChunk);
+      if (logs.length === 0 && chunkSize < growCeiling) {
+        chunkSize = Math.min(growCeiling, chunkSize * 2);
       }
     } catch (error) {
-      if (chunkSize <= minChunk) {
+      if (error && error.code === 'HOLDER_LOG_BUDGET_EXHAUSTED') {
+        throw error;
+      }
+
+      const inferredMaxChunk = inferMaxLogRangeFromError(error);
+      if (inferredMaxChunk != null) {
+        learnedMaxChunk = Math.min(learnedMaxChunk, inferredMaxChunk);
+        // An explicit provider ceiling is stronger evidence than the operator's
+        // generic safety floor. Permit that exact smaller span, but never an
+        // arbitrary shrink below the floor for unrelated errors.
+        effectiveMinChunk = Math.min(effectiveMinChunk, inferredMaxChunk);
+      }
+
+      if (chunkSize <= effectiveMinChunk) {
         throw new Error(
           `[holder-rankings] ${config.chain}: failed scanning blocks ${cursor}-${endBlock}: ${
             error instanceof Error ? error.message : String(error)
@@ -943,7 +1112,9 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
         );
       }
 
-      const nextChunkSize = Math.max(minChunk, Math.floor(chunkSize / 2));
+      const nextChunkSize = inferredMaxChunk != null
+        ? Math.max(effectiveMinChunk, Math.min(chunkSize - 1, inferredMaxChunk))
+        : Math.max(effectiveMinChunk, Math.floor(chunkSize / 2));
       console.warn(
         `[holder-rankings] ${config.chain}: reducing log chunk ${chunkSize} -> ${nextChunkSize} after RPC error`,
       );
@@ -1177,4 +1348,12 @@ module.exports = {
   clearChainBalances,
   processChainViaAlchemyAssetTransfers,
   processChainViaStandardRpcLogs,
+  requestWithRetries,
+  parseRetryAfterMs,
+  providerDisableKey,
+  shouldDisableProviderForRun,
+  disableProviderForRun,
+  getDisabledProviderInfo,
+  inferMaxLogRangeFromError,
+  createFallbackLogBudget,
 };

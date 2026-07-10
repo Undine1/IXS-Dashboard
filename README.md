@@ -41,9 +41,13 @@ Create a `.env.local` in the project root.
 - `ALCHEMY_API_KEY` - primary shared RPC credential for Ethereum, Polygon, and Base
 - `BACKUP_INFURA_API_KEY` - optional Infura project key used as fallback
 - `BACKUP_CHAINSTACK_BASE_RPC_URL` - optional full HTTPS Chainstack Base RPC URL used as a third fallback for Base and by the hourly pool workflow keepalive ping
+- `RPC_LIVE_READ_TOKEN` - optional server-only token required in the `x-ixs-live-rpc-token` header when using the operational `?fresh=1` or `?debug=1` live-RPC bypasses
+- `MULTICALL3_ADDRESS` - optional override for the canonical Multicall3 deployment used to batch hourly snapshot reads
 - `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` - optional page size for Alchemy transfer pagination
 - `HOLDER_RANKINGS_EXCLUDED_ADDRESSES` - optional comma-separated addresses to hide from the public holder ranking
 - `HOLDER_RANKINGS_LOG_CHUNK` - optional initial `eth_getLogs` block span
+- `HOLDER_RANKINGS_MAX_FALLBACK_LOG_WINDOWS` - optional cross-chain cap for standard-RPC fallback windows per updater run (default `2000`)
+- `API_RATE_LIMIT_MAX_ATTEMPTS` - optional maximum attempts for a single 429 response path (default `2`; other transient failures retain `API_MAX_ATTEMPTS`)
 - `HOLDER_RANKINGS_MIN_LOG_CHUNK` - optional minimum block span after backoff
 - `HOLDER_RANKINGS_SAVE_EVERY_BATCHES` - optional save cadence during long bootstrap runs
 - `GH_PAT` - CI token used to push generated artifacts
@@ -95,8 +99,8 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - Production deploys are expected to come from Vercel's Git integration on pushes to `main`, not from the workflows themselves. Vercel does not honor `[skip ci]`, which is what makes data-commit deploys work.
 
 ## Data outputs
-- `public/data/pool_volume.json` - per-pool cumulative totals
-- `public/data/pool_volume_checkpoint.json` - per-pool scan checkpoints
+- `public/data/pool_volume.json` - per-pool cumulative totals and authoritative scan checkpoints
+- `public/data/pool_volume_checkpoint.json` - derived checkpoint compatibility/monitoring mirror
 - `public/data/pool_volume_runs.json` - pool updater run history (gitignored; uploaded as a CI artifact per run, not committed)
 - `public/data/pool_volume_alert.json` - pool updater alert output (gitignored; CI artifact only)
 - `public/data/holder_rankings.json` - top-holder snapshot served by `/api/holderRankings`

@@ -66,6 +66,7 @@ let totalPoolCount = 0;
 let successfulPoolCount = 0;
 let failedPoolCount = 0;
 const latestBlockCache = new Map();
+const latestBlockNumberCache = new Map();
 const disabledProviders = new Map();
 
 if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY && !BACKUP_CHAINSTACK_BASE_RPC_URL) {
@@ -526,12 +527,22 @@ async function getLatestBlockRpc(chain) {
   return n;
 }
 
+async function getLatestBlockNumberForRun(chain) {
+  if (latestBlockNumberCache.has(chain)) {
+    return latestBlockNumberCache.get(chain);
+  }
+
+  const latestNumber = await getLatestBlockRpc(chain);
+  latestBlockNumberCache.set(chain, latestNumber);
+  return latestNumber;
+}
+
 async function getLatestBlockState(chain) {
   if (latestBlockCache.has(chain)) {
     return latestBlockCache.get(chain);
   }
 
-  const latestNumber = await getLatestBlockRpc(chain);
+  const latestNumber = await getLatestBlockNumberForRun(chain);
   const latestBlock = await getBlockByNumberRpc(chain, latestNumber);
   latestBlockCache.set(chain, latestBlock);
   return latestBlock;
@@ -781,6 +792,10 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
         chunkSize = Math.min(growCeiling, chunkSize * 2);
       }
     } catch (error) {
+      if (error && error.code === 'POOL_STATE_PERSIST_FAILED') {
+        throw error;
+      }
+
       const inferredMaxChunk = inferMaxLogRangeFromError(error);
       if (inferredMaxChunk != null) {
         learnedMaxChunk = Math.min(learnedMaxChunk, inferredMaxChunk);
@@ -924,16 +939,92 @@ function writeFileAtomic(filePath, content) {
   }
 }
 
-function persistPoolFile(poolsMap) {
-  writeFileAtomic(
-    POOL_FILE,
-    JSON.stringify({ pools: poolsMap, lastUpdated: new Date().toISOString() }, null, 2),
+function selectAuthoritativeCheckpoint(poolState, legacyCheckpoint) {
+  if (
+    poolState &&
+    typeof poolState === 'object' &&
+    Object.prototype.hasOwnProperty.call(poolState, 'checkpoints')
+  ) {
+    return poolState.checkpoints &&
+      typeof poolState.checkpoints === 'object' &&
+      !Array.isArray(poolState.checkpoints)
+      ? poolState.checkpoints
+      : {};
+  }
+  return legacyCheckpoint &&
+    typeof legacyCheckpoint === 'object' &&
+    !Array.isArray(legacyCheckpoint)
+    ? legacyCheckpoint
+    : {};
+}
+
+function buildPoolState(poolsMap, checkpoint, lastUpdated = new Date().toISOString()) {
+  return { pools: poolsMap, checkpoints: checkpoint, lastUpdated };
+}
+
+// `pool_volume.json` is the authoritative transaction: totals and their scan
+// cursors are replaced in one atomic rename, so a process exit can expose
+// neither a new total with an old cursor nor the reverse. The historical
+// checkpoint file remains a derived compatibility/monitoring mirror only.
+function persistPoolState(poolsMap, checkpoint) {
+  writeFileAtomic(POOL_FILE, JSON.stringify(buildPoolState(poolsMap, checkpoint), null, 2));
+  try {
+    writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+  } catch (error) {
+    // The mirror must never make a successfully committed canonical state look
+    // failed to the scanner, or the caller could retry an already-counted
+    // window. A later run rebuilds the mirror from the embedded checkpoints.
+    console.warn(
+      `Unable to refresh checkpoint mirror after canonical commit: ${
+        error && error.message ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+function commitPoolProgress(
+  poolsMap,
+  checkpoint,
+  { addr, legacyCheckpointKey, endTs, windowEndBlock, increment },
+  persist = persistPoolState,
+) {
+  const hadPool = Object.prototype.hasOwnProperty.call(poolsMap, addr);
+  const previousPool = hadPool ? { ...poolsMap[addr] } : undefined;
+  const hadCheckpoint = Object.prototype.hasOwnProperty.call(checkpoint, addr);
+  const previousCheckpoint = checkpoint[addr];
+  const hadLegacyCheckpoint = Boolean(
+    legacyCheckpointKey && Object.prototype.hasOwnProperty.call(checkpoint, legacyCheckpointKey),
   );
+  const previousLegacyCheckpoint = legacyCheckpointKey ? checkpoint[legacyCheckpointKey] : undefined;
+
+  const currentPool = poolsMap[addr] && typeof poolsMap[addr] === 'object' ? poolsMap[addr] : {};
+  poolsMap[addr] = {
+    ...currentPool,
+    total_usd: Number(currentPool.total_usd || 0) + increment,
+    lastUpdated: new Date().toISOString(),
+  };
+  checkpoint[addr] = { lastTimestamp: endTs, lastBlock: windowEndBlock };
+  if (legacyCheckpointKey) delete checkpoint[legacyCheckpointKey];
+
+  try {
+    persist(poolsMap, checkpoint);
+  } catch (error) {
+    if (hadPool) poolsMap[addr] = previousPool;
+    else delete poolsMap[addr];
+    if (hadCheckpoint) checkpoint[addr] = previousCheckpoint;
+    else delete checkpoint[addr];
+    if (legacyCheckpointKey) {
+      if (hadLegacyCheckpoint) checkpoint[legacyCheckpointKey] = previousLegacyCheckpoint;
+      else delete checkpoint[legacyCheckpointKey];
+    }
+    if (error && typeof error === 'object') error.code = 'POOL_STATE_PERSIST_FAILED';
+    throw error;
+  }
 }
 
 async function main() {
   const now = Math.floor(Date.now() / 1000);
-  const checkpoint = readJson(CHECKPOINT, {});
+  const legacyCheckpoint = readJson(CHECKPOINT, {});
   const poolsRaw = readJson(POOL_FILE, {});
   // Normalize pool file formats:
   // - legacy: object where keys are pool addresses
@@ -952,6 +1043,7 @@ async function main() {
       poolsMap = poolsRaw;
     }
   }
+  const checkpoint = selectAuthoritativeCheckpoint(poolsRaw, legacyCheckpoint);
 
   // initialize alert file
   try {
@@ -981,7 +1073,7 @@ async function main() {
   const prunedCheckpointKeys = pruneCheckpoint(checkpoint, poolsMap);
   if (prunedCheckpointKeys > 0) {
     console.log(`Pruned ${prunedCheckpointKeys} stale checkpoint entries`);
-    writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+    persistPoolState(poolsMap, checkpoint);
   }
 
   for (const rawAddr of Object.keys(poolsMap)) {
@@ -1008,7 +1100,7 @@ async function main() {
         console.log(`Skipping ${addr}: checkpoint start (${startTs}) is not before end (${endTs})`);
         checkpoint[addr] = { lastTimestamp: endTs, lastBlock: poolCheckpoint.lastBlock || null };
         if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
-        writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+        persistPoolState(poolsMap, checkpoint);
         successfulPoolCount += 1;
         continue;
       }
@@ -1022,7 +1114,7 @@ async function main() {
         // save checkpoint to avoid reprocessing this bad entry repeatedly
         checkpoint[addr] = { lastTimestamp: endTs || now, lastBlock: null };
         if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
-        writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+        persistPoolState(poolsMap, checkpoint);
         failedPoolCount += 1;
         continue;
       }
@@ -1031,7 +1123,11 @@ async function main() {
       let endBlock;
       let source = 'alchemy-asset-transfers';
       startBlock = checkpointStartBlock != null ? checkpointStartBlock + 1 : await getBlockByTimestamp(startTs, chain);
-      endBlock = await getBlockByTimestamp(endTs, chain);
+      // This index is cumulative and resumes from a concrete block checkpoint,
+      // so the current head number is the exact end cursor we need. Resolving
+      // the current wall-clock timestamp back to a block fetched that same head
+      // and then fetched the full block solely to rediscover its number.
+      endBlock = await getLatestBlockNumberForRun(chain);
       if (!Number.isFinite(startBlock) || !Number.isFinite(endBlock)) {
         const err = new Error(`Invalid block range resolved: start=${startBlock}, end=${endBlock}`);
         err.code = 'INVALID_BLOCK_RANGE';
@@ -1044,7 +1140,7 @@ async function main() {
           lastBlock: clampCheckpointBlock(checkpointStartBlock, endBlock),
         };
         if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
-        writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
+        persistPoolState(poolsMap, checkpoint);
         successfulPoolCount += 1;
         continue;
       }
@@ -1056,7 +1152,7 @@ async function main() {
       }
 
       // Commit each scanned window incrementally: add its volume delta AND
-      // advance the checkpoint to its last block in the same persist, so a
+      // advance the checkpoint to its last block in one authoritative file, so a
       // scan interrupted partway through a large backlog (e.g. the free-tier
       // eth_getLogs fallback rate-limiting mid-run) keeps its progress. The
       // next run resumes from lastBlock+1, so no window is rescanned (which
@@ -1066,13 +1162,12 @@ async function main() {
       let runTotalUsdc = 0;
       const commitProgress = (windowEndBlock, windowRaw) => {
         const increment = Number(windowRaw) / Math.pow(10, tokenDecimals);
-        poolsMap[addr].total_usd = Number(poolsMap[addr].total_usd || 0) + increment;
-        poolsMap[addr].lastUpdated = new Date().toISOString();
+        commitPoolProgress(
+          poolsMap,
+          checkpoint,
+          { addr, legacyCheckpointKey, endTs, windowEndBlock, increment },
+        );
         runTotalUsdc += increment;
-        checkpoint[addr] = { lastTimestamp: endTs, lastBlock: windowEndBlock };
-        if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
-        persistPoolFile(poolsMap);
-        writeFileAtomic(CHECKPOINT, JSON.stringify(checkpoint, null, 2));
       };
 
       try {
@@ -1086,6 +1181,9 @@ async function main() {
           commitProgress,
         );
       } catch (error) {
+        if (error && error.code === 'POOL_STATE_PERSIST_FAILED') {
+          throw error;
+        }
         console.warn(
           `[pool-volume] ${chain}: alchemy_getAssetTransfers failed, falling back to eth_getLogs: ${
             error && error.message ? error.message : String(error)
@@ -1175,4 +1273,8 @@ module.exports = {
   sumTokenTransfersViaRpc,
   sumTokenTransfersViaAlchemyAssetTransfers,
   inferMaxLogRangeFromError,
+  getLatestBlockNumberForRun,
+  selectAuthoritativeCheckpoint,
+  buildPoolState,
+  commitPoolProgress,
 };

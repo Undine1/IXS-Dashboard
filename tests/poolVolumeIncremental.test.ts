@@ -75,6 +75,47 @@ test('eth_getLogs scan commits per-window progress and stops at the failing wind
   ], 'committed windows 0-9 (5) and 10-19 (3); nothing for the failed 20-29');
 });
 
+test('eth_getLogs scan stops immediately when canonical progress persistence fails', async () => {
+  const originalMaxChunk = process.env.RPC_LOG_BLOCK_CHUNK;
+  const originalMinChunk = process.env.RPC_MIN_LOG_BLOCK_CHUNK;
+  process.env.RPC_LOG_BLOCK_CHUNK = '20';
+  process.env.RPC_MIN_LOG_BLOCK_CHUNK = '10';
+  const requestedFromBlocks: number[] = [];
+
+  globalThis.fetch = (async (_url: string | URL, opts?: { body?: string }) => {
+    const body = JSON.parse(String((opts && opts.body) || '{}'));
+    const p = body.params && body.params[0];
+    const from = parseInt(p.fromBlock, 16);
+    requestedFromBlocks.push(from);
+    const outgoing = Array.isArray(p.topics) && p.topics.length === 2;
+    const logs = outgoing
+      ? [{ transactionHash: `0x${'3'.repeat(64)}`, logIndex: '0x0', data: '0x05' }]
+      : [];
+    return ok({ jsonrpc: '2.0', id: 1, result: logs });
+  }) as unknown as typeof fetch;
+
+  let commitAttempts = 0;
+  try {
+    await assert.rejects(
+      () => sumTokenTransfersViaRpc(0, 39, pair, usdc, 'ethereum', 0, () => {
+        commitAttempts += 1;
+        throw Object.assign(new Error('canonical state write failed'), {
+          code: 'POOL_STATE_PERSIST_FAILED',
+        });
+      }),
+      (error: unknown) => error instanceof Error &&
+        (error as Error & { code?: string }).code === 'POOL_STATE_PERSIST_FAILED',
+    );
+    assert.equal(commitAttempts, 1);
+    assert.deepEqual(requestedFromBlocks, [0, 0], 'no later block window is scanned');
+  } finally {
+    if (originalMaxChunk === undefined) delete process.env.RPC_LOG_BLOCK_CHUNK;
+    else process.env.RPC_LOG_BLOCK_CHUNK = originalMaxChunk;
+    if (originalMinChunk === undefined) delete process.env.RPC_MIN_LOG_BLOCK_CHUNK;
+    else process.env.RPC_MIN_LOG_BLOCK_CHUNK = originalMinChunk;
+  }
+});
+
 // Each test uses a distinct chain: the disabled-provider map is module-level
 // and keyed by (method, url), so a ban raised in one test would otherwise leak
 // into the next via the shared module instance.

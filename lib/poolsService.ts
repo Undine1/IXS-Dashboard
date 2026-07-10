@@ -3,6 +3,7 @@
 import type { ChainNetwork } from '../types';
 import { getRpcUrls, hasAnyRpcConfigured, rpcCall, sleep } from './rpc';
 import { bigintToDecimalNumber, normalizeAddressFromHex, parseHexInt } from './poolMath';
+import { poolReserveReadKey, type PrefetchedOnchainReads } from './onchainReadKeys';
 import { POOLS, type PoolConfig } from './poolsConfig';
 import { readSnapshotSection } from './onchainSnapshot';
 
@@ -101,7 +102,11 @@ function poolPricingTier(pool: PoolConfig): number {
   return 2;
 }
 
-async function fetchPoolValue(pool: PoolConfig, prices: Prices): Promise<FetchPoolResult> {
+async function fetchPoolValue(
+  pool: PoolConfig,
+  prices: Prices,
+  prefetchedReads?: PrefetchedOnchainReads,
+): Promise<FetchPoolResult> {
   const rpcUrls = getRpcUrls(pool.network);
 
   try {
@@ -148,12 +153,22 @@ async function fetchPoolValue(pool: PoolConfig, prices: Prices): Promise<FetchPo
       decimals1 = parseHexInt(decimals1Hex, 'token1 decimals');
     }
 
-    const reservesHex = await rpcCall(rpcUrls, {
-      jsonrpc: '2.0',
-      id: 5,
-      method: 'eth_call',
-      params: [{ to: pool.address, data: '0x0902f1ac' }, 'latest'],
-    });
+    const reserveKey = poolReserveReadKey(pool.network, pool.address);
+    let reservesHex: string;
+    if (prefetchedReads?.has(reserveKey)) {
+      const prefetched = prefetchedReads.get(reserveKey);
+      if (typeof prefetched !== 'string') {
+        throw new Error('Multicall reserves subcall failed');
+      }
+      reservesHex = prefetched;
+    } else {
+      reservesHex = await rpcCall(rpcUrls, {
+        jsonrpc: '2.0',
+        id: 5,
+        method: 'eth_call',
+        params: [{ to: pool.address, data: '0x0902f1ac' }, 'latest'],
+      });
+    }
 
     if (reservesHex.length < 130) {
       throw new Error('invalid reserves result');
@@ -234,6 +249,21 @@ async function fetchPoolValue(pool: PoolConfig, prices: Prices): Promise<FetchPo
 const POOLS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 let cachedBody: PoolsResponseBody | null = null;
 let cachedAtMs = 0;
+const poolsInFlight = new Map<'canonical' | 'debug', Promise<PoolsServiceResult>>();
+
+function computePoolsBodySingleFlight(debugMode: boolean): Promise<PoolsServiceResult> {
+  const key = debugMode ? 'debug' : 'canonical';
+  const existing = poolsInFlight.get(key);
+  if (existing) return existing;
+
+  const pending = computePoolsBody({ debug: debugMode }).finally(() => {
+    if (poolsInFlight.get(key) === pending) {
+      poolsInFlight.delete(key);
+    }
+  });
+  poolsInFlight.set(key, pending);
+  return pending;
+}
 
 export async function getPoolsBody(
   options: { forceFresh?: boolean; debug?: boolean } = {},
@@ -254,7 +284,7 @@ export async function getPoolsBody(
     }
   }
 
-  const result = await computePoolsBody({ debug: debugMode });
+  const result = await computePoolsBodySingleFlight(debugMode);
 
   // Only cache the canonical (non-debug) payload, and only when healthy.
   if (!debugMode && result.healthy) {
@@ -268,7 +298,7 @@ export async function getPoolsBody(
 // Pure live RPC fan-out, no snapshot/cache involvement. Exported for the CI
 // snapshot script.
 export async function computePoolsBody(
-  options: { debug?: boolean } = {},
+  options: { debug?: boolean; prefetchedReads?: PrefetchedOnchainReads } = {},
 ): Promise<PoolsServiceResult> {
   const debugMode = Boolean(options.debug);
 
@@ -294,7 +324,7 @@ export async function computePoolsBody(
     }
     processedAny = true;
 
-    const result = await fetchPoolValue(pool, prices);
+    const result = await fetchPoolValue(pool, prices, options.prefetchedReads);
     if (result.derivedIxsPrice && result.derivedIxsPrice > 0) {
       const current = prices[pool.network] || {};
       current.ixs = { usd: result.derivedIxsPrice };

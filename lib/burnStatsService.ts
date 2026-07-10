@@ -1,6 +1,7 @@
 // Relative imports (not the @/ alias) so scripts/update_onchain_snapshot.ts
 // can run this module under tsx in CI.
 import type { ChainNetwork } from '../types';
+import { burnBalanceReadKey, type PrefetchedOnchainReads } from './onchainReadKeys';
 import { getRpcUrls, rpcCall, sleep } from './rpc';
 import { readSnapshotSection } from './onchainSnapshot';
 
@@ -52,10 +53,35 @@ function isValidAddress(address: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
 
+export type BurnBalanceReadRequest = {
+  network: ChainNetwork;
+  tokenAddress: string;
+  holderAddress: string;
+};
+
+export function getBurnBalanceReadRequests(): BurnBalanceReadRequest[] {
+  const configs: Array<[ChainNetwork, string, string[]]> = [
+    ['ethereum', ETH_TOKEN_ADDRESS, ETH_BURN_ADDRESSES],
+    ['polygon', POLYGON_TOKEN_ADDRESS, POLYGON_BURN_ADDRESSES],
+    ['base', BASE_TOKEN_ADDRESS, BASE_BURN_ADDRESSES],
+  ];
+  const requests: BurnBalanceReadRequest[] = [];
+
+  for (const [network, tokenAddress, burnAddresses] of configs) {
+    if (!isValidAddress(tokenAddress)) continue;
+    for (const holderAddress of burnAddresses) {
+      if (!isValidAddress(holderAddress)) continue;
+      requests.push({ network, tokenAddress, holderAddress });
+    }
+  }
+  return requests;
+}
+
 async function fetchBalancesForNetwork(
   tokenAddress: string,
   burnAddresses: string[],
   network: ChainNetwork,
+  prefetchedReads?: PrefetchedOnchainReads,
 ): Promise<Record<string, string | null>> {
   const balances: Record<string, string | null> = {};
 
@@ -64,13 +90,8 @@ async function fetchBalancesForNetwork(
     return balances;
   }
 
-  const urls = getRpcUrls(network);
-  if (!urls.length) {
-    console.error(`[burnStats service] RPC provider is not configured for ${network}`);
-    return balances;
-  }
-
-  let madePriorCall = false;
+  let urls: string[] | null = null;
+  let madePriorRpcCall = false;
   for (const address of burnAddresses) {
     const trimmedAddress = address.trim();
 
@@ -80,25 +101,38 @@ async function fetchBalancesForNetwork(
       continue;
     }
 
-    // Pace between RPC calls only — no trailing sleep after the last address.
-    if (madePriorCall) {
-      await sleep(WAIT_BETWEEN_REQUESTS_MS);
-    }
-    madePriorCall = true;
-
+    // Prefetched Multicall values need no delay; individual fallback calls are
+    // paced below when a chain-wide batch was unavailable.
     try {
-      const result = await rpcCall(urls, {
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'eth_call',
-        params: [
-          {
-            to: tokenAddress,
-            data: `0x70a08231000000000000000000000000${trimmedAddress.slice(2)}`,
-          },
-          'latest',
-        ],
-      });
+      const readKey = burnBalanceReadKey(network, tokenAddress, trimmedAddress);
+      let result: string;
+      if (prefetchedReads?.has(readKey)) {
+        const prefetched = prefetchedReads.get(readKey);
+        if (typeof prefetched !== 'string') {
+          throw new Error('Multicall balanceOf subcall failed');
+        }
+        result = prefetched;
+      } else {
+        if (urls === null) urls = getRpcUrls(network);
+        if (!urls.length) {
+          throw new Error(`RPC provider is not configured for ${network}`);
+        }
+
+        if (madePriorRpcCall) await sleep(WAIT_BETWEEN_REQUESTS_MS);
+        madePriorRpcCall = true;
+        result = await rpcCall(urls, {
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_call',
+          params: [
+            {
+              to: tokenAddress,
+              data: `0x70a08231000000000000000000000000${trimmedAddress.slice(2)}`,
+            },
+            'latest',
+          ],
+        });
+      }
 
       const balance = BigInt(result).toString();
       balances[trimmedAddress] = /^\d+$/.test(balance) ? balance : null;
@@ -117,6 +151,19 @@ async function fetchBalancesForNetwork(
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 let cachedData: BurnStatsApiResponse | null = null;
 let lastFetchTime = 0;
+let burnStatsInFlight: Promise<BurnStatsServiceResult> | null = null;
+
+function computeBurnStatsSingleFlight(): Promise<BurnStatsServiceResult> {
+  if (burnStatsInFlight) return burnStatsInFlight;
+
+  const pending = computeBurnStats().finally(() => {
+    if (burnStatsInFlight === pending) {
+      burnStatsInFlight = null;
+    }
+  });
+  burnStatsInFlight = pending;
+  return pending;
+}
 
 export async function getBurnStatsBody(
   options: { forceFresh?: boolean } = {},
@@ -142,7 +189,7 @@ export async function getBurnStatsBody(
     }
   }
 
-  const result = await computeBurnStats();
+  const result = await computeBurnStatsSingleFlight();
 
   if (result.healthy) {
     cachedData = result.payload;
@@ -154,16 +201,33 @@ export async function getBurnStatsBody(
 
 // Pure live RPC fan-out, no snapshot/cache involvement. Exported for the CI
 // snapshot script.
-export async function computeBurnStats(): Promise<BurnStatsServiceResult> {
+export async function computeBurnStats(
+  options: { prefetchedReads?: PrefetchedOnchainReads } = {},
+): Promise<BurnStatsServiceResult> {
   const [ethereumBalances, polygonBalances, baseBalances] = [
     ETH_TOKEN_ADDRESS && ETH_BURN_ADDRESSES.length > 0
-      ? await fetchBalancesForNetwork(ETH_TOKEN_ADDRESS, ETH_BURN_ADDRESSES, 'ethereum')
+      ? await fetchBalancesForNetwork(
+          ETH_TOKEN_ADDRESS,
+          ETH_BURN_ADDRESSES,
+          'ethereum',
+          options.prefetchedReads,
+        )
       : {},
     POLYGON_TOKEN_ADDRESS && POLYGON_BURN_ADDRESSES.length > 0
-      ? await fetchBalancesForNetwork(POLYGON_TOKEN_ADDRESS, POLYGON_BURN_ADDRESSES, 'polygon')
+      ? await fetchBalancesForNetwork(
+          POLYGON_TOKEN_ADDRESS,
+          POLYGON_BURN_ADDRESSES,
+          'polygon',
+          options.prefetchedReads,
+        )
       : {},
     BASE_TOKEN_ADDRESS && BASE_BURN_ADDRESSES.length > 0
-      ? await fetchBalancesForNetwork(BASE_TOKEN_ADDRESS, BASE_BURN_ADDRESSES, 'base')
+      ? await fetchBalancesForNetwork(
+          BASE_TOKEN_ADDRESS,
+          BASE_BURN_ADDRESSES,
+          'base',
+          options.prefetchedReads,
+        )
       : {},
   ];
 

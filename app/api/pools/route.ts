@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isLiveRpcRequestAuthorized } from '@/lib/liveRpcAccess';
 import { getPoolsBody } from '@/lib/poolsService';
 
 export async function GET(req: Request) {
@@ -6,6 +7,13 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const debugMode = url.searchParams.get('debug') === '1' || url.searchParams.get('debug') === 'true';
     const forceFresh = url.searchParams.get('fresh') === '1' || url.searchParams.get('fresh') === 'true';
+
+    if ((debugMode || forceFresh) && !isLiveRpcRequestAuthorized(req)) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
 
     const { body, healthy } = await getPoolsBody({ debug: debugMode, forceFresh });
 

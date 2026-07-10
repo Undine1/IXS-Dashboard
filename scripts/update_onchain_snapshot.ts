@@ -1,6 +1,8 @@
 /**
  * Hourly snapshot of the on-demand chain reads: pool reserve valuations (TVL)
- * and burn-address balances. Running this in CI lets the Vercel routes serve
+ * and burn-address balances. Reads are grouped into one Multicall3 eth_call per
+ * configured chain, with individual RPC fallback if a whole batch fails.
+ * Running this in CI lets the Vercel routes serve
  * a deployment-baked file instead of fanning out RPC calls per request — the
  * live RPC path in lib/poolsService + lib/burnStatsService remains only as a
  * fallback (missing/stale snapshot, ?fresh=1, ?debug=1).
@@ -75,9 +77,11 @@ async function main(): Promise<void> {
   // their module-level configuration.
   const { computePoolsBody } = await import('../lib/poolsService');
   const { computeBurnStats } = await import('../lib/burnStatsService');
+  const { prefetchSnapshotRpcReads } = await import('../lib/snapshotRpcBatch');
 
-  const poolsResult = await computePoolsBody();
-  const burnResult = await computeBurnStats();
+  const prefetchedReads = await prefetchSnapshotRpcReads();
+  const poolsResult = await computePoolsBody({ prefetchedReads });
+  const burnResult = await computeBurnStats({ prefetchedReads });
 
   const generatedAt = new Date().toISOString();
   const previous = readPreviousSnapshot();

@@ -14,6 +14,14 @@ const {
   ensureChainState,
   processChainViaAlchemyAssetTransfers,
   processChainViaStandardRpcLogs,
+  requestWithRetries,
+  parseRetryAfterMs,
+  providerDisableKey,
+  shouldDisableProviderForRun,
+  disableProviderForRun,
+  getDisabledProviderInfo,
+  inferMaxLogRangeFromError,
+  createFallbackLogBudget,
 } = holderRankings;
 
 const ZERO = `0x${'0'.repeat(40)}`;
@@ -40,6 +48,152 @@ const pager = (pages: any[]) => {
 };
 const noPersist = () => {};
 const ethConfig = () => ({ chain: 'ethereum', address: TOKEN, decimals: 18 });
+
+test('Retry-After parsing supports seconds, dates, caps, and invalid values', () => {
+  const now = Date.parse('2026-01-01T00:00:00.000Z');
+  assert.equal(parseRetryAfterMs('2', 10_000, now), 2_000);
+  assert.equal(parseRetryAfterMs('20', 5_000, now), 5_000);
+  assert.equal(parseRetryAfterMs('Thu, 01 Jan 2026 00:00:03 GMT', 10_000, now), 3_000);
+  assert.equal(parseRetryAfterMs('invalid', 10_000, now), null);
+});
+
+test('provider cooldown is scoped to the RPC method', () => {
+  const url = 'https://provider.example/rpc';
+  assert.notEqual(providerDisableKey(url, 'eth_call'), providerDisableKey(url, 'eth_getLogs'));
+  assert.equal(shouldDisableProviderForRun({ status: 429 }), true);
+  assert.equal(shouldDisableProviderForRun({ message: 'execution reverted' }), false);
+
+  assert.equal(disableProviderForRun(url, 'eth_call', { code: 'RPC_RATE_LIMIT' }), true);
+  assert.ok(getDisabledProviderInfo(url, 'eth_call'));
+  assert.equal(getDisabledProviderInfo(url, 'eth_getLogs'), null);
+});
+
+test('429 responses use Retry-After and stop after the bounded attempt count', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = {
+    API_MAX_ATTEMPTS: process.env.API_MAX_ATTEMPTS,
+    API_RATE_LIMIT_MAX_ATTEMPTS: process.env.API_RATE_LIMIT_MAX_ATTEMPTS,
+    RPC_MIN_INTERVAL_MS: process.env.RPC_MIN_INTERVAL_MS,
+  };
+  let calls = 0;
+
+  process.env.API_MAX_ATTEMPTS = '5';
+  process.env.API_RATE_LIMIT_MAX_ATTEMPTS = '2';
+  process.env.RPC_MIN_INTERVAL_MS = '0';
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return {
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      headers: { get: () => '0.001' },
+      json: async () => ({}),
+      text: async () => 'rate limited',
+    };
+  }) as unknown as typeof fetch;
+
+  try {
+    const response = await requestWithRetries('https://rate-limit.example/rpc');
+    assert.equal(response.status, 429);
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+test('range hints are parsed from provider ceiling errors', () => {
+  assert.equal(
+    inferMaxLogRangeFromError(
+      new Error('Under the Free tier plan, you can make eth_getLogs requests with up to a 10 block range.'),
+    ),
+    10,
+  );
+  assert.equal(
+    inferMaxLogRangeFromError(new Error('Based on your parameters, this block range should work: [0x64, 0x6d].')),
+    10,
+  );
+  assert.equal(inferMaxLogRangeFromError(new Error('rate limited')), null);
+});
+
+test('standard log fallback follows an explicit range hint below the configured floor', async () => {
+  const originalChunk = process.env.HOLDER_RANKINGS_LOG_CHUNK;
+  const originalMinChunk = process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK;
+  process.env.HOLDER_RANKINGS_LOG_CHUNK = '20000';
+  process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK = '500';
+
+  const state = createDefaultState();
+  const config = ethConfig();
+  const chainState = ensureChainState(state, config, 30);
+  const spans: number[] = [];
+  let first = true;
+
+  try {
+    await processChainViaStandardRpcLogs(state, chainState, config, 30, 0, {
+      fetchLogs: async (_chain: string, _token: string, from: number, to: number) => {
+        spans.push(to - from + 1);
+        if (first) {
+          first = false;
+          throw new Error('you can make eth_getLogs requests with up to a 10 block range');
+        }
+        return [];
+      },
+      persist: noPersist,
+      logBudget: createFallbackLogBudget(20),
+    });
+
+    assert.deepEqual(spans, [31, 10, 10, 10, 1]);
+  } finally {
+    if (originalChunk === undefined) delete process.env.HOLDER_RANKINGS_LOG_CHUNK;
+    else process.env.HOLDER_RANKINGS_LOG_CHUNK = originalChunk;
+    if (originalMinChunk === undefined) delete process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK;
+    else process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK = originalMinChunk;
+  }
+});
+
+test('standard log fallback stops cleanly at the shared window budget', async () => {
+  const originalChunk = process.env.HOLDER_RANKINGS_LOG_CHUNK;
+  const originalMinChunk = process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK;
+  const originalSaveEvery = process.env.HOLDER_RANKINGS_SAVE_EVERY_BATCHES;
+  process.env.HOLDER_RANKINGS_LOG_CHUNK = '10';
+  process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK = '10';
+  process.env.HOLDER_RANKINGS_SAVE_EVERY_BATCHES = '1';
+
+  const state = createDefaultState();
+  const config = ethConfig();
+  const chainState = ensureChainState(state, config, 99);
+  const persistedBlocks: number[] = [];
+  let first = true;
+
+  try {
+    await assert.rejects(
+      () => processChainViaStandardRpcLogs(state, chainState, config, 99, 0, {
+        fetchLogs: async () => {
+          if (first) {
+            first = false;
+            throw new Error('you can make eth_getLogs requests with up to a 10 block range');
+          }
+          return [];
+        },
+        persist: () => persistedBlocks.push(chainState.lastScannedBlock),
+        logBudget: createFallbackLogBudget(2),
+      }),
+      /budget exhausted after 2 windows/,
+    );
+    assert.equal(chainState.lastScannedBlock, 9);
+    assert.deepEqual(persistedBlocks, [9]);
+  } finally {
+    if (originalChunk === undefined) delete process.env.HOLDER_RANKINGS_LOG_CHUNK;
+    else process.env.HOLDER_RANKINGS_LOG_CHUNK = originalChunk;
+    if (originalMinChunk === undefined) delete process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK;
+    else process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK = originalMinChunk;
+    if (originalSaveEvery === undefined) delete process.env.HOLDER_RANKINGS_SAVE_EVERY_BATCHES;
+    else process.env.HOLDER_RANKINGS_SAVE_EVERY_BATCHES = originalSaveEvery;
+  }
+});
 
 test('isValidAddress accepts 20-byte hex and rejects others', () => {
   assert.equal(isValidAddress(A), true);
