@@ -152,14 +152,14 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[#0B1120] p-4 md:p-8 transition-colors duration-300">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8 relative overflow-hidden rounded-3xl border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white shadow-[0_20px_70px_-35px_rgba(2,6,23,0.9)]">
+    <main className="ixs-dashboard-shell min-h-screen bg-[#0B1120] p-4 md:p-8 transition-colors duration-300">
+      <div className="ixs-dashboard-container max-w-7xl mx-auto">
+        <div className="ixs-dashboard-hero mb-8 relative overflow-hidden rounded-3xl border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white shadow-[0_20px_70px_-35px_rgba(2,6,23,0.9)]">
           <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(to_right,rgba(148,163,184,0.25)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.25)_1px,transparent_1px)] [background-size:32px_32px]" />
           <div className="absolute -top-20 -left-14 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
           <div className="absolute -bottom-24 -right-8 h-72 w-72 rounded-full bg-emerald-400/15 blur-3xl" />
 
-          <div className="relative z-10 grid gap-6 p-6 md:p-8 lg:grid-cols-[1.25fr_1fr] lg:items-end">
+          <div className="ixs-dashboard-hero-content relative z-10 grid gap-6 p-6 md:p-8 lg:grid-cols-[1.25fr_1fr] lg:items-end">
             <div>
               <h1 className="text-3xl font-semibold leading-tight md:text-4xl">IXS Statistics</h1>
               <p className="mt-3 max-w-2xl text-sm text-slate-200/85 md:text-base">
@@ -167,8 +167,8 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-              <div className="rounded-2xl border border-white/15 bg-white/6 px-4 py-3 backdrop-blur-sm">
+            <div className="ixs-dashboard-status-grid grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              <div className="ixs-dashboard-status-card rounded-2xl border border-white/15 bg-white/6 px-4 py-3 backdrop-blur-sm">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Burn Engine</p>
                 <div className="mt-2 flex items-center gap-2">
                   <span className={`h-2.5 w-2.5 rounded-full ${statusTone(burnEngineStatus)}`} />
@@ -176,7 +176,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/15 bg-white/6 px-4 py-3 backdrop-blur-sm">
+              <div className="ixs-dashboard-status-card rounded-2xl border border-white/15 bg-white/6 px-4 py-3 backdrop-blur-sm">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Pool Indexer</p>
                 <div className="mt-2 flex items-center gap-2">
                   <span className={`h-2.5 w-2.5 rounded-full ${statusTone(poolIndexerStatus)}`} />
@@ -184,7 +184,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/15 bg-white/6 px-4 py-3 backdrop-blur-sm">
+              <div className="ixs-dashboard-status-card rounded-2xl border border-white/15 bg-white/6 px-4 py-3 backdrop-blur-sm">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Last Sync</p>
                 <p className="mt-2 text-sm font-semibold text-white">{loading ? 'Syncing...' : lastSync}</p>
               </div>
@@ -193,7 +193,7 @@ export default function Dashboard() {
         </div>
 
         {loading ? (
-          <div className="py-8 md:py-10">
+          <div className="ixs-dashboard-loading py-8 md:py-10">
             <div className="mx-auto w-full max-w-2xl">
               <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                 <span>Updating Statistics</span>
