@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-08-01T19:38:24.297Z",
+    "generatedAt": "2026-08-01T21:12:23.911Z",
     "data": {
       "pools": [
         {
@@ -16,7 +16,7 @@
             "decimals0": 6,
             "decimals1": 18
           },
-          "value": 34635.742374
+          "value": 34664.233234
         },
         {
           "type": "Crypto",
@@ -29,7 +29,7 @@
             "decimals0": 18,
             "decimals1": 6
           },
-          "value": 20287.305
+          "value": 20085.054046
         },
         {
           "type": "RWA",
@@ -42,7 +42,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 24614.292740710218
+          "value": 24125.239091891806
         },
         {
           "type": "RWA",
@@ -55,7 +55,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 10539.071004031231
+          "value": 10329.673513558018
         },
         {
           "type": "RWA",
@@ -69,7 +69,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 6268.509198972451
+          "value": 6143.962159221887
         },
         {
           "type": "RWA",
@@ -83,13 +83,13 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 1916.9934010092618
+          "value": 1878.9052614311615
         }
       ]
     }
   },
   "burnStats": {
-    "generatedAt": "2026-08-01T19:38:24.297Z",
+    "generatedAt": "2026-08-01T21:12:23.911Z",
     "data": {
       "ethereum": {
         "balances": {
