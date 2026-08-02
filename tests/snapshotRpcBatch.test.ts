@@ -60,7 +60,16 @@ test('hourly snapshot prefetch emits one Multicall3 request per configured chain
   }) as unknown as typeof fetch;
 
   try {
-    const { prefetchSnapshotRpcReads } = await import('../lib/snapshotRpcBatch');
+    const { createSnapshotRpcReadGroups, prefetchSnapshotRpcReads } = await import(
+      '../lib/snapshotRpcBatch'
+    );
+    const grouped = createSnapshotRpcReadGroups();
+    assert.deepEqual(
+      Object.fromEntries(
+        Object.entries(grouped).map(([network, calls]) => [network, calls.length]),
+      ),
+      { ethereum: 3, polygon: 6, base: 2 },
+    );
     const reads = await prefetchSnapshotRpcReads();
 
     assert.equal(reads.size, 11);

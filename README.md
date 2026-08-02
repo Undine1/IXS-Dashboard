@@ -8,10 +8,10 @@ A production-ready analytics dashboard that tracks IXS token burns, Total Value 
 - App entry: [app/page.tsx](app/page.tsx)
 - APIs: [app/api/pools/route.ts](app/api/pools/route.ts), [app/api/burnStats/route.ts](app/api/burnStats/route.ts), [app/api/holderRankings/route.ts](app/api/holderRankings/route.ts)
 - Components: [components/BurnStats.tsx](components/BurnStats.tsx)
-- Scripts: `scripts/update_pool_volume_indexer.js`, `scripts/update_holder_rankings.js`
+- Scripts: `scripts/update_pool_volume_indexer.js`, `scripts/update_holder_rankings.js`, `scripts/probe_eth_call_many.ts`
 - Data outputs (committed): `public/data/pool_volume.json`, `public/data/holder_rankings.json`, `public/data/pool_volume_checkpoint.json`, `public/data/onchain_snapshot.json`
 - Debug outputs (CI artifacts only, gitignored): `public/data/pool_volume_runs.json`, `public/data/pool_volume_alert.json`
-- CI workflows: `.github/workflows/update-dashboard-data.yml`, `.github/workflows/codeql.yml`
+- CI workflows: `.github/workflows/update-dashboard-data.yml`, `.github/workflows/probe-eth-call-many.yml`, `.github/workflows/codeql.yml`
 
 ## Project overview
 - Purpose: Track cumulative token burns, pool TVL (USD), and IXS holder rankings using on-chain derived data where possible.
@@ -102,6 +102,8 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - The deployment-baked holder-ranking and pool-volume API responses are prerendered and retained by Vercel's CDN for the lifetime of that immutable deployment; malformed baked snapshots fail the new build so the previous healthy deployment remains active. `/api/syncStatus` stays dynamic with a five-minute shared-cache TTL.
 - Authorized live pool/burn fallbacks batch reads into one Multicall3 request per involved chain; any failed batch or subcall falls back to the existing individual provider path.
 - The config-triggered pool metadata verifier uses two dependent Multicall3 phases per involved chain (pair token addresses, then those actual tokens' decimals), reducing its healthy path from 24 to 4 physical RPC calls while retaining individual fallback for failed or malformed results.
+- `.github/workflows/probe-eth-call-many.yml` runs a daily, read-only shadow comparison that wraps the exact production Multicall3 target and calldata in one Alchemy `eth_callMany` transaction at the same explicit block on Ethereum, Polygon, and Base. Its artifact is diagnostic only and is never consumed by the dashboard or committed; the temporary evidence run costs about 288 estimated Alchemy CU per day. Polygon-only fee/gas shaping and missing-`0x` transport normalization are explicit in the artifact.
+- `eth_callMany` is not auto-promoted. A manual change is allowed only after at least 30 consecutive accepted daily artifacts spanning at least seven days show exact block, cardinality, order, aggregate return-data, and forced-revert isolation parity on all three chains, with no reorg-tainted sample counted. Every counted artifact must have the same evidence-set identity digest; a read-plan, Multicall address, algorithm, provider-network, shaping, or decoding-policy change resets the streak. Multicall3 remains the production path and fallback.
 - The two updater steps are independent: a pool-updater failure does not block the holder rankings step (and vice versa), and the commit step pushes whatever valid progress was produced so the next run resumes from checkpoints. The job still reports failure when any step failed.
 - Pool/holder RPC attempt counts, per-provider/method breakdowns, pacing waits, and conservative Alchemy CU estimates are uploaded in `data/rpc_usage.json`; the keepalive, on-chain snapshot, and Vercel live fallback are explicitly outside that artifact's scope.
 - `.github/workflows/codeql.yml` runs CodeQL analysis on code changes and a weekly schedule; data-only commits are excluded via `paths-ignore`.
@@ -116,6 +118,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - `public/data/onchain_snapshot.json` - hourly pool-valuation and burn-balance snapshot served by `/api/pools`, `/api/burnStats`, and `/metrics`
 - `data/holder_rankings_state.json` - non-public cumulative balances and per-chain checkpoints for holder rankings (gitignored; persisted between runs on the `refs/data-state` ref as a single orphan commit, plus a per-run CI artifact backup — not committed to `main`)
 - `data/holder_labels.json` - manual address labels and exclusion rules for holder rankings
+- `data/eth_call_many_shadow.json` - gitignored evidence from the optional `eth_callMany` parity probe; uploaded by its workflow and never served
 
 ## Troubleshooting
 - If pool updates fail, inspect `public/data/pool_volume_alert.json` and `public/data/pool_volume_runs.json` — download them from the failing run's `dashboard-data-artifacts` artifact (they are no longer committed).

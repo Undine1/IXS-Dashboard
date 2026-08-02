@@ -8,13 +8,14 @@ import { POOLS } from './poolsConfig';
 import {
   createMulticall3ReadGroups,
   prefetchMulticall3Reads,
+  type Multicall3ReadGroups,
 } from './rpcReadBatch';
 
 function balanceOfCallData(address: string): string {
   return `0x70a08231000000000000000000000000${address.slice(2).toLowerCase()}`;
 }
 
-export async function prefetchSnapshotRpcReads(): Promise<PrefetchedOnchainReads> {
+export function createSnapshotRpcReadGroups(): Multicall3ReadGroups {
   const grouped = createMulticall3ReadGroups();
   const seen = new Set<string>();
 
@@ -45,6 +46,12 @@ export async function prefetchSnapshotRpcReads(): Promise<PrefetchedOnchainReads
       callData: balanceOfCallData(request.holderAddress),
     });
   }
+
+  return grouped;
+}
+
+export async function prefetchSnapshotRpcReads(): Promise<PrefetchedOnchainReads> {
+  const grouped = createSnapshotRpcReadGroups();
 
   return prefetchMulticall3Reads(grouped, {
     logContext: 'onchain-snapshot',

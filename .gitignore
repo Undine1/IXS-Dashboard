@@ -46,6 +46,7 @@ public/data/pool_volume_alert.json
 # instead of in main's history. Also backed up as a CI artifact each run.
 data/holder_rankings_state.json
 data/rpc_usage.json
+data/eth_call_many_shadow.json*
 
 # typescript
 *.tsbuildinfo
