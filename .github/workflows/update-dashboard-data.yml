@@ -8,7 +8,10 @@ name: Update Dashboard Data
 
 on:
   schedule:
-    - cron: '23 * * * *'
+    # Two expressions preserve the hourly cadence while giving the daily
+    # keepalive a stable event marker even when GitHub delays runner startup.
+    - cron: '23 0 * * *'
+    - cron: '23 1-23 * * *'
   workflow_dispatch: {}
 
 permissions:
@@ -54,7 +57,8 @@ jobs:
             npm install
           fi
 
-      - name: Ping Chainstack backup RPC
+      - name: Ping Chainstack backup RPC (daily)
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '23 0 * * *' }}
         env:
           BACKUP_CHAINSTACK_BASE_RPC_URL: ${{ secrets.BACKUP_CHAINSTACK_BASE_RPC_URL }}
         run: |

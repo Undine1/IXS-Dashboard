@@ -40,7 +40,7 @@ Create a `.env.local` in the project root.
 
 - `ALCHEMY_API_KEY` - primary shared RPC credential for Ethereum, Polygon, and Base
 - `BACKUP_INFURA_API_KEY` - optional Infura project key used as fallback
-- `BACKUP_CHAINSTACK_BASE_RPC_URL` - optional full HTTPS Chainstack Base RPC URL used as a third fallback for Base and by the hourly pool workflow keepalive ping
+- `BACKUP_CHAINSTACK_BASE_RPC_URL` - optional full HTTPS Chainstack Base RPC URL used as a third fallback for Base and by the once-daily workflow keepalive ping
 - `RPC_LIVE_READ_TOKEN` - optional server-only token required in the `x-ixs-live-rpc-token` header when using the operational `?fresh=1` or `?debug=1` live-RPC bypasses
 - `MULTICALL3_ADDRESS` - optional override for the canonical Multicall3 deployment used to batch hourly snapshot reads
 - `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` - optional page size for Alchemy transfer pagination
@@ -97,7 +97,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - The first holder rankings run is the expensive bootstrap. Later runs only scan blocks after the last saved checkpoint.
 
 ## GitHub Actions
-- `.github/workflows/update-dashboard-data.yml` runs hourly (at minute 23 — off the congested top of the hour, where GitHub delays or drops scheduled runs). It sends a lightweight `eth_blockNumber` keepalive request to the Chainstack backup Base RPC when configured, runs the pool volume updater, the holder rankings updater, and the on-chain snapshot (pool reserve valuations + burn balances), and commits the served data files back to `main` in a single push so Vercel builds the new data once per run. The holder rankings incremental state is persisted separately on the `refs/data-state` ref (single orphan commit, no history) rather than in `main`, so the repo doesn't accumulate a ~1 MB state version every hour.
+- `.github/workflows/update-dashboard-data.yml` runs hourly (at minute 23 — off the congested top of the hour, where GitHub delays or drops scheduled runs). The daily 00:23 UTC schedule event sends a lightweight `eth_blockNumber` keepalive request to the Chainstack backup Base RPC when configured (manual runs also exercise it); the other hourly events skip that standalone call even if runner startup is delayed. Every run executes the pool volume updater, the holder rankings updater, and the on-chain snapshot (pool reserve valuations + burn balances), then commits the served data files back to `main` in a single push so Vercel builds the new data once per run. The holder rankings incremental state is persisted separately on the `refs/data-state` ref (single orphan commit, no history) rather than in `main`, so the repo doesn't accumulate a ~1 MB state version every hour.
 - Because of the snapshot, Vercel makes no RPC calls in steady state — its RPC keys are only used by the live fallback paths.
 - Authorized live pool/burn fallbacks batch reads into one Multicall3 request per involved chain; any failed batch or subcall falls back to the existing individual provider path.
 - The two updater steps are independent: a pool-updater failure does not block the holder rankings step (and vice versa), and the commit step pushes whatever valid progress was produced so the next run resumes from checkpoints. The job still reports failure when any step failed.
