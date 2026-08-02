@@ -22,6 +22,14 @@ const {
 
 test('classifyRpcErrorMessage buckets known failure shapes', () => {
   assert.equal(classifyRpcErrorMessage('over rate limit'), 'RPC_RATE_LIMIT');
+  assert.equal(
+    classifyRpcErrorMessage('block range limit exceeded; supports up to a 50 block range'),
+    'RPC_RANGE_LIMIT',
+  );
+  assert.equal(
+    classifyRpcErrorMessage('query limit exceeded; this block range should work: [0x64, 0x6d]'),
+    'RPC_RANGE_LIMIT',
+  );
   assert.equal(classifyRpcErrorMessage('request timed out'), 'RPC_TIMEOUT');
   assert.equal(classifyRpcErrorMessage('too many requests'), 'RPC_RATE_LIMIT');
   assert.equal(classifyRpcErrorMessage('boom'), 'RPC_ERROR');
@@ -29,6 +37,20 @@ test('classifyRpcErrorMessage buckets known failure shapes', () => {
 
 test('shouldDisableProviderForRun trips on auth/rate-limit signals', () => {
   assert.equal(shouldDisableProviderForRun({ status: 429 }), true);
+  assert.equal(
+    shouldDisableProviderForRun({
+      code: 'RPC_RANGE_LIMIT',
+      message: 'block range limit exceeded; supports up to a 50 block range',
+    }),
+    false,
+  );
+  assert.equal(
+    shouldDisableProviderForRun({
+      code: 'RPC_RANGE_LIMIT',
+      message: 'query limit exceeded; this block range should work: [0x64, 0x6d]',
+    }),
+    false,
+  );
   assert.equal(shouldDisableProviderForRun({ code: 'RPC_FORBIDDEN' }), true);
   assert.equal(shouldDisableProviderForRun({ message: 'unauthorized' }), true);
   assert.equal(shouldDisableProviderForRun({ message: 'execution reverted' }), false);

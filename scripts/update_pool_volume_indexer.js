@@ -6,6 +6,11 @@
 // public/data/pool_volume.json and updates a checkpoint.
 const fs = require('fs');
 const path = require('path');
+const {
+  createProviderRangeCeilingTracker,
+  chooseRetryRangeCeiling,
+  inferExplicitProviderRangeCeiling,
+} = require('./rpc_range_ceiling');
 
 function loadEnvLocal() {
   try {
@@ -68,6 +73,7 @@ let failedPoolCount = 0;
 const latestBlockCache = new Map();
 const latestBlockNumberCache = new Map();
 const disabledProviders = new Map();
+const providerRangeCeilings = createProviderRangeCeilingTracker();
 
 if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY && !BACKUP_CHAINSTACK_BASE_RPC_URL) {
   console.error(
@@ -183,6 +189,7 @@ async function requestWithRetries(url, opts = {}) {
 
 function classifyRpcErrorMessage(message) {
   const txt = String(message || '').toLowerCase();
+  if (inferMaxLogRangeFromError(message) != null) return 'RPC_RANGE_LIMIT';
   if (txt.includes('limit') || txt.includes('rate')) return 'RPC_RATE_LIMIT';
   if (txt.includes('timeout') || txt.includes('timed out')) return 'RPC_TIMEOUT';
   if (txt.includes('too many requests')) return 'RPC_RATE_LIMIT';
@@ -445,6 +452,7 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
 
   let lastErr = null;
   const providerErrors = [];
+  const retryRangeCeilings = [];
   for (const url of urls) {
     const providerLabel = getProviderLabel(url);
     const providerHost = getProviderHost(url);
@@ -457,6 +465,20 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
       lastErr = err;
       continue;
     }
+
+    const rangeSkip = providerRangeCeilings.getSkipDecision(chain, method, url, params);
+    if (rangeSkip) {
+      const err = new Error(
+        `Provider has a known eth_getLogs ceiling of ${rangeSkip.ceiling} blocks; requested ${rangeSkip.requestedSpan}`,
+      );
+      err.code = 'RPC_RANGE_CEILING';
+      err.maxLogRange = rangeSkip.ceiling;
+      providerErrors.push(`${providerLabel}@${providerHost} code=${err.code} msg=${err.message}`);
+      retryRangeCeilings.push(rangeSkip.ceiling);
+      lastErr = err;
+      continue;
+    }
+
     try {
       const payload = { jsonrpc: '2.0', id: Date.now(), method, params };
       const res = await requestWithRetries(url, {
@@ -498,7 +520,17 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
       const message = (e && e.message) || String(e);
       providerErrors.push(`${providerLabel}@${providerHost} code=${code} msg=${message}`);
       console.warn(`[pool-volume] ${chain} ${method}: provider ${providerLabel} (${providerHost}) failed: ${message}`);
-      disableProviderForRun(url, method, e);
+      const inferredMaxRange = method === 'eth_getLogs' ? inferMaxLogRangeFromError(e) : null;
+      const providerMaxRange = method === 'eth_getLogs'
+        ? inferExplicitProviderRangeCeiling(e)
+        : null;
+      if (providerMaxRange != null) {
+        providerRangeCeilings.remember(chain, method, url, providerMaxRange);
+      }
+      const disabled = disableProviderForRun(url, method, e);
+      if (inferredMaxRange != null && !disabled) {
+        retryRangeCeilings.push(inferredMaxRange);
+      }
       lastErr = e;
       continue;
     }
@@ -509,6 +541,8 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
   );
   aggregate.code = (lastErr && lastErr.code) || 'RPC_ALL_PROVIDERS_FAILED';
   aggregate.providerErrors = providerErrors;
+  const retryRangeCeiling = chooseRetryRangeCeiling(retryRangeCeilings);
+  if (retryRangeCeiling != null) aggregate.maxLogRange = retryRangeCeiling;
   throw aggregate;
 }
 
@@ -598,6 +632,10 @@ async function getBlockByTimestampRpc(ts, chain) {
 // ceiling so the scan can drop straight to a compliant chunk instead of
 // blindly halving. Returns null when no range hint is present.
 function inferMaxLogRangeFromError(error) {
+  const attachedCeiling = Number(error && error.maxLogRange);
+  if (Number.isFinite(attachedCeiling) && attachedCeiling > 0) {
+    return Math.floor(attachedCeiling);
+  }
   const message = error instanceof Error ? error.message : String(error || '');
 
   const rangeMatch = message.match(/up to a (\d+) block range/i);
@@ -1277,4 +1315,6 @@ module.exports = {
   selectAuthoritativeCheckpoint,
   buildPoolState,
   commitPoolProgress,
+  rpcCallWithUrls,
+  providerRangeCeilings,
 };

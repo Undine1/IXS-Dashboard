@@ -28,7 +28,14 @@ const modulePath = requireCjs.resolve('../scripts/update_pool_volume_indexer.js'
 delete requireCjs.cache[modulePath];
 const poolVolume = requireCjs(modulePath);
 
-const { inferMaxLogRangeFromError, sumTokenTransfersViaRpc, getLogScanRpcUrlsForChain, getPublicRpcUrlsForChain } = poolVolume;
+const {
+  inferMaxLogRangeFromError,
+  sumTokenTransfersViaRpc,
+  getLogScanRpcUrlsForChain,
+  getPublicRpcUrlsForChain,
+  rpcCallWithUrls,
+  providerRangeCeilings,
+} = poolVolume;
 
 interface FakeResponse {
   ok: boolean;
@@ -73,6 +80,108 @@ test('base log-scan order is [infura, chainstack, public base.org, alchemy]; pol
   assert.deepEqual(getPublicRpcUrlsForChain('base'), ['https://mainnet.base.org']);
   assert.deepEqual(getPublicRpcUrlsForChain('polygon'), [], 'no unverified public endpoint feeds polygon');
   assert.ok(!getLogScanRpcUrlsForChain('polygon').some((u: string) => u.includes('base.org')));
+});
+
+test('pool RPC skips only oversized calls to a provider with a learned range ceiling', async () => {
+  const constrainedUrl = 'https://range-limited-pool.example/rpc';
+  const fallbackUrl = 'https://wide-pool.example/rpc';
+  const oversizedParams = [{ fromBlock: '0x64', toBlock: '0xc7' }];
+  const compliantParams = [{ fromBlock: '0x64', toBlock: '0x95' }];
+  let constrainedCalls = 0;
+  let fallbackCalls = 0;
+
+  providerRangeCeilings.clear();
+  globalThis.fetch = (async (url: string | URL, options?: { body?: string }) => {
+    const body = JSON.parse(String((options && options.body) || '{}'));
+    const filter = body.params[0];
+    const span = Number.parseInt(filter.toBlock, 16) - Number.parseInt(filter.fromBlock, 16) + 1;
+
+    if (String(url) === constrainedUrl) {
+      constrainedCalls += 1;
+      if (span > 50) {
+        return status(
+          400,
+          'Bad Request',
+          '{"error":{"message":"block range limit exceeded; eth_getLogs requests support up to a 50 block range"}}',
+        );
+      }
+      return ok({ jsonrpc: '2.0', id: 1, result: [] });
+    }
+
+    fallbackCalls += 1;
+    return ok({ jsonrpc: '2.0', id: 1, result: [] });
+  }) as unknown as typeof fetch;
+
+  try {
+    assert.deepEqual(
+      await rpcCallWithUrls('base', 'eth_getLogs', oversizedParams, [constrainedUrl, fallbackUrl]),
+      [],
+    );
+    assert.deepEqual(
+      await rpcCallWithUrls('base', 'eth_getLogs', oversizedParams, [constrainedUrl, fallbackUrl]),
+      [],
+    );
+    assert.deepEqual(
+      await rpcCallWithUrls('base', 'eth_getLogs', compliantParams, [constrainedUrl, fallbackUrl]),
+      [],
+    );
+    assert.equal(constrainedCalls, 2, 'the repeated oversized request is skipped, but a compliant one is tried');
+    assert.equal(fallbackCalls, 2, 'the fallback remains eligible for the original oversized range');
+  } finally {
+    providerRangeCeilings.clear();
+  }
+});
+
+test('pool RPC uses a query-specific range hint immediately without caching or disabling it', async () => {
+  const constrainedUrl = 'https://query-specific-pool.example/rpc';
+  const fallbackUrl = 'https://query-fallback-pool.example/rpc';
+  const oversizedParams = [{ fromBlock: '0x64', toBlock: '0x77' }];
+  const compliantParams = [{ fromBlock: '0x64', toBlock: '0x6d' }];
+  let constrainedCalls = 0;
+  let fallbackCalls = 0;
+
+  providerRangeCeilings.clear();
+  globalThis.fetch = (async (url: string | URL, options?: { body?: string }) => {
+    const body = JSON.parse(String((options && options.body) || '{}'));
+    const filter = body.params[0];
+    const span = Number.parseInt(filter.toBlock, 16) - Number.parseInt(filter.fromBlock, 16) + 1;
+
+    if (String(url) === constrainedUrl) {
+      constrainedCalls += 1;
+      if (span > 10) {
+        return ok({
+          jsonrpc: '2.0',
+          id: 1,
+          error: {
+            message: 'query limit exceeded; this block range should work: [0x64, 0x6d]',
+          },
+        });
+      }
+      return ok({ jsonrpc: '2.0', id: 1, result: [] });
+    }
+
+    fallbackCalls += 1;
+    return status(400, 'Bad Request', '{"error":{"message":"generic failure"}}');
+  }) as unknown as typeof fetch;
+
+  try {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await assert.rejects(
+        () => rpcCallWithUrls('base', 'eth_getLogs', oversizedParams, [constrainedUrl, fallbackUrl]),
+        (error: unknown) => error instanceof Error && inferMaxLogRangeFromError(error) === 10,
+      );
+    }
+    assert.equal(constrainedCalls, 2, 'the filter-specific hint is retried rather than cached or disabled');
+    assert.equal(fallbackCalls, 2);
+
+    assert.deepEqual(
+      await rpcCallWithUrls('base', 'eth_getLogs', compliantParams, [constrainedUrl, fallbackUrl]),
+      [],
+    );
+    assert.equal(constrainedCalls, 3, 'the provider remains usable at the suggested span');
+  } finally {
+    providerRangeCeilings.clear();
+  }
 });
 
 test('polygon scan recovers via 10-block Alchemy shrink when Infura 429s (no public endpoint)', async () => {

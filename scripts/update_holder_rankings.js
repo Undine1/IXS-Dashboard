@@ -1,5 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const {
+  createProviderRangeCeilingTracker,
+  chooseRetryRangeCeiling,
+  inferExplicitProviderRangeCeiling,
+} = require('./rpc_range_ceiling');
 
 function loadEnvLocal() {
   try {
@@ -118,6 +123,7 @@ const OUTPUT_FILE = path.join(OUTPUT_DIR, 'holder_rankings.json');
 let rpcCallCount = 0;
 let retryCount = 0;
 const disabledProviders = new Map();
+const providerRangeCeilings = createProviderRangeCeilingTracker();
 // chain -> Set<address> of holders whose Transfer-event sum went negative this
 // run and must be reconciled against on-chain balanceOf after the scan. IXS is
 // not a vanilla ERC-20 (its balanceOf is changed by mechanics that don't emit
@@ -391,8 +397,9 @@ async function requestWithRetries(url, options = {}) {
   throw new Error(`Request retries exhausted for ${url}`);
 }
 
-async function rpcCall(chain, method, params) {
-  const urls = getRpcUrlsForChain(chain);
+async function rpcCall(chain, method, params, deps = {}) {
+  const urls = deps.urls || getRpcUrlsForChain(chain);
+  const request = deps.request || requestWithRetries;
   if (!urls.length) {
     throw new Error(
       `No RPC URL configured for ${chain}. Set ALCHEMY_API_KEY, BACKUP_INFURA_API_KEY, or BACKUP_CHAINSTACK_BASE_RPC_URL.`,
@@ -400,18 +407,36 @@ async function rpcCall(chain, method, params) {
   }
 
   let lastError = null;
+  const providerErrors = [];
+  const retryRangeCeilings = [];
 
   for (const url of urls) {
     const disabledInfo = getDisabledProviderInfo(url, method);
     if (disabledInfo) {
-      lastError = new Error(
+      const disabledError = new Error(
         `Provider disabled for ${method} after ${disabledInfo.code}: ${disabledInfo.message}`,
       );
+      disabledError.code = 'RPC_PROVIDER_DISABLED';
+      providerErrors.push(disabledError);
+      lastError = disabledError;
+      continue;
+    }
+
+    const rangeSkip = providerRangeCeilings.getSkipDecision(chain, method, url, params);
+    if (rangeSkip) {
+      const rangeError = new Error(
+        `Provider has a known eth_getLogs ceiling of ${rangeSkip.ceiling} blocks; requested ${rangeSkip.requestedSpan}`,
+      );
+      rangeError.code = 'RPC_RANGE_CEILING';
+      rangeError.maxLogRange = rangeSkip.ceiling;
+      providerErrors.push(rangeError);
+      retryRangeCeilings.push(rangeSkip.ceiling);
+      lastError = rangeError;
       continue;
     }
 
     try {
-      const response = await requestWithRetries(url, {
+      const response = await request(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -440,12 +465,32 @@ async function rpcCall(chain, method, params) {
 
       return payload.result;
     } catch (error) {
-      disableProviderForRun(url, method, error);
+      const inferredMaxRange = method === 'eth_getLogs' ? inferMaxLogRangeFromError(error) : null;
+      const providerMaxRange = method === 'eth_getLogs'
+        ? inferExplicitProviderRangeCeiling(error)
+        : null;
+      if (providerMaxRange != null) {
+        providerRangeCeilings.remember(chain, method, url, providerMaxRange);
+      }
+      const disabled = disableProviderForRun(url, method, error);
+      if (inferredMaxRange != null && !disabled) {
+        retryRangeCeilings.push(inferredMaxRange);
+      }
+      providerErrors.push(error instanceof Error ? error : new Error(String(error)));
       lastError = error;
     }
   }
 
-  throw lastError || new Error(`RPC ${method} failed for ${chain}`);
+  const aggregate = new Error(
+    `RPC ${method} failed for ${chain}; providers tried: ${providerErrors
+      .map((error) => error.message)
+      .join(' | ')}`,
+  );
+  aggregate.code = (lastError && lastError.code) || 'RPC_ALL_PROVIDERS_FAILED';
+  aggregate.providerErrors = providerErrors;
+  const retryRangeCeiling = chooseRetryRangeCeiling(retryRangeCeilings);
+  if (retryRangeCeiling != null) aggregate.maxLogRange = retryRangeCeiling;
+  throw aggregate;
 }
 
 async function alchemyCall(chain, method, params) {
@@ -522,6 +567,10 @@ function fromRpcHex(value) {
 // Learning that exact ceiling avoids a long sequence of guaranteed failures
 // while halving from the configured 20k window.
 function inferMaxLogRangeFromError(error) {
+  const attachedCeiling = Number(error && error.maxLogRange);
+  if (Number.isFinite(attachedCeiling) && attachedCeiling > 0) {
+    return Math.floor(attachedCeiling);
+  }
   const message = error instanceof Error ? error.message : String(error || '');
 
   const rangeMatch = message.match(/up to a (\d+) block range/i);
@@ -1389,4 +1438,6 @@ module.exports = {
   createFallbackLogBudget,
   persistHolderState,
   processChain,
+  rpcCall,
+  providerRangeCeilings,
 };

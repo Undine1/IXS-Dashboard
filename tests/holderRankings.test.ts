@@ -23,6 +23,8 @@ const {
   getDisabledProviderInfo,
   inferMaxLogRangeFromError,
   createFallbackLogBudget,
+  rpcCall,
+  providerRangeCeilings,
 } = holderRankings;
 
 const ZERO = `0x${'0'.repeat(40)}`;
@@ -118,6 +120,120 @@ test('range hints are parsed from provider ceiling errors', () => {
     10,
   );
   assert.equal(inferMaxLogRangeFromError(new Error('rate limited')), null);
+});
+
+test('holder RPC remembers each provider range ceiling without hiding other providers', async () => {
+  const constrainedUrl = 'https://range-limited-holder.example/rpc';
+  const fallbackUrl = 'https://wide-holder.example/rpc';
+  const oversizedParams = [{ fromBlock: '0x64', toBlock: '0x77' }];
+  const compliantParams = [{ fromBlock: '0x64', toBlock: '0x6d' }];
+  const calls: string[] = [];
+  let fallbackShouldFail = false;
+
+  providerRangeCeilings.clear();
+  const request = async (url: string, options: { body?: string }) => {
+    calls.push(url);
+    const body = JSON.parse(String(options.body || '{}'));
+    const filter = body.params[0];
+    const span = Number.parseInt(filter.toBlock, 16) - Number.parseInt(filter.fromBlock, 16) + 1;
+
+    if (url === constrainedUrl && span > 10) {
+      return {
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        text: async () => 'eth_getLogs requests support up to a 10 block range',
+      };
+    }
+    if (url === fallbackUrl && fallbackShouldFail) {
+      return {
+        ok: false,
+        status: 500,
+        statusText: 'Server Error',
+        text: async () => 'temporary failure',
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({ jsonrpc: '2.0', id: 1, result: [] }),
+    };
+  };
+
+  try {
+    assert.deepEqual(
+      await rpcCall('ethereum', 'eth_getLogs', oversizedParams, {
+        urls: [constrainedUrl, fallbackUrl],
+        request,
+      }),
+      [],
+    );
+
+    fallbackShouldFail = true;
+    await assert.rejects(
+      () => rpcCall('ethereum', 'eth_getLogs', oversizedParams, {
+        urls: [constrainedUrl, fallbackUrl],
+        request,
+      }),
+      (error: unknown) => error instanceof Error && inferMaxLogRangeFromError(error) === 10,
+    );
+
+    assert.deepEqual(
+      await rpcCall('ethereum', 'eth_getLogs', compliantParams, {
+        urls: [constrainedUrl, fallbackUrl],
+        request,
+      }),
+      [],
+    );
+    assert.deepEqual(
+      calls,
+      [constrainedUrl, fallbackUrl, fallbackUrl, constrainedUrl],
+      'oversized requests skip only the constrained provider; compliant ranges can use it again',
+    );
+  } finally {
+    providerRangeCeilings.clear();
+  }
+});
+
+test('holder RPC does not cache a query-specific suggested range as a provider ceiling', async () => {
+  const constrainedUrl = 'https://query-specific-holder.example/rpc';
+  const fallbackUrl = 'https://query-fallback-holder.example/rpc';
+  const params = [{ fromBlock: '0x64', toBlock: '0x77' }];
+  let constrainedCalls = 0;
+
+  providerRangeCeilings.clear();
+  const request = async (url: string) => {
+    if (url === constrainedUrl) {
+      constrainedCalls += 1;
+      return {
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        text: async () => 'Based on your parameters, this block range should work: [0x64, 0x6d].',
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({ jsonrpc: '2.0', id: 1, result: [] }),
+    };
+  };
+
+  try {
+    await rpcCall('ethereum', 'eth_getLogs', params, {
+      urls: [constrainedUrl, fallbackUrl],
+      request,
+    });
+    await rpcCall('ethereum', 'eth_getLogs', params, {
+      urls: [constrainedUrl, fallbackUrl],
+      request,
+    });
+    assert.equal(constrainedCalls, 2, 'the filter-specific suggestion must not suppress later queries');
+  } finally {
+    providerRangeCeilings.clear();
+  }
 });
 
 test('standard log fallback follows an explicit range hint below the configured floor', async () => {
