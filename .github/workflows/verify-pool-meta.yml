@@ -2,19 +2,24 @@ name: Verify Pool Metadata
 
 # The pools API route trusts hardcoded token0/token1/decimals in
 # lib/poolsConfig.ts (immutable for a V2 pair) to skip RPC calls. Those only go
-# stale if a pool's address is swapped for a different pair — a config edit — so
-# this check runs when that file changes, not on a schedule. ~24 RPC calls, only
-# when relevant.
+# stale if a pool's address is swapped for a different pair - a config edit - so
+# this check runs when that file changes, not on a schedule. The healthy path is
+# four physical RPC calls (two dependent Multicall3 phases per involved chain),
+# with individual read fallback only when a batch/subcall fails.
 
 on:
   push:
     branches: [main]
     paths:
       - 'lib/poolsConfig.ts'
+      - 'lib/poolMetaVerifier.ts'
+      - 'lib/multicall3Codec.js'
       - 'scripts/verify_pool_meta.ts'
   pull_request:
     paths:
       - 'lib/poolsConfig.ts'
+      - 'lib/poolMetaVerifier.ts'
+      - 'lib/multicall3Codec.js'
       - 'scripts/verify_pool_meta.ts'
   workflow_dispatch: {}
 
