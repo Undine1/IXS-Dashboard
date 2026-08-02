@@ -48,6 +48,7 @@ const DEFAULT_LOG_CHUNK = 20000;
 const DEFAULT_MIN_LOG_CHUNK = 500;
 const DEFAULT_SAVE_EVERY_BATCHES = 10;
 const DEFAULT_MAX_FALLBACK_LOG_WINDOWS = 2000;
+const HOLDER_STATE_PERSIST_FAILED = 'HOLDER_STATE_PERSIST_FAILED';
 
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
 const BACKUP_INFURA_API_KEY = String(process.env.BACKUP_INFURA_API_KEY || '').trim();
@@ -857,6 +858,16 @@ function persistState(state) {
   writeJson(STATE_FILE, state, 0);
 }
 
+function persistHolderState(state, persist = persistState) {
+  try {
+    persist(state);
+  } catch (error) {
+    const persistError = error instanceof Error ? error : new Error(String(error));
+    persistError.code = HOLDER_STATE_PERSIST_FAILED;
+    throw persistError;
+  }
+}
+
 async function fetchAssetTransfersPage(chain, tokenAddress, fromBlock, toBlock, pageKey) {
   const params = {
     fromBlock: asRpcHex(fromBlock),
@@ -946,7 +957,7 @@ async function processChainViaAlchemyAssetTransfers(state, chainState, config, l
     chainState.lastScannedBlock = to;
     chainState.latestBlockAtRun = latestBlock;
     from = to + 1;
-    persist(state);
+    persistHolderState(state, persist);
   }
 
   return {
@@ -1062,34 +1073,10 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
   while (cursor <= latestBlock) {
     const endBlock = Math.min(latestBlock, cursor + chunkSize - 1);
 
+    let logs;
     try {
       logBudget.consume(config.chain, cursor, endBlock);
-      const logs = await fetchLogs(config.chain, config.address, cursor, endBlock);
-      logsFetched += logs.length;
-
-      for (const log of logs) {
-        if (applyTransferLog(state, config.chain, log)) {
-          logsApplied += 1;
-        }
-      }
-
-      chainState.lastScannedBlock = endBlock;
-      chainState.latestBlockAtRun = latestBlock;
-      const processedLogCount = toNonNegativeInteger(chainState.processedLogCount) ?? 0;
-      chainState.processedLogCount = processedLogCount + logs.length;
-
-      batchesSinceSave += 1;
-      if (batchesSinceSave >= saveEveryBatches) {
-        persist(state);
-        batchesSinceSave = 0;
-      }
-
-      cursor = endBlock + 1;
-
-      const growCeiling = Math.min(maxChunk, learnedMaxChunk);
-      if (logs.length === 0 && chunkSize < growCeiling) {
-        chunkSize = Math.min(growCeiling, chunkSize * 2);
-      }
+      logs = await fetchLogs(config.chain, config.address, cursor, endBlock);
     } catch (error) {
       if (error && error.code === 'HOLDER_LOG_BUDGET_EXHAUSTED') {
         throw error;
@@ -1119,10 +1106,40 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
         `[holder-rankings] ${config.chain}: reducing log chunk ${chunkSize} -> ${nextChunkSize} after RPC error`,
       );
       chunkSize = nextChunkSize;
+      continue;
+    }
+
+    logsFetched += logs.length;
+
+    for (const log of logs) {
+      if (applyTransferLog(state, config.chain, log)) {
+        logsApplied += 1;
+      }
+    }
+
+    chainState.lastScannedBlock = endBlock;
+    chainState.latestBlockAtRun = latestBlock;
+    const processedLogCount = toNonNegativeInteger(chainState.processedLogCount) ?? 0;
+    chainState.processedLogCount = processedLogCount + logs.length;
+
+    batchesSinceSave += 1;
+    if (batchesSinceSave >= saveEveryBatches) {
+      // Persistence is deliberately outside the RPC range-recovery catch.
+      // A failed durable write must terminate the run so the next invocation
+      // reloads the last atomic checkpoint and replays this window exactly once.
+      persistHolderState(state, persist);
+      batchesSinceSave = 0;
+    }
+
+    cursor = endBlock + 1;
+
+    const growCeiling = Math.min(maxChunk, learnedMaxChunk);
+    if (logs.length === 0 && chunkSize < growCeiling) {
+      chunkSize = Math.min(growCeiling, chunkSize * 2);
     }
   }
 
-  persist(state);
+  persistHolderState(state, persist);
 
   return {
     startBlock,
@@ -1200,12 +1217,15 @@ async function reconcileFlaggedBalances(state, config, chainState) {
   return { reconciled, failed };
 }
 
-async function processChain(state, config) {
+async function processChain(state, config, deps = {}) {
   if (!isValidAddress(config.address)) {
     throw new Error(`Invalid token address for ${config.chain}: ${config.address}`);
   }
 
-  const latestBlock = await getLatestBlockRpc(config.chain);
+  const getLatestBlock = deps.getLatestBlock || getLatestBlockRpc;
+  const getAlchemyRpcUrl = deps.getAlchemyRpcUrl || getAlchemyRpcUrlForChain;
+  const persist = deps.persist || persistState;
+  const latestBlock = await getLatestBlock(config.chain);
   let chainState = ensureChainState(state, config, latestBlock);
 
   let contractStartBlock =
@@ -1220,7 +1240,7 @@ async function processChain(state, config) {
     const attemptSnapshot = snapshotChainState(state, config.chain);
 
     try {
-      if (getAlchemyRpcUrlForChain(config.chain)) {
+      if (getAlchemyRpcUrl(config.chain)) {
         if (contractStartBlock == null) {
           contractStartBlock = 0;
         }
@@ -1233,9 +1253,13 @@ async function processChain(state, config) {
             config,
             latestBlock,
             contractStartBlock,
+            deps.alchemyScan,
           );
           break;
         } catch (error) {
+          if (error && error.code === HOLDER_STATE_PERSIST_FAILED) {
+            throw error;
+          }
           if (isStateIntegrityError(error)) {
             throw error;
           }
@@ -1255,7 +1279,7 @@ async function processChain(state, config) {
           if (contractStartBlock != null) {
             chainState.contractStartBlock = contractStartBlock;
           }
-          persistState(state);
+          persistHolderState(state, persist);
 
           console.warn(
             `[holder-rankings] ${config.chain}: alchemy_getAssetTransfers failed${
@@ -1270,7 +1294,14 @@ async function processChain(state, config) {
         contractStartBlock = await findContractDeploymentBlock(config.chain, config.address, latestBlock);
       }
 
-      summary = await processChainViaStandardRpcLogs(state, chainState, config, latestBlock, contractStartBlock);
+      summary = await processChainViaStandardRpcLogs(
+        state,
+        chainState,
+        config,
+        latestBlock,
+        contractStartBlock,
+        deps.standardScan,
+      );
       break;
     } catch (error) {
       if (!isStateIntegrityError(error) || hasRetriedFromScratch) {
@@ -1281,7 +1312,7 @@ async function processChain(state, config) {
         `[holder-rankings] ${config.chain}: detected incomplete saved state, clearing ${config.chain} balances and rebuilding from block ${contractStartBlock}`,
       );
       resetChainForFullResync(state, chainState, config.chain, contractStartBlock, latestBlock);
-      persistState(state);
+      persistHolderState(state, persist);
       hasRetriedFromScratch = true;
     }
   }
@@ -1308,7 +1339,7 @@ async function main() {
 
   const completedAt = new Date().toISOString();
   state.updatedAt = completedAt;
-  persistState(state);
+  persistHolderState(state);
 
   const publicPayload = buildPublicPayload(state, holderLabels);
   writeJson(OUTPUT_FILE, publicPayload, 2);
@@ -1356,4 +1387,6 @@ module.exports = {
   getDisabledProviderInfo,
   inferMaxLogRangeFromError,
   createFallbackLogBudget,
+  persistHolderState,
+  processChain,
 };

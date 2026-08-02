@@ -14,6 +14,7 @@ const {
   ensureChainState,
   processChainViaAlchemyAssetTransfers,
   processChainViaStandardRpcLogs,
+  processChain,
   requestWithRetries,
   parseRetryAfterMs,
   providerDisableKey,
@@ -193,6 +194,143 @@ test('standard log fallback stops cleanly at the shared window budget', async ()
     if (originalSaveEvery === undefined) delete process.env.HOLDER_RANKINGS_SAVE_EVERY_BATCHES;
     else process.env.HOLDER_RANKINGS_SAVE_EVERY_BATCHES = originalSaveEvery;
   }
+});
+
+test('standard log persistence failure stops before an overlapping retry and replays once next run', async () => {
+  const originalChunk = process.env.HOLDER_RANKINGS_LOG_CHUNK;
+  const originalMinChunk = process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK;
+  const originalSaveEvery = process.env.HOLDER_RANKINGS_SAVE_EVERY_BATCHES;
+  process.env.HOLDER_RANKINGS_LOG_CHUNK = '1000';
+  process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK = '500';
+  process.env.HOLDER_RANKINGS_SAVE_EVERY_BATCHES = '1';
+
+  const config = ethConfig();
+  const state = createDefaultState();
+  ensureChainState(state, config, 999);
+  const durableBefore = JSON.parse(JSON.stringify(state));
+  let durableState = JSON.parse(JSON.stringify(durableBefore));
+  let fetchCalls = 0;
+  let persistCalls = 0;
+
+  const fetchLogs = async () => {
+    fetchCalls += 1;
+    return [transferLog(ZERO, A, 1n)];
+  };
+
+  try {
+    await assert.rejects(
+      () => processChainViaStandardRpcLogs(
+        state,
+        state.chains.ethereum,
+        config,
+        999,
+        0,
+        {
+          fetchLogs,
+          persist: (candidate: unknown) => {
+            persistCalls += 1;
+            if (persistCalls === 1) {
+              throw Object.assign(new Error('transient state write failure'), { code: 'EIO' });
+            }
+            durableState = JSON.parse(JSON.stringify(candidate));
+          },
+          logBudget: createFallbackLogBudget(10),
+        },
+      ),
+      (error: unknown) => error instanceof Error &&
+        (error as Error & { code?: string }).code === 'HOLDER_STATE_PERSIST_FAILED',
+    );
+
+    assert.equal(fetchCalls, 1, 'the failed window must not be fetched again in the same run');
+    assert.equal(persistCalls, 1, 'the run must terminate at the failed durable write');
+    assert.deepEqual(durableState, durableBefore, 'no failed in-memory progress becomes durable');
+
+    const resumedState = JSON.parse(JSON.stringify(durableState));
+    const resumedChainState = ensureChainState(resumedState, config, 999);
+    await processChainViaStandardRpcLogs(resumedState, resumedChainState, config, 999, 0, {
+      fetchLogs: async () => [transferLog(ZERO, A, 1n)],
+      persist: (candidate: unknown) => {
+        durableState = JSON.parse(JSON.stringify(candidate));
+      },
+      logBudget: createFallbackLogBudget(10),
+    });
+
+    assert.equal(durableState.holders[A].ethereum, '1');
+    assert.equal(durableState.chains.ethereum.processedLogCount, 1);
+    assert.equal(durableState.chains.ethereum.lastScannedBlock, 999);
+  } finally {
+    if (originalChunk === undefined) delete process.env.HOLDER_RANKINGS_LOG_CHUNK;
+    else process.env.HOLDER_RANKINGS_LOG_CHUNK = originalChunk;
+    if (originalMinChunk === undefined) delete process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK;
+    else process.env.HOLDER_RANKINGS_MIN_LOG_CHUNK = originalMinChunk;
+    if (originalSaveEvery === undefined) delete process.env.HOLDER_RANKINGS_SAVE_EVERY_BATCHES;
+    else process.env.HOLDER_RANKINGS_SAVE_EVERY_BATCHES = originalSaveEvery;
+  }
+});
+
+test('asset-transfers persistence failures are classified as terminal holder-state errors', async () => {
+  const state = createDefaultState();
+  const config = ethConfig();
+  const chainState = ensureChainState(state, config, 200);
+  let fetchCalls = 0;
+  let persistCalls = 0;
+
+  await assert.rejects(
+    () => processChainViaAlchemyAssetTransfers(state, chainState, config, 200, 0, {
+      fetchPage: async () => {
+        fetchCalls += 1;
+        return { transfers: [xfer(ZERO, A, 1n)], pageKey: null };
+      },
+      persist: () => {
+        persistCalls += 1;
+        throw new Error('transient state write failure');
+      },
+    }),
+    (error: unknown) => error instanceof Error &&
+      (error as Error & { code?: string }).code === 'HOLDER_STATE_PERSIST_FAILED',
+  );
+
+  assert.equal(fetchCalls, 1);
+  assert.equal(persistCalls, 1);
+});
+
+test('processChain never converts an Alchemy state-write failure into log fallback', async () => {
+  const state = createDefaultState();
+  const config = ethConfig();
+  let fallbackFetchCalls = 0;
+  let rollbackPersistCalls = 0;
+
+  await assert.rejects(
+    () => processChain(state, config, {
+      getLatestBlock: async () => 200,
+      getAlchemyRpcUrl: () => 'https://alchemy.example/rpc',
+      persist: () => {
+        rollbackPersistCalls += 1;
+      },
+      alchemyScan: {
+        fetchPage: async () => ({
+          transfers: [xfer(ZERO, A, 1n)],
+          pageKey: null,
+        }),
+        persist: () => {
+          throw new Error('transient state write failure');
+        },
+      },
+      standardScan: {
+        fetchLogs: async () => {
+          fallbackFetchCalls += 1;
+          return [];
+        },
+        persist: noPersist,
+        logBudget: createFallbackLogBudget(10),
+      },
+    }),
+    (error: unknown) => error instanceof Error &&
+      (error as Error & { code?: string }).code === 'HOLDER_STATE_PERSIST_FAILED',
+  );
+
+  assert.equal(fallbackFetchCalls, 0, 'filesystem errors must never trigger standard-log fallback');
+  assert.equal(rollbackPersistCalls, 0, 'the terminal error must bypass fallback rollback persistence');
 });
 
 test('isValidAddress accepts 20-byte hex and rejects others', () => {
