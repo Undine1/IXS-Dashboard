@@ -4,6 +4,10 @@ import type { ChainNetwork } from '../types';
 import { burnBalanceReadKey, type PrefetchedOnchainReads } from './onchainReadKeys';
 import { getRpcUrls, rpcCall, sleep } from './rpc';
 import { readSnapshotSection } from './onchainSnapshot';
+import {
+  createMulticall3ReadGroups,
+  prefetchMulticall3Reads,
+} from './rpcReadBatch';
 
 // Core burn-balance logic, shared by /api/burnStats, /metrics, and the CI
 // snapshot script. Serving order at request time: hourly committed snapshot
@@ -75,6 +79,31 @@ export function getBurnBalanceReadRequests(): BurnBalanceReadRequest[] {
     }
   }
   return requests;
+}
+
+async function prefetchLiveBurnBalanceReads(): Promise<PrefetchedOnchainReads> {
+  const grouped = createMulticall3ReadGroups();
+  const seen = new Set<string>();
+
+  for (const request of getBurnBalanceReadRequests()) {
+    const key = burnBalanceReadKey(
+      request.network,
+      request.tokenAddress,
+      request.holderAddress,
+    );
+    if (seen.has(key)) continue;
+    seen.add(key);
+    grouped[request.network].push({
+      key,
+      target: request.tokenAddress,
+      allowFailure: true,
+      callData: `0x70a08231000000000000000000000000${request.holderAddress.slice(2).toLowerCase()}`,
+    });
+  }
+
+  // Failed batches and failed subcalls remain absent so the existing
+  // individual provider-failover path handles only those balances.
+  return prefetchMulticall3Reads(grouped, { logContext: 'burnStats service' });
 }
 
 async function fetchBalancesForNetwork(
@@ -204,13 +233,14 @@ export async function getBurnStatsBody(
 export async function computeBurnStats(
   options: { prefetchedReads?: PrefetchedOnchainReads } = {},
 ): Promise<BurnStatsServiceResult> {
+  const prefetchedReads = options.prefetchedReads ?? await prefetchLiveBurnBalanceReads();
   const [ethereumBalances, polygonBalances, baseBalances] = [
     ETH_TOKEN_ADDRESS && ETH_BURN_ADDRESSES.length > 0
       ? await fetchBalancesForNetwork(
           ETH_TOKEN_ADDRESS,
           ETH_BURN_ADDRESSES,
           'ethereum',
-          options.prefetchedReads,
+          prefetchedReads,
         )
       : {},
     POLYGON_TOKEN_ADDRESS && POLYGON_BURN_ADDRESSES.length > 0
@@ -218,7 +248,7 @@ export async function computeBurnStats(
           POLYGON_TOKEN_ADDRESS,
           POLYGON_BURN_ADDRESSES,
           'polygon',
-          options.prefetchedReads,
+          prefetchedReads,
         )
       : {},
     BASE_TOKEN_ADDRESS && BASE_BURN_ADDRESSES.length > 0
@@ -226,7 +256,7 @@ export async function computeBurnStats(
           BASE_TOKEN_ADDRESS,
           BASE_BURN_ADDRESSES,
           'base',
-          options.prefetchedReads,
+          prefetchedReads,
         )
       : {},
   ];

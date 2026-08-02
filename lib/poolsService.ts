@@ -6,6 +6,10 @@ import { bigintToDecimalNumber, normalizeAddressFromHex, parseHexInt } from './p
 import { poolReserveReadKey, type PrefetchedOnchainReads } from './onchainReadKeys';
 import { POOLS, type PoolConfig } from './poolsConfig';
 import { readSnapshotSection } from './onchainSnapshot';
+import {
+  createMulticall3ReadGroups,
+  prefetchMulticall3Reads,
+} from './rpcReadBatch';
 
 // Core pool-valuation logic, shared by /api/pools, /metrics, and the CI
 // snapshot script. Serving order at request time: hourly committed snapshot
@@ -100,6 +104,27 @@ function poolPricingTier(pool: PoolConfig): number {
     return 1;
   }
   return 2;
+}
+
+async function prefetchLivePoolReserveReads(): Promise<PrefetchedOnchainReads> {
+  const grouped = createMulticall3ReadGroups();
+  const seen = new Set<string>();
+
+  for (const pool of POOLS) {
+    const key = poolReserveReadKey(pool.network, pool.address);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    grouped[pool.network].push({
+      key,
+      target: pool.address,
+      allowFailure: true,
+      callData: '0x0902f1ac',
+    });
+  }
+
+  // Failed batches and failed subcalls remain absent so fetchPoolValue uses
+  // the existing individual provider-failover path for only those reads.
+  return prefetchMulticall3Reads(grouped, { logContext: 'pools service' });
 }
 
 async function fetchPoolValue(
@@ -306,6 +331,8 @@ export async function computePoolsBody(
     console.warn('[pools service] No RPC API key is set; eth_calls will fail');
   }
 
+  const prefetchedReads = options.prefetchedReads ?? await prefetchLivePoolReserveReads();
+
   const prices: Prices = {};
   const warnings: string[] = [];
   const resultsByIndex = new Array<FetchPoolResult>(POOLS.length);
@@ -324,7 +351,7 @@ export async function computePoolsBody(
     }
     processedAny = true;
 
-    const result = await fetchPoolValue(pool, prices, options.prefetchedReads);
+    const result = await fetchPoolValue(pool, prices, prefetchedReads);
     if (result.derivedIxsPrice && result.derivedIxsPrice > 0) {
       const current = prices[pool.network] || {};
       current.ixs = { usd: result.derivedIxsPrice };
