@@ -3,6 +3,10 @@ import { isLiveRpcRequestAuthorized } from '@/lib/liveRpcAccess';
 import { hasAnyRpcConfigured } from '@/lib/rpc';
 import { getBurnStatsBody } from '@/lib/burnStatsService';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -17,7 +21,10 @@ export async function GET(req: Request) {
 
     if (forceFresh && !hasAnyRpcConfigured()) {
       console.error('[burnStats API] RPC API keys are not configured');
-      return NextResponse.json({ error: 'Service misconfiguration' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Service misconfiguration' },
+        { status: 500, headers: { 'Cache-Control': 'no-store' } },
+      );
     }
 
     const { payload, healthy } = await getBurnStatsBody({ forceFresh });
@@ -38,6 +45,9 @@ export async function GET(req: Request) {
     });
   } catch (error) {
     console.error('[burnStats API] Unexpected error:', error);
-    return NextResponse.json({ error: 'Failed to fetch burn statistics' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch burn statistics' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 }

@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { isLiveRpcRequestAuthorized } from '@/lib/liveRpcAccess';
 import { getPoolsBody } from '@/lib/poolsService';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -33,6 +37,9 @@ export async function GET(req: Request) {
     });
   } catch (error) {
     console.error('[pools API] Unexpected error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 }

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // branch/status filters keep the 20-entry page from being crowded out by
 // unrelated runs (CodeQL, PRs), so the data workflows are always in range.

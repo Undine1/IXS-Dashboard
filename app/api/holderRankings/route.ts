@@ -3,7 +3,8 @@ import path from 'path';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-static';
+export const revalidate = false;
 
 interface HolderRankingRow {
   rank: number;
@@ -20,15 +21,6 @@ interface HolderRankingsSuccessPayload {
   lastRefreshed: string | null;
 }
 
-interface HolderRankingsErrorPayload {
-  ok: false;
-  error: string;
-  details?: string;
-  rows: HolderRankingRow[];
-  totalRowCount: number;
-  lastRefreshed: string | null;
-}
-
 interface HolderRankingsSnapshot {
   ok?: boolean;
   rows?: unknown[];
@@ -37,13 +29,6 @@ interface HolderRankingsSnapshot {
 }
 
 const HOLDER_RANKINGS_FILE = path.join(process.cwd(), 'public', 'data', 'holder_rankings.json');
-const DEFAULT_CACHE_TTL_SECONDS = 300;
-const MIN_CACHE_TTL_SECONDS = 30;
-const MAX_CACHE_TTL_SECONDS = 3600;
-
-let cachedPayload: HolderRankingsSuccessPayload | null = null;
-let cachedAtMs = 0;
-let inFlightRead: Promise<HolderRankingsSuccessPayload> | null = null;
 
 function toFiniteNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -52,10 +37,6 @@ function toFiniteNumber(value: unknown): number | null {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
 
 function normalizeRow(row: unknown, index: number): HolderRankingRow | null {
@@ -80,14 +61,28 @@ function normalizeRow(row: unknown, index: number): HolderRankingRow | null {
   };
 }
 
-async function readSnapshotFromDisk(): Promise<HolderRankingsSuccessPayload> {
-  const raw = await fs.readFile(HOLDER_RANKINGS_FILE, 'utf8');
-  const payload = JSON.parse(raw) as HolderRankingsSnapshot;
+export function normalizeHolderRankingsSnapshot(raw: unknown): HolderRankingsSuccessPayload {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('holder rankings snapshot must be an object');
+  }
+
+  const payload = raw as HolderRankingsSnapshot;
+  if (payload.ok === false || !Array.isArray(payload.rows)) {
+    throw new Error('holder rankings snapshot must contain a successful rows array');
+  }
+
   const rawRows = Array.isArray(payload.rows) ? payload.rows : [];
   const rows = rawRows
     .map((row, index) => normalizeRow(row, index))
     .filter((row): row is HolderRankingRow => row !== null);
+  if (rows.length !== rawRows.length) {
+    throw new Error('holder rankings snapshot contains an invalid row');
+  }
+
   const totalRowCount = toFiniteNumber(payload.totalRowCount) ?? rows.length;
+  if (typeof payload.lastRefreshed === 'string' && !Number.isFinite(Date.parse(payload.lastRefreshed))) {
+    throw new Error('holder rankings snapshot has an invalid lastRefreshed timestamp');
+  }
 
   return {
     ok: true,
@@ -97,62 +92,32 @@ async function readSnapshotFromDisk(): Promise<HolderRankingsSuccessPayload> {
   };
 }
 
-function json(payload: HolderRankingsSuccessPayload | HolderRankingsErrorPayload, status = 200) {
+async function readSnapshotFromDisk(): Promise<HolderRankingsSuccessPayload> {
+  const raw = await fs.readFile(HOLDER_RANKINGS_FILE, 'utf8');
+  return normalizeHolderRankingsSnapshot(JSON.parse(raw));
+}
+
+function json(payload: HolderRankingsSuccessPayload) {
   return NextResponse.json(payload, {
-    status,
     headers: {
-      // The snapshot file is immutable within a deployment (refreshed data
-      // arrives via a new deploy, which purges the CDN cache), so a long
-      // s-maxage is loss-free. The dashboard's 5-minute poll then terminates
-      // at the edge instead of invoking the function. Errors stay uncached.
-      'Cache-Control':
-        status === 200
-          ? 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
-          : 'no-store',
+      // This route is prerendered from a deployment-baked file. Browsers still
+      // revalidate, while the CDN can retain the immutable deployment result;
+      // publishing refreshed data creates a new deployment/cache namespace.
+      'Cache-Control': 'public, max-age=0, must-revalidate',
+      'Vercel-CDN-Cache-Control': 'public, max-age=31536000, immutable',
     },
   });
 }
 
 export async function GET() {
-  const configuredCacheTtlSeconds =
-    toFiniteNumber(process.env.HOLDER_RANKINGS_CACHE_TTL_SECONDS) ?? DEFAULT_CACHE_TTL_SECONDS;
-  const cacheTtlSeconds = Math.floor(
-    clamp(configuredCacheTtlSeconds, MIN_CACHE_TTL_SECONDS, MAX_CACHE_TTL_SECONDS),
-  );
-  const cacheTtlMs = cacheTtlSeconds * 1000;
-
   try {
-    const now = Date.now();
-    if (cachedPayload && now - cachedAtMs < cacheTtlMs) {
-      return json(cachedPayload);
-    }
-
-    if (!inFlightRead) {
-      inFlightRead = readSnapshotFromDisk();
-    }
-
-    const freshPayload = await inFlightRead;
-    cachedPayload = freshPayload;
-    cachedAtMs = Date.now();
-
-    return json(freshPayload);
+    return json(await readSnapshotFromDisk());
   } catch (error) {
-    if (cachedPayload) {
-      return json(cachedPayload);
-    }
-
-    return json(
-      {
-        ok: false,
-        error: 'Failed to read holder rankings snapshot',
-        details: error instanceof Error ? error.message : String(error),
-        rows: [],
-        totalRowCount: 0,
-        lastRefreshed: null,
-      },
-      500,
+    throw new Error(
+      `Invalid deployment-baked holder rankings snapshot: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      { cause: error },
     );
-  } finally {
-    inFlightRead = null;
   }
 }

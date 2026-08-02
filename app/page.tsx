@@ -96,7 +96,7 @@ export default function Dashboard() {
             setLoadingProgress((previous) => Math.max(previous, 82));
             return null;
           });
-        const syncStatusPromise: Promise<SyncStatusResponse | null> = fetch('/api/syncStatus', { cache: 'no-store' })
+        const syncStatusPromise: Promise<SyncStatusResponse | null> = fetch('/api/syncStatus')
           .then(async (r) => (r.ok ? ((await r.json()) as SyncStatusResponse) : null))
           .then((result) => {
             setLoadingProgress((previous) => Math.max(previous, 92));

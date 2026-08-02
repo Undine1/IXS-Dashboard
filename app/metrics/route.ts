@@ -6,6 +6,7 @@ import { getPoolsBody, type PoolsResponseBody } from '@/lib/poolsService';
 import { getBurnStatsBody, type BurnStatsApiResponse } from '@/lib/burnStatsService';
 import { getTotalSupply } from '@/lib/supply';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
