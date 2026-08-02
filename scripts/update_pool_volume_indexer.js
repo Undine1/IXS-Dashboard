@@ -778,15 +778,47 @@ async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, p
   return Number(totalRaw) / Math.pow(10, Number(decimals) || 6);
 }
 
-async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6, onProgress) {
+const DEFAULT_RPC_LOG_BLOCK_CHUNKS = {
+  polygon: 3000,
+  base: 5000,
+};
+
+function firstPositiveIntegerOr(values, fallback) {
+  for (const value of values) {
+    const parsed = Number(value);
+    const integer = Math.floor(parsed);
+    if (Number.isFinite(parsed) && integer > 0) return integer;
+  }
+  return fallback;
+}
+
+function getRpcLogChunkConfig(chain, env = process.env) {
+  const normalizedChain = normalizeChain(chain);
+  const chainSuffix = normalizedChain.toUpperCase();
+  const defaultMaxChunk = DEFAULT_RPC_LOG_BLOCK_CHUNKS[normalizedChain] || 500;
   const configuredMaxChunk = Math.max(
     10,
-    Number(process.env.RPC_LOG_BLOCK_CHUNK || process.env.LOG_CHUNK || 500),
+    firstPositiveIntegerOr(
+      [env[`RPC_LOG_BLOCK_CHUNK_${chainSuffix}`], env.RPC_LOG_BLOCK_CHUNK, env.LOG_CHUNK],
+      defaultMaxChunk,
+    ),
   );
   const configuredMinChunk = Math.max(
     1,
-    Math.min(configuredMaxChunk, Number(process.env.RPC_MIN_LOG_BLOCK_CHUNK || 10)),
+    Math.min(
+      configuredMaxChunk,
+      firstPositiveIntegerOr(
+        [env[`RPC_MIN_LOG_BLOCK_CHUNK_${chainSuffix}`], env.RPC_MIN_LOG_BLOCK_CHUNK],
+        10,
+      ),
+    ),
   );
+
+  return { configuredMaxChunk, configuredMinChunk };
+}
+
+async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6, onProgress) {
+  const { configuredMaxChunk, configuredMinChunk } = getRpcLogChunkConfig(chain);
   const pairTopic = addrToTopic(pairAddr);
   const seen = new Set();
   let totalRaw = 0n;
@@ -1317,4 +1349,5 @@ module.exports = {
   commitPoolProgress,
   rpcCallWithUrls,
   providerRangeCeilings,
+  getRpcLogChunkConfig,
 };

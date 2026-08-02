@@ -122,7 +122,8 @@ jobs:
           BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
           BACKUP_CHAINSTACK_BASE_RPC_URL: ${{ secrets.BACKUP_CHAINSTACK_BASE_RPC_URL }}
           POLYGON_USDC: ${{ secrets.POLYGON_USDC }}
-          RPC_LOG_BLOCK_CHUNK: '200'
+          RPC_LOG_BLOCK_CHUNK_POLYGON: '3000'
+          RPC_LOG_BLOCK_CHUNK_BASE: '5000'
           RPC_MIN_LOG_BLOCK_CHUNK: '10'
           WINDOW_SECONDS: '3600'
         run: node ./scripts/update_pool_volume_indexer.js

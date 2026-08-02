@@ -52,6 +52,8 @@ Create a `.env.local` in the project root.
 - `HOLDER_RANKINGS_SAVE_EVERY_BATCHES` - optional save cadence during long bootstrap runs
 - `GH_PAT` - CI token used to push generated artifacts
 - `POLYGON_USDC` - optional override of the tracked USDC token address for pool volume jobs
+- `RPC_LOG_BLOCK_CHUNK_POLYGON` / `RPC_LOG_BLOCK_CHUNK_BASE` - optional initial pool-volume fallback spans (defaults `3000` / `5000`; provider errors still shrink adaptively)
+- `RPC_MIN_LOG_BLOCK_CHUNK_POLYGON` / `RPC_MIN_LOG_BLOCK_CHUNK_BASE` - optional per-chain pool-volume fallback floors; `RPC_MIN_LOG_BLOCK_CHUNK` remains the shared fallback
 - `NEXT_PUBLIC_TOTAL_SUPPLY` (or `TOTAL_SUPPLY`) - optional override of the 180M IXS max supply; read by both the dashboard and `/metrics` via `lib/supply.ts` so they cannot drift
 
 `scripts/update_pool_volume_indexer.js` and `scripts/update_holder_rankings.js` both auto-load `.env.local` when environment variables are not already exported.

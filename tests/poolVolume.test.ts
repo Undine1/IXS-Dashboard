@@ -18,6 +18,7 @@ const {
   buildPoolState,
   getLatestBlockNumberForRun,
   commitPoolProgress,
+  getRpcLogChunkConfig,
 } = poolVolume;
 
 test('classifyRpcErrorMessage buckets known failure shapes', () => {
@@ -60,6 +61,43 @@ test('normalizeChain accepts supported chains and rejects others', () => {
   assert.equal(normalizeChain('Polygon'), 'polygon');
   assert.throws(() => normalizeChain(''), /Missing chain/);
   assert.throws(() => normalizeChain('solana'), /Unsupported chain/);
+});
+
+test('pool log chunk config uses conservative per-chain defaults and explicit precedence', () => {
+  assert.deepEqual(getRpcLogChunkConfig('polygon', {}), {
+    configuredMaxChunk: 3000,
+    configuredMinChunk: 10,
+  });
+  assert.deepEqual(getRpcLogChunkConfig('base', {}), {
+    configuredMaxChunk: 5000,
+    configuredMinChunk: 10,
+  });
+  assert.deepEqual(
+    getRpcLogChunkConfig('polygon', {
+      RPC_LOG_BLOCK_CHUNK: '200',
+      RPC_LOG_BLOCK_CHUNK_POLYGON: '1200',
+      RPC_MIN_LOG_BLOCK_CHUNK: '10',
+      RPC_MIN_LOG_BLOCK_CHUNK_POLYGON: '25',
+    }),
+    { configuredMaxChunk: 1200, configuredMinChunk: 25 },
+  );
+  assert.deepEqual(
+    getRpcLogChunkConfig('base', {
+      RPC_LOG_BLOCK_CHUNK_BASE: 'invalid',
+      RPC_LOG_BLOCK_CHUNK: '200',
+      RPC_MIN_LOG_BLOCK_CHUNK_BASE: '9999',
+    }),
+    { configuredMaxChunk: 200, configuredMinChunk: 200 },
+  );
+  assert.deepEqual(
+    getRpcLogChunkConfig('polygon', {
+      RPC_LOG_BLOCK_CHUNK_POLYGON: '0',
+      RPC_LOG_BLOCK_CHUNK: '250',
+      RPC_MIN_LOG_BLOCK_CHUNK_POLYGON: '-1',
+      RPC_MIN_LOG_BLOCK_CHUNK: '5',
+    }),
+    { configuredMaxChunk: 250, configuredMinChunk: 5 },
+  );
 });
 
 test('asRpcHex/fromRpcHex round-trip block numbers', () => {
