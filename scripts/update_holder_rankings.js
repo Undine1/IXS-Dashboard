@@ -10,6 +10,10 @@ const {
   getRpcUsageRunId,
   writeRpcUsageComponent,
 } = require('./rpc_run_usage');
+const {
+  encodeAggregate3Call,
+  decodeAggregate3Result,
+} = require('../lib/multicall3Codec');
 
 function loadEnvLocal() {
   try {
@@ -58,6 +62,9 @@ const DEFAULT_LOG_CHUNK = 20000;
 const DEFAULT_MIN_LOG_CHUNK = 500;
 const DEFAULT_SAVE_EVERY_BATCHES = 10;
 const DEFAULT_MAX_FALLBACK_LOG_WINDOWS = 2000;
+const DEFAULT_RECONCILE_BATCH_SIZE = 100;
+const DEFAULT_MULTICALL3_ADDRESS = '0xcA11bde05977b3631167028862bE2a173976CA11';
+const HOLDER_STATE_VERSION = 2;
 const HOLDER_STATE_PERSIST_FAILED = 'HOLDER_STATE_PERSIST_FAILED';
 
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
@@ -131,13 +138,6 @@ let retryCount = 0;
 const disabledProviders = new Map();
 const providerRangeCeilings = createProviderRangeCeilingTracker();
 const rpcRunUsage = createRpcRunUsageTracker();
-// chain -> Set<address> of holders whose Transfer-event sum went negative this
-// run and must be reconciled against on-chain balanceOf after the scan. IXS is
-// not a vanilla ERC-20 (its balanceOf is changed by mechanics that don't emit
-// Transfer events — reflections/fees/migration credits), so summing transfers
-// can drive a high-volume pass-through address below zero even with a complete,
-// correct event history.
-const pendingBalanceReconcile = new Map();
 
 function ensureDirectory(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -691,18 +691,55 @@ function getRawBalance(value) {
   }
 }
 
+function normalizePendingBalanceReconcile(chainState) {
+  const raw = Array.isArray(chainState && chainState.pendingBalanceReconcile)
+    ? chainState.pendingBalanceReconcile
+    : [];
+  const normalized = [];
+  const seen = new Set();
+
+  for (const address of raw) {
+    const value = String(address || '').toLowerCase();
+    if (!isValidAddress(value) || value === ZERO_ADDRESS || seen.has(value)) continue;
+    seen.add(value);
+    normalized.push(value);
+  }
+
+  if (normalized.length > 0) {
+    chainState.pendingBalanceReconcile = normalized;
+  } else if (chainState && typeof chainState === 'object') {
+    delete chainState.pendingBalanceReconcile;
+  }
+  return normalized;
+}
+
+function getPendingBalanceReconcile(state, chain) {
+  const chainState = state.chains && state.chains[chain];
+  if (!chainState || typeof chainState !== 'object') return [];
+  return normalizePendingBalanceReconcile(chainState);
+}
+
+function enqueuePendingBalanceReconcile(state, chain, holder) {
+  if (!isValidAddress(holder) || holder === ZERO_ADDRESS) return;
+  if (!state.chains || typeof state.chains !== 'object') state.chains = {};
+  const chainState =
+    state.chains[chain] && typeof state.chains[chain] === 'object' ? state.chains[chain] : {};
+  state.chains[chain] = chainState;
+  const pending = normalizePendingBalanceReconcile(chainState);
+  if (!pending.includes(holder)) pending.push(holder);
+  chainState.pendingBalanceReconcile = pending;
+}
+
+function clearPendingBalanceReconcile(state, chain) {
+  const chainState = state.chains && state.chains[chain];
+  if (chainState && typeof chainState === 'object') {
+    delete chainState.pendingBalanceReconcile;
+  }
+}
+
 function setRawBalance(holders, holder, chain, nextBalance) {
   if (!isValidAddress(holder) || holder === ZERO_ADDRESS) return;
   if (nextBalance < 0n) {
-    // Don't fail the run (or silently clamp and corrupt the ranking): record
-    // the address and reconcile it against the authoritative on-chain
-    // balanceOf after the scan completes. See pendingBalanceReconcile above.
-    let flagged = pendingBalanceReconcile.get(chain);
-    if (!flagged) {
-      flagged = new Set();
-      pendingBalanceReconcile.set(chain, flagged);
-    }
-    flagged.add(holder);
     nextBalance = 0n;
   }
 
@@ -740,6 +777,12 @@ function applyTransferLog(state, chain, log) {
 
   if (from && from !== ZERO_ADDRESS) {
     const nextFromBalance = getRawBalance(state.holders[from] && state.holders[from][chain]) - value;
+    if (nextFromBalance < 0n) {
+      // IXS balanceOf can change without Transfer events. Persist this retry
+      // marker beside the clamped balance and block checkpoint so interruption
+      // cannot make the zero placeholder permanent.
+      enqueuePendingBalanceReconcile(state, chain, from);
+    }
     setRawBalance(state.holders, from, chain, nextFromBalance);
   }
 
@@ -756,6 +799,7 @@ function applyTransferDelta(state, chain, from, to, value) {
 
   if (from && from !== ZERO_ADDRESS) {
     const nextFromBalance = getRawBalance(state.holders[from] && state.holders[from][chain]) - value;
+    if (nextFromBalance < 0n) enqueuePendingBalanceReconcile(state, chain, from);
     setRawBalance(state.holders, from, chain, nextFromBalance);
   }
 
@@ -799,18 +843,43 @@ function formatTokenAmount(rawValue, decimals, fractionDigits = 2) {
 
 function createDefaultState() {
   return {
-    version: 1,
+    version: HOLDER_STATE_VERSION,
     updatedAt: null,
     chains: {},
     holders: {},
   };
 }
 
+function migrateLegacyState(state, rawVersion) {
+  if (rawVersion >= HOLDER_STATE_VERSION) return;
+
+  console.warn(
+    `[holder-rankings] Migrating holder state v${rawVersion} -> v${HOLDER_STATE_VERSION}: clearing legacy balances and checkpoints for one accuracy-safe rebuild`,
+  );
+  // State v1 could durably checkpoint a clamped zero while its reconciliation
+  // marker existed only in process memory. Reset every supported chain before
+  // setting v2 so the first subsequent persistence cannot bless an unexamined
+  // legacy checkpoint on a chain that has not rebuilt yet.
+  for (const config of TOKEN_CONFIGS) {
+    clearChainBalances(state, config.chain);
+    const chainState = state.chains[config.chain];
+    if (!chainState || typeof chainState !== 'object') continue;
+    delete chainState.lastScannedBlock;
+    delete chainState.latestBlockAtRun;
+    delete chainState.processedLogCount;
+    delete chainState.assetTransfersCursor;
+    delete chainState.pendingBalanceReconcile;
+  }
+  state.version = HOLDER_STATE_VERSION;
+  state.updatedAt = null;
+}
+
 function normalizeState(rawState) {
   const state = createDefaultState();
   if (!rawState || typeof rawState !== 'object') return state;
 
-  if (rawState.version != null) state.version = Number(rawState.version) || 1;
+  const rawVersion = toNonNegativeInteger(rawState.version) || 1;
+  state.version = rawVersion;
   if (typeof rawState.updatedAt === 'string') state.updatedAt = rawState.updatedAt;
 
   if (rawState.chains && typeof rawState.chains === 'object') {
@@ -819,6 +888,14 @@ function normalizeState(rawState) {
 
   if (rawState.holders && typeof rawState.holders === 'object') {
     state.holders = rawState.holders;
+  }
+
+  migrateLegacyState(state, rawVersion);
+
+  for (const chainState of Object.values(state.chains)) {
+    if (chainState && typeof chainState === 'object') {
+      normalizePendingBalanceReconcile(chainState);
+    }
   }
 
   return state;
@@ -842,6 +919,7 @@ function clearChainBalances(state, chain) {
 
 function resetChainForFullResync(state, chainState, chain, contractStartBlock, latestBlock) {
   clearChainBalances(state, chain);
+  clearPendingBalanceReconcile(state, chain);
   chainState.contractStartBlock = contractStartBlock;
   chainState.latestBlockAtRun = latestBlock;
   chainState.processedLogCount = 0;
@@ -892,6 +970,7 @@ function ensureChainState(state, config, latestBlock) {
       : {};
 
   state.chains[config.chain] = chainState;
+  normalizePendingBalanceReconcile(chainState);
   chainState.tokenAddress = config.address;
   chainState.decimals = config.decimals;
   chainState.latestBlockAtRun = latestBlock;
@@ -966,6 +1045,7 @@ async function processChainViaAlchemyAssetTransfers(state, chainState, config, l
   // or it would re-add the full history on top of whatever is already present.
   if (lastScannedBlock == null) {
     clearChainBalances(state, config.chain);
+    clearPendingBalanceReconcile(state, config.chain);
     chainState.processedLogCount = 0;
   }
 
@@ -1086,6 +1166,7 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
   // per block chunk, so an interrupted scan resumes incrementally instead).
   if (lastScannedBlock == null) {
     clearChainBalances(state, config.chain);
+    clearPendingBalanceReconcile(state, config.chain);
     chainState.processedLogCount = 0;
   }
 
@@ -1193,71 +1274,153 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
   };
 }
 
-// After a chain's transfer scan, replace any flagged (negative event-sum)
-// holders with their authoritative on-chain balanceOf at the scanned block, so
-// these values are consistent with the event-summed balances of every other
-// holder. Never throws: a balanceOf RPC failure leaves the address at its 0
-// placeholder and is surfaced as a warning for the next run to retry.
-async function reconcileFlaggedBalances(state, config, chainState) {
-  const flagged = pendingBalanceReconcile.get(config.chain);
-  if (!flagged || flagged.size === 0) return { reconciled: 0, failed: 0 };
+function balanceOfCallData(address) {
+  return `0x70a08231000000000000000000000000${address.slice(2).toLowerCase()}`;
+}
 
-  const addresses = [...flagged];
-  flagged.clear();
+function parseBalanceOfResult(result) {
+  if (typeof result !== 'string' || !/^0x[0-9a-f]{64}$/i.test(result)) {
+    throw new Error(`invalid balanceOf result: ${result}`);
+  }
+  return BigInt(result);
+}
 
-  const scannedBlock =
-    toNonNegativeInteger(chainState.lastScannedBlock) ?? toNonNegativeInteger(chainState.latestBlockAtRun);
-  const blockTag = scannedBlock == null ? 'latest' : asRpcHex(scannedBlock);
+function getReconcileBatchSize(value = process.env.HOLDER_RANKINGS_RECONCILE_BATCH_SIZE) {
+  const configured = Number(value == null || value === '' ? DEFAULT_RECONCILE_BATCH_SIZE : value);
+  return Number.isFinite(configured) && configured > 0
+    ? Math.max(1, Math.floor(configured))
+    : DEFAULT_RECONCILE_BATCH_SIZE;
+}
+
+function applyAuthoritativeBalance(state, chain, address, raw) {
+  const existing =
+    state.holders[address] && typeof state.holders[address] === 'object' ? state.holders[address] : {};
+  if (raw === 0n) {
+    delete existing[chain];
+  } else {
+    existing[chain] = raw.toString();
+  }
+  if (Object.keys(existing).length === 0) {
+    delete state.holders[address];
+  } else {
+    state.holders[address] = existing;
+  }
+}
+
+// After a chain's transfer scan, replace flagged negative event-sums with
+// authoritative balanceOf values at the exact durable scan checkpoint. The
+// queue is persisted in chainState; only successful addresses are removed.
+async function reconcileFlaggedBalances(state, config, chainState, deps = {}) {
+  const addresses = [...getPendingBalanceReconcile(state, config.chain)];
+  if (addresses.length === 0) return { reconciled: 0, failed: 0 };
+
+  const scannedBlock = toNonNegativeInteger(chainState.lastScannedBlock);
+  if (scannedBlock == null) {
+    console.warn(
+      `[holder-rankings] ${config.chain}: cannot reconcile ${addresses.length} queued address(es) without a durable lastScannedBlock; keeping them queued`,
+    );
+    return { reconciled: 0, failed: addresses.length };
+  }
+
+  const blockTag = asRpcHex(scannedBlock);
+  const callRpc = deps.rpcCall || rpcCall;
+  const persist = deps.persist || persistState;
+  const multicallAddress = String(
+    process.env.MULTICALL3_ADDRESS || DEFAULT_MULTICALL3_ADDRESS,
+  ).trim();
+  const batchSize = getReconcileBatchSize();
 
   console.warn(
-    `[holder-rankings] ${config.chain}: ${addresses.length} address(es) had a negative Transfer-event sum (expected for IXS, whose balanceOf is not the net of Transfer events); reconciling against on-chain balanceOf @ block ${scannedBlock ?? 'latest'}`,
+    `[holder-rankings] ${config.chain}: ${addresses.length} address(es) had a negative Transfer-event sum (expected for IXS, whose balanceOf is not the net of Transfer events); reconciling against on-chain balanceOf @ block ${scannedBlock}`,
   );
 
-  let reconciled = 0;
-  let failed = 0;
-  for (const address of addresses) {
-    try {
-      const data = `0x70a08231000000000000000000000000${address.slice(2)}`;
-      const result = await rpcCall(config.chain, 'eth_call', [{ to: config.address, data }, blockTag]);
-      let raw;
-      try {
-        raw = BigInt(result);
-      } catch {
-        throw new Error(`invalid balanceOf result: ${result}`);
-      }
-      if (raw < 0n) throw new Error(`negative balanceOf result: ${raw}`);
+  const successful = new Map();
+  for (let offset = 0; offset < addresses.length; offset += batchSize) {
+    const batchAddresses = addresses.slice(offset, offset + batchSize);
+    const calls = batchAddresses.map((address) => ({
+      target: config.address,
+      allowFailure: true,
+      callData: balanceOfCallData(address),
+    }));
+    let batchResults = null;
 
-      // Write the authoritative value directly (balanceOf is always >= 0, so
-      // this never re-flags).
-      const existing =
-        state.holders[address] && typeof state.holders[address] === 'object' ? state.holders[address] : {};
-      if (raw === 0n) {
-        delete existing[config.chain];
-      } else {
-        existing[config.chain] = raw.toString();
+    try {
+      const encoded = encodeAggregate3Call(calls);
+      const result = await callRpc(
+        config.chain,
+        'eth_call',
+        [{ to: multicallAddress, data: encoded }, blockTag],
+      );
+      batchResults = decodeAggregate3Result(result);
+      if (batchResults.length !== batchAddresses.length) {
+        throw new Error(
+          `Multicall returned ${batchResults.length} results for ${batchAddresses.length} calls`,
+        );
       }
-      if (Object.keys(existing).length === 0) {
-        delete state.holders[address];
-      } else {
-        state.holders[address] = existing;
-      }
-      reconciled += 1;
     } catch (error) {
-      failed += 1;
       console.warn(
-        `[holder-rankings] ${config.chain}: balanceOf reconciliation failed for ${address} (left at 0): ${
+        `[holder-rankings] ${config.chain}: balanceOf Multicall3 batch failed; using individual reads @ block ${scannedBlock}: ${
           error && error.message ? error.message : String(error)
         }`,
       );
+      batchResults = null;
+    }
+
+    for (let index = 0; index < batchAddresses.length; index += 1) {
+      const address = batchAddresses[index];
+      let raw = null;
+      const batchResult = batchResults && batchResults[index];
+
+      if (batchResult && batchResult.success) {
+        try {
+          raw = parseBalanceOfResult(batchResult.returnData);
+        } catch {
+          // Malformed successful subcalls get the same individual fallback as
+          // explicit subcall failures.
+        }
+      }
+
+      if (raw == null) {
+        try {
+          const result = await callRpc(
+            config.chain,
+            'eth_call',
+            [{ to: config.address, data: balanceOfCallData(address) }, blockTag],
+          );
+          raw = parseBalanceOfResult(result);
+        } catch (error) {
+          console.warn(
+            `[holder-rankings] ${config.chain}: balanceOf reconciliation failed for ${address} (left queued at 0): ${
+              error && error.message ? error.message : String(error)
+            }`,
+          );
+        }
+      }
+
+      if (raw != null) successful.set(address, raw);
     }
   }
 
+  for (const [address, raw] of successful) {
+    applyAuthoritativeBalance(state, config.chain, address, raw);
+  }
+  const remaining = getPendingBalanceReconcile(state, config.chain).filter(
+    (address) => !successful.has(address),
+  );
+  if (remaining.length > 0) {
+    chainState.pendingBalanceReconcile = remaining;
+  } else {
+    delete chainState.pendingBalanceReconcile;
+  }
+
+  const reconciled = successful.size;
+  const failed = addresses.length - reconciled;
+  if (reconciled > 0) persistHolderState(state, persist);
   console.log(
     `[holder-rankings] ${config.chain}: reconciled ${reconciled} address(es) against chain${
-      failed ? `, ${failed} failed (left at 0, will retry next run)` : ''
+      failed ? `, ${failed} failed (left at 0, queued for next run)` : ''
     }`,
   );
-  if (reconciled || failed) persistState(state);
   return { reconciled, failed };
 }
 
@@ -1361,7 +1524,10 @@ async function processChain(state, config, deps = {}) {
     }
   }
 
-  const recon = await reconcileFlaggedBalances(state, config, chainState);
+  const recon = await reconcileFlaggedBalances(state, config, chainState, {
+    rpcCall: deps.reconcileRpcCall || deps.rpcCall,
+    persist,
+  });
   if (recon.reconciled || recon.failed) {
     summary = { ...summary, reconciled: recon.reconciled, reconcileFailed: recon.failed };
   }
@@ -1438,12 +1604,15 @@ module.exports = {
   normalizeTopicAddress,
   normalizePlainAddress,
   getRawBalance,
+  getPendingBalanceReconcile,
+  enqueuePendingBalanceReconcile,
   setRawBalance,
   applyTransferDelta,
   applyAssetTransfer,
   addThousandsSeparators,
   formatTokenAmount,
   createDefaultState,
+  normalizeState,
   ensureChainState,
   clearChainBalances,
   processChainViaAlchemyAssetTransfers,
@@ -1457,6 +1626,9 @@ module.exports = {
   inferMaxLogRangeFromError,
   createFallbackLogBudget,
   persistHolderState,
+  parseBalanceOfResult,
+  getReconcileBatchSize,
+  reconcileFlaggedBalances,
   processChain,
   rpcCall,
   providerRangeCeilings,

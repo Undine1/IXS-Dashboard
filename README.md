@@ -50,6 +50,7 @@ Create a `.env.local` in the project root.
 - `API_RATE_LIMIT_MAX_ATTEMPTS` - optional maximum attempts for a single 429 response path (default `2`; other transient failures retain `API_MAX_ATTEMPTS`)
 - `HOLDER_RANKINGS_MIN_LOG_CHUNK` - optional minimum block span after backoff
 - `HOLDER_RANKINGS_SAVE_EVERY_BATCHES` - optional save cadence during long bootstrap runs
+- `HOLDER_RANKINGS_RECONCILE_BATCH_SIZE` - optional number of flagged holder `balanceOf` reads per exact-checkpoint Multicall3 request (default `100`)
 - `GH_PAT` - CI token used to push generated artifacts
 - `POLYGON_USDC` - optional override of the tracked USDC token address for pool volume jobs
 - `RPC_LOG_BLOCK_CHUNK_POLYGON` / `RPC_LOG_BLOCK_CHUNK_BASE` - optional initial pool-volume fallback spans (defaults `3000` / `5000`; provider errors still shrink adaptively)
@@ -91,7 +92,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 
 ## Updater behavior
 - The pool volume updater uses Alchemy Asset Transfers first, falls back to JSON-RPC log scans through Infura and then optional Chainstack URLs when needed, and persists per-pool checkpoints.
-- The holder rankings updater uses Alchemy Asset Transfers pagination when available, falls back to standard JSON-RPC if needed, keeps cumulative per-holder balances in `data/holder_rankings_state.json`, and writes a public top-500 snapshot.
+- The holder rankings updater uses Alchemy Asset Transfers pagination when available, falls back to standard JSON-RPC if needed, keeps cumulative per-holder balances in `data/holder_rankings_state.json`, and writes a public top-500 snapshot. Any non-Transfer balance exceptions are kept in a durable retry queue and reconciled in Multicall3 batches at the exact saved scan block; individual exact-block reads retain the failure fallback.
 - The public holder ranking excludes zero/dead/token-contract addresses by default and supports extra exclusions through env vars.
 - The first holder rankings run is the expensive bootstrap. Later runs only scan blocks after the last saved checkpoint.
 
