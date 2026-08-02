@@ -35,6 +35,7 @@ const {
   getPublicRpcUrlsForChain,
   rpcCallWithUrls,
   providerRangeCeilings,
+  rpcRunUsage,
 } = poolVolume;
 
 interface FakeResponse {
@@ -91,6 +92,7 @@ test('pool RPC skips only oversized calls to a provider with a learned range cei
   let fallbackCalls = 0;
 
   providerRangeCeilings.clear();
+  rpcRunUsage.reset();
   globalThis.fetch = (async (url: string | URL, options?: { body?: string }) => {
     const body = JSON.parse(String((options && options.body) || '{}'));
     const filter = body.params[0];
@@ -127,8 +129,10 @@ test('pool RPC skips only oversized calls to a provider with a learned range cei
     );
     assert.equal(constrainedCalls, 2, 'the repeated oversized request is skipped, but a compliant one is tried');
     assert.equal(fallbackCalls, 2, 'the fallback remains eligible for the original oversized range');
+    assert.equal(rpcRunUsage.snapshot().requestCount, 4, 'the provider skip is not counted as an RPC attempt');
   } finally {
     providerRangeCeilings.clear();
+    rpcRunUsage.reset();
   }
 });
 

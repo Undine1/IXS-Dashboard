@@ -125,6 +125,7 @@ jobs:
           RPC_LOG_BLOCK_CHUNK_POLYGON: '3000'
           RPC_LOG_BLOCK_CHUNK_BASE: '5000'
           RPC_MIN_LOG_BLOCK_CHUNK: '10'
+          RPC_ALCHEMY_TARGET_CUPS: ${{ vars.RPC_ALCHEMY_TARGET_CUPS || '600' }}
           WINDOW_SECONDS: '3600'
         run: node ./scripts/update_pool_volume_indexer.js
 
@@ -176,6 +177,7 @@ jobs:
           HOLDER_RANKINGS_ETHEREUM_START_BLOCK: ${{ vars.HOLDER_RANKINGS_ETHEREUM_START_BLOCK }}
           HOLDER_RANKINGS_BASE_START_BLOCK: ${{ vars.HOLDER_RANKINGS_BASE_START_BLOCK }}
           HOLDER_RANKINGS_POLYGON_START_BLOCK: ${{ vars.HOLDER_RANKINGS_POLYGON_START_BLOCK }}
+          RPC_ALCHEMY_TARGET_CUPS: ${{ vars.RPC_ALCHEMY_TARGET_CUPS || '600' }}
         run: npm run update:holder-rankings
 
       # Persist the (possibly partially updated) state back to refs/data-state
@@ -276,6 +278,7 @@ jobs:
             public/data/holder_rankings.json
             public/data/onchain_snapshot.json
             data/holder_rankings_state.json
+            data/rpc_usage.json
 
       # ALERT_INDEXER_CALLS is a runaway-guard, not a health signal (health is
       # allPoolsFailed + providerSignals). When Alchemy's alchemy_getAssetTransfers

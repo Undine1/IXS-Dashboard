@@ -25,6 +25,7 @@ const {
   createFallbackLogBudget,
   rpcCall,
   providerRangeCeilings,
+  rpcRunUsage,
 } = holderRankings;
 
 const ZERO = `0x${'0'.repeat(40)}`;
@@ -83,6 +84,7 @@ test('429 responses use Retry-After and stop after the bounded attempt count', a
   process.env.API_MAX_ATTEMPTS = '5';
   process.env.API_RATE_LIMIT_MAX_ATTEMPTS = '2';
   process.env.RPC_MIN_INTERVAL_MS = '0';
+  rpcRunUsage.reset();
   globalThis.fetch = (async () => {
     calls += 1;
     return {
@@ -96,11 +98,19 @@ test('429 responses use Retry-After and stop after the bounded attempt count', a
   }) as unknown as typeof fetch;
 
   try {
-    const response = await requestWithRetries('https://rate-limit.example/rpc');
+    const response = await requestWithRetries(
+      'https://rate-limit.example/rpc',
+      {},
+      { method: 'eth_getLogs' },
+    );
     assert.equal(response.status, 429);
     assert.equal(calls, 2);
+    const usage = rpcRunUsage.snapshot();
+    assert.equal(usage.requestCount, 2, 'every actual retry attempt is counted');
+    assert.equal(usage.providers['rate-limit.example'].methods.eth_getLogs.requestCount, 2);
   } finally {
     globalThis.fetch = originalFetch;
+    rpcRunUsage.reset();
     for (const [key, value] of Object.entries(originalEnv)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;

@@ -11,6 +11,11 @@ const {
   chooseRetryRangeCeiling,
   inferExplicitProviderRangeCeiling,
 } = require('./rpc_range_ceiling');
+const {
+  createRpcRunUsageTracker,
+  getRpcUsageRunId,
+  writeRpcUsageComponent,
+} = require('./rpc_run_usage');
 
 function loadEnvLocal() {
   try {
@@ -63,6 +68,7 @@ const CHECKPOINT = path.join(__dirname, '..', 'public', 'data', 'pool_volume_che
 const POOL_FILE = path.join(__dirname, '..', 'public', 'data', 'pool_volume.json');
 const RUNS_FILE = path.join(__dirname, '..', 'public', 'data', 'pool_volume_runs.json');
 const ALERT_FILE = path.join(__dirname, '..', 'public', 'data', 'pool_volume_alert.json');
+const RPC_USAGE_FILE = path.join(__dirname, '..', 'data', 'rpc_usage.json');
 
 // global counters used by requestWithRetries and persisted to alert file
 let apiCallCount = 0;
@@ -74,26 +80,7 @@ const latestBlockCache = new Map();
 const latestBlockNumberCache = new Map();
 const disabledProviders = new Map();
 const providerRangeCeilings = createProviderRangeCeilingTracker();
-
-if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY && !BACKUP_CHAINSTACK_BASE_RPC_URL) {
-  console.error(
-    'At least one RPC provider is required (ALCHEMY_API_KEY, BACKUP_INFURA_API_KEY, or BACKUP_CHAINSTACK_BASE_RPC_URL)',
-  );
-  process.exit(2);
-}
-
-// Global request pacing: enforce a minimum gap between outbound RPC requests so
-// the updater never bursts many calls in the same second. Alchemy's throughput
-// (CUPS) ceiling is account-wide, so flattening this run's peak leaves headroom
-// for other apps on the same key. Tune/disable via RPC_MIN_INTERVAL_MS.
-let lastRpcRequestAt = 0;
-async function paceRpcRequests() {
-  const minIntervalMs = Number(process.env.RPC_MIN_INTERVAL_MS || 100);
-  if (!(minIntervalMs > 0)) return;
-  const waitMs = lastRpcRequestAt + minIntervalMs - Date.now();
-  if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
-  lastRpcRequestAt = Date.now();
-}
+const rpcRunUsage = createRpcRunUsageTracker();
 
 // Equal jitter: half the exponential step is a guaranteed floor, the other
 // half is randomized. Full jitter (random 0..exp) can roll near-zero waits
@@ -103,14 +90,15 @@ function computeRetryDelayMs(attempt, baseDelayMs, maxDelayMs) {
   return Math.floor(exp / 2 + Math.random() * (exp / 2));
 }
 
-async function requestWithRetries(url, opts = {}) {
+async function requestWithRetries(url, opts = {}, context = {}) {
   const maxAttempts = Number(process.env.API_MAX_ATTEMPTS || 5);
   const baseDelay = Number(process.env.API_BASE_DELAY_MS || 500); // ms
   const maxDelay = Number(process.env.API_MAX_DELAY_MS || 30000); // ms
+  const method = String(context.method || 'unknown');
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await paceRpcRequests();
+      await rpcRunUsage.beforeAttempt(url, method);
       apiCallCount += 1;
       const res = await fetch(url, opts);
 
@@ -357,7 +345,7 @@ async function alchemyCall(chain, method, params) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      });
+      }, { method });
       if (!res.ok) {
         let responseText = '';
         try {
@@ -485,7 +473,7 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      });
+      }, { method });
       if (!res.ok) {
         let responseText = '';
         try {
@@ -1093,6 +1081,12 @@ function commitPoolProgress(
 }
 
 async function main() {
+  if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY && !BACKUP_CHAINSTACK_BASE_RPC_URL) {
+    throw new Error(
+      'At least one RPC provider is required (ALCHEMY_API_KEY, BACKUP_INFURA_API_KEY, or BACKUP_CHAINSTACK_BASE_RPC_URL)',
+    );
+  }
+
   const now = Math.floor(Date.now() / 1000);
   const legacyCheckpoint = readJson(CHECKPOINT, {});
   const poolsRaw = readJson(POOL_FILE, {});
@@ -1314,8 +1308,37 @@ async function main() {
   console.log('Done - wrote', POOL_FILE);
 }
 
+function flushRpcUsageTelemetry() {
+  try {
+    const usage = { ...rpcRunUsage.snapshot(), retryCount };
+    writeRpcUsageComponent(
+      RPC_USAGE_FILE,
+      'poolVolume',
+      getRpcUsageRunId(),
+      usage,
+      { reset: true },
+    );
+    console.log(`[rpc-usage] poolVolume ${JSON.stringify(usage)}`);
+  } catch (error) {
+    try {
+      console.warn(
+        `[rpc-usage] Unable to finalize poolVolume telemetry: ${
+          error && error.message ? error.message : String(error)
+        }`,
+      );
+    } catch {
+      // Telemetry is best-effort and must never alter the updater outcome.
+    }
+  }
+}
+
 if (require.main === module) {
-  main().catch((e) => { console.error(e); process.exit(1); });
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exitCode = 1;
+    })
+    .finally(flushRpcUsageTelemetry);
 }
 
 // Exported for unit tests (see tests/poolVolume.test.ts). Importing this module
@@ -1350,4 +1373,5 @@ module.exports = {
   rpcCallWithUrls,
   providerRangeCeilings,
   getRpcLogChunkConfig,
+  rpcRunUsage,
 };

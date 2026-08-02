@@ -45,6 +45,7 @@ public/data/pool_volume_alert.json
 # runs on the custom ref refs/data-state (single orphan commit, no history)
 # instead of in main's history. Also backed up as a CI artifact each run.
 data/holder_rankings_state.json
+data/rpc_usage.json
 
 # typescript
 *.tsbuildinfo

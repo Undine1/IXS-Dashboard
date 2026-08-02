@@ -5,6 +5,11 @@ const {
   chooseRetryRangeCeiling,
   inferExplicitProviderRangeCeiling,
 } = require('./rpc_range_ceiling');
+const {
+  createRpcRunUsageTracker,
+  getRpcUsageRunId,
+  writeRpcUsageComponent,
+} = require('./rpc_run_usage');
 
 function loadEnvLocal() {
   try {
@@ -119,11 +124,13 @@ const OUTPUT_DIR = path.join(__dirname, '..', 'public', 'data');
 const STATE_FILE = process.env.HOLDER_RANKINGS_STATE_FILE || path.join(STATE_DIR, 'holder_rankings_state.json');
 const LABELS_FILE = path.join(STATE_DIR, 'holder_labels.json');
 const OUTPUT_FILE = path.join(OUTPUT_DIR, 'holder_rankings.json');
+const RPC_USAGE_FILE = path.join(STATE_DIR, 'rpc_usage.json');
 
 let rpcCallCount = 0;
 let retryCount = 0;
 const disabledProviders = new Map();
 const providerRangeCeilings = createProviderRangeCeilingTracker();
+const rpcRunUsage = createRpcRunUsageTracker();
 // chain -> Set<address> of holders whose Transfer-event sum went negative this
 // run and must be reconciled against on-chain balanceOf after the scan. IXS is
 // not a vanilla ERC-20 (its balanceOf is changed by mechanics that don't emit
@@ -289,19 +296,6 @@ function getAlchemyRpcUrlForChain(chain) {
   return getAlchemyRpcUrlsForChain(chain)[0] || null;
 }
 
-// Global request pacing: enforce a minimum gap between outbound RPC requests so
-// the updater never bursts many calls in the same second. Alchemy's throughput
-// (CUPS) ceiling is account-wide, so flattening this run's peak leaves headroom
-// for other apps on the same key. Tune/disable via RPC_MIN_INTERVAL_MS.
-let lastRpcRequestAt = 0;
-async function paceRpcRequests() {
-  const minIntervalMs = Number(process.env.RPC_MIN_INTERVAL_MS || 100);
-  if (!(minIntervalMs > 0)) return;
-  const waitMs = lastRpcRequestAt + minIntervalMs - Date.now();
-  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
-  lastRpcRequestAt = Date.now();
-}
-
 function computeRetryDelayMs(attempt, baseDelayMs, maxDelayMs) {
   const exponential = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt - 1));
   return Math.floor(exponential / 2 + Math.random() * (exponential / 2));
@@ -349,7 +343,7 @@ function getDisabledProviderInfo(url, method) {
   return disabledProviders.get(providerDisableKey(url, method)) || null;
 }
 
-async function requestWithRetries(url, options = {}) {
+async function requestWithRetries(url, options = {}, context = {}) {
   const maxAttempts = Math.max(1, Number(process.env.API_MAX_ATTEMPTS || 5));
   const maxRateLimitAttempts = Math.max(
     1,
@@ -358,10 +352,11 @@ async function requestWithRetries(url, options = {}) {
   const baseDelayMs = Math.max(50, Number(process.env.API_BASE_DELAY_MS || 500));
   const maxDelayMs = Math.max(baseDelayMs, Number(process.env.API_MAX_DELAY_MS || 30000));
   let rateLimitAttempts = 0;
+  const method = String(context.method || 'unknown');
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      await paceRpcRequests();
+      await rpcRunUsage.beforeAttempt(url, method);
       rpcCallCount += 1;
       const response = await fetch(url, options);
       if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
@@ -445,7 +440,7 @@ async function rpcCall(chain, method, params, deps = {}) {
           method,
           params,
         }),
-      });
+      }, { method });
 
       if (!response.ok) {
         const text = await response.text();
@@ -519,7 +514,7 @@ async function alchemyCall(chain, method, params) {
           method,
           params,
         }),
-      });
+      }, { method });
 
       if (!response.ok) {
         const text = await response.text();
@@ -1401,11 +1396,36 @@ async function main() {
   );
 }
 
+function flushRpcUsageTelemetry() {
+  try {
+    const usage = { ...rpcRunUsage.snapshot(), retryCount };
+    writeRpcUsageComponent(
+      RPC_USAGE_FILE,
+      'holderRankings',
+      getRpcUsageRunId(),
+      usage,
+    );
+    console.log(`[rpc-usage] holderRankings ${JSON.stringify(usage)}`);
+  } catch (error) {
+    try {
+      console.warn(
+        `[rpc-usage] Unable to finalize holderRankings telemetry: ${
+          error && error.message ? error.message : String(error)
+        }`,
+      );
+    } catch {
+      // Telemetry is best-effort and must never alter the updater outcome.
+    }
+  }
+}
+
 if (require.main === module) {
-  main().catch((error) => {
-    console.error('[holder-rankings] Update failed:', error && error.stack ? error.stack : error);
-    process.exit(1);
-  });
+  main()
+    .catch((error) => {
+      console.error('[holder-rankings] Update failed:', error && error.stack ? error.stack : error);
+      process.exitCode = 1;
+    })
+    .finally(flushRpcUsageTelemetry);
 }
 
 // Exported for unit tests (see tests/holderRankings.test.ts). Importing this
@@ -1440,4 +1460,5 @@ module.exports = {
   processChain,
   rpcCall,
   providerRangeCeilings,
+  rpcRunUsage,
 };

@@ -54,6 +54,8 @@ Create a `.env.local` in the project root.
 - `POLYGON_USDC` - optional override of the tracked USDC token address for pool volume jobs
 - `RPC_LOG_BLOCK_CHUNK_POLYGON` / `RPC_LOG_BLOCK_CHUNK_BASE` - optional initial pool-volume fallback spans (defaults `3000` / `5000`; provider errors still shrink adaptively)
 - `RPC_MIN_LOG_BLOCK_CHUNK_POLYGON` / `RPC_MIN_LOG_BLOCK_CHUNK_BASE` - optional per-chain pool-volume fallback floors; `RPC_MIN_LOG_BLOCK_CHUNK` remains the shared fallback
+- `RPC_ALCHEMY_TARGET_CUPS` - optional pool/holder updater pacing target (default `600`); method-weighted Alchemy pacing leaves throughput headroom while other providers retain a 100 ms per-provider gap
+- `RPC_MIN_INTERVAL_MS` - optional legacy fixed pacing override for every pool/holder RPC provider; `0` disables pacing
 - `NEXT_PUBLIC_TOTAL_SUPPLY` (or `TOTAL_SUPPLY`) - optional override of the 180M IXS max supply; read by both the dashboard and `/metrics` via `lib/supply.ts` so they cannot drift
 
 `scripts/update_pool_volume_indexer.js` and `scripts/update_holder_rankings.js` both auto-load `.env.local` when environment variables are not already exported.
@@ -97,6 +99,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - `.github/workflows/update-dashboard-data.yml` runs hourly (at minute 23 — off the congested top of the hour, where GitHub delays or drops scheduled runs). It sends a lightweight `eth_blockNumber` keepalive request to the Chainstack backup Base RPC when configured, runs the pool volume updater, the holder rankings updater, and the on-chain snapshot (pool reserve valuations + burn balances), and commits the served data files back to `main` in a single push so Vercel builds the new data once per run. The holder rankings incremental state is persisted separately on the `refs/data-state` ref (single orphan commit, no history) rather than in `main`, so the repo doesn't accumulate a ~1 MB state version every hour.
 - Because of the snapshot, Vercel makes no RPC calls in steady state — its RPC keys are only used by the live fallback paths.
 - The two updater steps are independent: a pool-updater failure does not block the holder rankings step (and vice versa), and the commit step pushes whatever valid progress was produced so the next run resumes from checkpoints. The job still reports failure when any step failed.
+- Pool/holder RPC attempt counts, per-provider/method breakdowns, pacing waits, and conservative Alchemy CU estimates are uploaded in `data/rpc_usage.json`; the keepalive, on-chain snapshot, and Vercel live fallback are explicitly outside that artifact's scope.
 - `.github/workflows/codeql.yml` runs CodeQL analysis on code changes and a weekly schedule; data-only commits are excluded via `paths-ignore`.
 - Production deploys are expected to come from Vercel's Git integration on pushes to `main`, not from the workflows themselves. Vercel does not honor `[skip ci]`, which is what makes data-commit deploys work.
 
