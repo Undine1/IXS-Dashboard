@@ -47,7 +47,7 @@
       "rank": 7,
       "holder": "0x3ee18b2214aff97000d974cf647e7c347e8fa585",
       "chainsHolding": 1,
-      "totalIxs": "2,939,534.99",
+      "totalIxs": "2,940,604.44",
       "label": "Wormhole Bridge"
     },
     {
@@ -61,35 +61,35 @@
       "rank": 9,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,837,923.77",
+      "totalIxs": "1,836,854.32",
       "label": "Uniswap V2"
     },
     {
       "rank": 10,
-      "holder": "0x9642b23ed1e01df1092b92641051881a322f5d4e",
-      "chainsHolding": 1,
-      "totalIxs": "1,752,291.49",
-      "label": "MEXC 16"
-    },
-    {
-      "rank": 11,
       "holder": "0x76692e60fe8e870b2b2aa13a301fce8551c3725a",
       "chainsHolding": 1,
       "totalIxs": "1,720,327.00",
       "label": null
     },
     {
-      "rank": 12,
-      "holder": "0x4492b21337f0664829a991da4c8aa7e686e24a23",
+      "rank": 11,
+      "holder": "0x9642b23ed1e01df1092b92641051881a322f5d4e",
       "chainsHolding": 1,
-      "totalIxs": "1,600,000.05",
+      "totalIxs": "1,690,535.79",
+      "label": "MEXC 16"
+    },
+    {
+      "rank": 12,
+      "holder": "0x93ede478a11cdb44af148abe8cbad1c70f44a626",
+      "chainsHolding": 1,
+      "totalIxs": "1,603,701.69",
       "label": null
     },
     {
       "rank": 13,
-      "holder": "0x93ede478a11cdb44af148abe8cbad1c70f44a626",
+      "holder": "0x4492b21337f0664829a991da4c8aa7e686e24a23",
       "chainsHolding": 1,
-      "totalIxs": "1,542,945.99",
+      "totalIxs": "1,600,000.05",
       "label": null
     },
     {
@@ -243,7 +243,7 @@
       "rank": 35,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "677,285.47",
+      "totalIxs": "676,479.29",
       "label": "Contract"
     },
     {
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12197,
-  "lastRefreshed": "2026-08-08T02:24:35.364Z",
+  "totalRowCount": 12198,
+  "lastRefreshed": "2026-08-08T03:01:39.112Z",
   "source": "rpc-snapshot"
 }
