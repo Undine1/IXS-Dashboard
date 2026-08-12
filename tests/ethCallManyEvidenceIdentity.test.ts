@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createEvidenceIdentity, SHADOW_ALGORITHM_VERSION } from '../scripts/probe_eth_call_many';
+import {
+  createEvidenceIdentity,
+  SHADOW_ALGORITHM_VERSION,
+  SHADOW_ARTIFACT_SCHEMA_VERSION,
+} from '../scripts/probe_eth_call_many';
 import type { TaggedMulticall3Call } from '../lib/rpcReadBatch';
 
 const MULTICALL = `0x${'c'.repeat(40)}`;
@@ -21,7 +25,9 @@ test('evidence identity is deterministic and binds the exact plan and policy', (
   const polygonPolicy = createEvidenceIdentity('polygon', calls(), MULTICALL);
 
   assert.deepEqual(first, repeated);
+  assert.equal(first.artifactSchemaVersion, SHADOW_ARTIFACT_SCHEMA_VERSION);
   assert.equal(first.algorithmVersion, SHADOW_ALGORITHM_VERSION);
+  assert.equal(SHADOW_ARTIFACT_SCHEMA_VERSION, 2);
   assert.notEqual(first.digest, changedTarget.digest);
   assert.notEqual(first.readPlanDigest, changedTarget.readPlanDigest);
   assert.notEqual(first.digest, polygonPolicy.digest);

@@ -10,6 +10,7 @@ import {
   ETH_CALL_MANY_REVERT_CANARY_KEY,
   redactSensitiveText,
 } from '../lib/ethCallManyShadow';
+import { classifyProbeError, JsonRpcProbeError } from '../scripts/probe_eth_call_many';
 import type { Multicall3Result } from '../lib/multicall3';
 import type { TaggedMulticall3Call } from '../lib/rpcReadBatch';
 
@@ -173,4 +174,26 @@ test('diagnostics redact provider URLs and API keys', () => {
   assert.equal(redacted.includes(apiKey), false);
   assert.equal(redacted.includes('https://'), false);
   assert.match(redacted, /REDACTED/);
+});
+
+test('only candidate method-not-found responses are classified as unsupported', () => {
+  const candidate = classifyProbeError(
+    new JsonRpcProbeError('the method eth_callMany does not exist/is not available', -32601),
+    'candidate-request',
+    [],
+  );
+  const baseline = classifyProbeError(
+    new JsonRpcProbeError('method not found', -32601),
+    'baseline-request',
+    [],
+  );
+  const preparation = classifyProbeError(new Error('invalid aggregate payload'), 'prepare-call', []);
+
+  assert.equal(candidate.status, 'unsupported');
+  assert.equal(candidate.error.classification, 'method-unsupported');
+  assert.equal(candidate.error.rpcCode, -32601);
+  assert.equal(baseline.status, 'error');
+  assert.equal(baseline.error.classification, 'baseline-error');
+  assert.equal(preparation.status, 'error');
+  assert.equal(preparation.error.classification, 'configuration-error');
 });

@@ -30,6 +30,7 @@ import type { ChainNetwork } from '../types';
 const ROOT = path.join(__dirname, '..');
 const ARTIFACT_FILE = path.join(ROOT, 'data', 'eth_call_many_shadow.json');
 const DEFAULT_MULTICALL3_ADDRESS = '0xcA11bde05977b3631167028862bE2a173976CA11';
+export const SHADOW_ARTIFACT_SCHEMA_VERSION = 2;
 // Bump this whenever comparison, shaping, sentinel, or decoding semantics
 // change. Evidence streaks may only span identical identity digests.
 export const SHADOW_ALGORITHM_VERSION = 1;
@@ -54,6 +55,17 @@ const ESTIMATED_ALCHEMY_CU: Record<string, number> = {
 };
 
 type ProbeStatus = 'pass' | 'mismatch' | 'discarded' | 'unsupported' | 'error';
+type ProbeStage =
+  | 'read-plan'
+  | 'head'
+  | 'block-before'
+  | 'prepare-call'
+  | 'baseline-request'
+  | 'candidate-request'
+  | 'block-after'
+  | 'baseline-decode'
+  | 'candidate-decode'
+  | 'compare';
 type ErrorClassification =
   | 'method-unsupported'
   | 'malformed-result'
@@ -64,6 +76,7 @@ type ErrorClassification =
 type ProbeError = {
   classification: ErrorClassification;
   message: string;
+  rpcCode?: number;
 };
 
 type BlockEvidence = {
@@ -71,8 +84,8 @@ type BlockEvidence = {
   number: string;
   lagBlocks: number;
   hashBefore: string;
-  hashAfter: string;
-  stable: boolean;
+  hashAfter: string | null;
+  stable: boolean | null;
 };
 
 type UsageEvidence = {
@@ -82,6 +95,7 @@ type UsageEvidence = {
 };
 
 type EvidenceIdentity = {
+  artifactSchemaVersion: number;
   algorithmVersion: number;
   digest: string;
   readPlanDigest: string;
@@ -115,10 +129,11 @@ type ChainProbeSample = {
   block?: BlockEvidence;
   parity?: ShadowComparison;
   error?: ProbeError;
+  failedStage?: ProbeStage;
 };
 
 type ProbeArtifact = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   probe: 'eth_callMany-shadow';
   shadowOnly: true;
   promoted: false;
@@ -139,6 +154,7 @@ type ProbeArtifact = {
     acceptedChains: number;
     discardedChains: number;
     failedChains: number;
+    unsupportedChains: number;
     allChainsAccepted: boolean;
     physicalRequests: number;
     estimatedComputeUnits: number;
@@ -147,7 +163,7 @@ type ProbeArtifact = {
   fatalError?: ProbeError;
 };
 
-class JsonRpcProbeError extends Error {
+export class JsonRpcProbeError extends Error {
   constructor(
     message: string,
     readonly rpcCode: number | null = null,
@@ -204,7 +220,7 @@ export function createEvidenceIdentity(
   }));
   const readPlanDigest = sha256Json(normalizedCalls);
   const identityPayload = {
-    artifactSchemaVersion: 1,
+    artifactSchemaVersion: SHADOW_ARTIFACT_SCHEMA_VERSION,
     algorithmVersion: SHADOW_ALGORITHM_VERSION,
     rpcMethod: 'eth_callMany',
     providerNetwork: NETWORK_TO_ALCHEMY[network],
@@ -222,6 +238,7 @@ export function createEvidenceIdentity(
     returnDataPolicy,
   };
   return {
+    artifactSchemaVersion: SHADOW_ARTIFACT_SCHEMA_VERSION,
     algorithmVersion: SHADOW_ALGORITHM_VERSION,
     digest: sha256Json(identityPayload),
     readPlanDigest,
@@ -329,12 +346,14 @@ async function rpcRequest(
   return payload.result;
 }
 
-function classifyError(
+export function classifyProbeError(
   error: unknown,
-  stage: string,
+  stage: ProbeStage,
   sensitiveValues: string[],
 ): { status: Extract<ProbeStatus, 'unsupported' | 'error'>; error: ProbeError } {
   const message = redactSensitiveText(error, sensitiveValues);
+  const rpcCode =
+    error instanceof JsonRpcProbeError && error.rpcCode !== null ? error.rpcCode : undefined;
   const unsupported =
     stage === 'candidate-request' &&
     ((error instanceof JsonRpcProbeError && error.rpcCode === -32601) ||
@@ -342,16 +361,18 @@ function classifyError(
   if (unsupported) {
     return {
       status: 'unsupported',
-      error: { classification: 'method-unsupported', message },
+      error: { classification: 'method-unsupported', message, rpcCode },
     };
   }
   const classification: ErrorClassification =
     stage === 'candidate-decode'
       ? 'malformed-result'
+      : stage === 'prepare-call'
+        ? 'configuration-error'
       : stage.startsWith('baseline')
         ? 'baseline-error'
         : 'rpc-error';
-  return { status: 'error', error: { classification, message } };
+  return { status: 'error', error: { classification, message, rpcCode } };
 }
 
 async function probeChain(
@@ -378,13 +399,14 @@ async function probeChain(
     transport: { missingHexPrefixCanonicalizations: 0 },
   };
   if (productionCalls.length === 0) {
+    sample.failedStage = 'read-plan';
     sample.error = {
       classification: 'configuration-error',
       message: 'Snapshot read plan contains no production reads for this chain',
     };
     return sample;
   }
-  let stage = 'head';
+  let stage: ProbeStage = 'head';
 
   try {
     const headAtStart = normalizeBlockNumber(
@@ -400,10 +422,19 @@ async function probeChain(
       await rpcRequest(rpcUrl, 'eth_getBlockByNumber', [head, false], usage),
       head,
     );
+    sample.block = {
+      headAtStart,
+      number: head,
+      lagBlocks: Number(headValue - BigInt(head)),
+      hashBefore: before.hash,
+      hashAfter: null,
+      stable: null,
+    };
     const shapeTransactions = network === 'polygon';
     const transactionBounds = shapeTransactions
       ? { gasPrice: before.baseFeePerGas, gas: before.gasLimit }
       : {};
+    stage = 'prepare-call';
     const aggregateCallData = multicall3Codec.encodeAggregate3Call(calls);
 
     stage = 'baseline-request';
@@ -455,10 +486,7 @@ async function probeChain(
       head,
     );
     sample.block = {
-      headAtStart,
-      number: head,
-      lagBlocks: Number(headValue - BigInt(head)),
-      hashBefore: before.hash,
+      ...sample.block,
       hashAfter: after.hash,
       stable: before.hash === after.hash,
     };
@@ -504,11 +532,13 @@ async function probeChain(
     });
     sample.accepted = sample.parity.parity && sample.aggregateEnvelope.returnDataParity;
     sample.status = sample.accepted ? 'pass' : 'mismatch';
+    if (!sample.accepted) sample.failedStage = 'compare';
     return sample;
   } catch (error) {
-    const classified = classifyError(error, stage, sensitiveValues);
+    const classified = classifyProbeError(error, stage, sensitiveValues);
     sample.status = classified.status;
     sample.error = classified.error;
+    sample.failedStage = stage;
     if (classified.status === 'unsupported') sample.supported = false;
     return sample;
   } finally {
@@ -532,7 +562,7 @@ async function main(): Promise<void> {
     process.env.MULTICALL3_ADDRESS || DEFAULT_MULTICALL3_ADDRESS,
   ).trim();
   const artifact: ProbeArtifact = {
-    schemaVersion: 1,
+    schemaVersion: SHADOW_ARTIFACT_SCHEMA_VERSION,
     probe: 'eth_callMany-shadow',
     shadowOnly: true,
     promoted: false,
@@ -577,7 +607,12 @@ async function main(): Promise<void> {
       console.log(
         `[eth-call-many-shadow] ${network}: ${sample.status} at ${sample.block?.number || 'no-block'} ` +
           `(${sample.productionReadCount} production reads, ${sample.usage.physicalRequests} RPC requests, ` +
-          `~${sample.usage.estimatedComputeUnits} CU)`,
+          `~${sample.usage.estimatedComputeUnits} CU)` +
+          (sample.error
+            ? `; ${sample.error.classification}` +
+              `${sample.error.rpcCode === undefined ? '' : ` (${sample.error.rpcCode})`} ` +
+              `during ${sample.failedStage || 'unknown-stage'}: ${sample.error.message}`
+            : ''),
       );
     }
   } catch (error) {
@@ -594,10 +629,14 @@ async function main(): Promise<void> {
     const failedChains = artifact.chains.filter(
       (sample) => !['pass', 'discarded'].includes(sample.status),
     ).length;
+    const unsupportedChains = artifact.chains.filter(
+      (sample) => sample.status === 'unsupported',
+    ).length;
     artifact.summary = {
       acceptedChains,
       discardedChains,
       failedChains,
+      unsupportedChains,
       allChainsAccepted: acceptedChains === NETWORKS.length,
       physicalRequests: artifact.chains.reduce(
         (sum, sample) => sum + sample.usage.physicalRequests,

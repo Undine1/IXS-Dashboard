@@ -12,6 +12,10 @@ test('eth_callMany workflow is read-only, evidence-only, and always uploads its 
     path.join(process.cwd(), '.github', 'workflows', 'update-dashboard-data.yml'),
     'utf8',
   );
+  const metadataWorkflow = fs.readFileSync(
+    path.join(process.cwd(), '.github', 'workflows', 'verify-pool-meta.yml'),
+    'utf8',
+  );
 
   assert.match(workflow, /schedule:/);
   assert.match(workflow, /workflow_dispatch:/);
@@ -19,6 +23,10 @@ test('eth_callMany workflow is read-only, evidence-only, and always uploads its 
   assert.match(workflow, /run: npm run probe:eth-call-many/);
   assert.match(workflow, /if: always\(\)/);
   assert.match(workflow, /path: data\/eth_call_many_shadow\.json/);
+  assert.match(workflow, /node-version: '24\.18\.1'/);
+  assert.match(workflow, /uses: actions\/upload-artifact@v6/);
+  assert.match(productionWorkflow, /node-version: '24\.18\.1'/);
+  assert.match(metadataWorkflow, /node-version: '24\.18\.1'/);
   assert.doesNotMatch(workflow, /^\s+push:/m);
   assert.doesNotMatch(workflow, /git (?:add|commit|push|config)/);
   assert.doesNotMatch(productionWorkflow, /probe:eth-call-many|eth_callMany/);
