@@ -29,6 +29,14 @@ export interface PoolsApiResponse {
   debug?: unknown;
 }
 
+export interface VaultTvl {
+  name: string;
+  address: string;
+  network: 'bsc';
+  valueUsd: number | null;
+  navUpdatedAt: string | null;
+}
+
 export interface TvlPrivateEntry {
   label: string;
   value: number | null;

@@ -25,7 +25,7 @@ A production-ready analytics dashboard that tracks IXS token burns, Total Value 
 
 ## Files & structure
 - `app/` - Next.js routes and pages
-- `app/api/` - API routes for pools, burn stats, and holder rankings
+- `app/api/` - API routes for pools, vault TVL, burn stats, and holder rankings
 - `components/` - UI components used by the dashboard
 - `lib/` - on-chain helpers, token/burn services, TVL config loader, and utils
 - `scripts/` - updater scripts
@@ -38,9 +38,10 @@ A production-ready analytics dashboard that tracks IXS token burns, Total Value 
 ## Environment variables
 Create a `.env.local` in the project root.
 
-- `ALCHEMY_API_KEY` - primary shared RPC credential for Ethereum, Polygon, and Base
+- `ALCHEMY_API_KEY` - primary shared RPC credential for Ethereum, Polygon, Base, and BNB Chain
 - `BACKUP_INFURA_API_KEY` - optional Infura project key used as fallback
 - `BACKUP_CHAINSTACK_BASE_RPC_URL` - optional full HTTPS Chainstack Base RPC URL used as a third fallback for Base and by the once-daily workflow keepalive ping
+- `BSC_RPC_URL` - optional full BNB Chain RPC URL used ahead of the Alchemy BNB endpoint for the IXS vault snapshot
 - `RPC_LIVE_READ_TOKEN` - optional server-only token required in the `x-ixs-live-rpc-token` header when using the operational `?fresh=1` or `?debug=1` live-RPC bypasses
 - `MULTICALL3_ADDRESS` - optional override for the canonical Multicall3 deployment used to batch hourly snapshot reads
 - `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` - optional page size for Alchemy transfer pagination
@@ -59,7 +60,7 @@ Create a `.env.local` in the project root.
 - `RPC_MIN_INTERVAL_MS` - optional legacy fixed pacing override for every pool/holder RPC provider; `0` disables pacing
 - `NEXT_PUBLIC_TOTAL_SUPPLY` (or `TOTAL_SUPPLY`) - optional override of the 180M IXS max supply; read by both the dashboard and `/metrics` via `lib/supply.ts` so they cannot drift
 
-`scripts/update_pool_volume_indexer.js` and `scripts/update_holder_rankings.js` both auto-load `.env.local` when environment variables are not already exported.
+The pool-volume, holder-ranking, and on-chain snapshot updaters auto-load `.env.local` when environment variables are not already exported.
 
 ## Running locally
 1. Install dependencies

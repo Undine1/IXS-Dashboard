@@ -215,7 +215,7 @@ jobs:
           done
 
       # Snapshots the on-demand chain reads (pool reserve valuations, burn
-      # balances) so the Vercel routes serve a deployment-baked file instead
+      # balances, and vault TVL) so the Vercel routes serve a deployment-baked file instead
       # of fanning out RPC calls per request. Sections that fail to refresh
       # keep their last good data in the file; the step still fails so the
       # run surfaces it.
@@ -225,6 +225,7 @@ jobs:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
           BACKUP_CHAINSTACK_BASE_RPC_URL: ${{ secrets.BACKUP_CHAINSTACK_BASE_RPC_URL }}
+          BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
           NEXT_PUBLIC_ETH_TOKEN_ADDRESS: ${{ vars.NEXT_PUBLIC_ETH_TOKEN_ADDRESS }}
           NEXT_PUBLIC_POLYGON_TOKEN_ADDRESS: ${{ vars.NEXT_PUBLIC_POLYGON_TOKEN_ADDRESS }}
           NEXT_PUBLIC_BASE_TOKEN_ADDRESS: ${{ vars.NEXT_PUBLIC_BASE_TOKEN_ADDRESS }}

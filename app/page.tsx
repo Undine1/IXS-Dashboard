@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import BurnStats from '@/components/BurnStats';
 import { fetchTokenBurnStatsFromAPI } from '@/lib/clientBurnService';
-import { Pool, PoolsApiResponse, TokenBurnStats } from '@/types';
+import { Pool, PoolsApiResponse, TokenBurnStats, VaultTvl } from '@/types';
 
 interface SyncStatusResponse {
   ok?: boolean;
@@ -15,6 +15,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [pools, setPools] = useState<Pool[]>([]);
+  const [vaultTvl, setVaultTvl] = useState<VaultTvl | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [lastDeploymentCompletedAt, setLastDeploymentCompletedAt] = useState<string | null>(null);
   // The loading screen only gates the very first load; hourly background
@@ -80,8 +81,8 @@ export default function Dashboard() {
         setLoadingProgress(8);
       }
       try {
-        // Fetch burn stats and pools in parallel so the page stays in
-        // "Loading statistics..." until both are available.
+        // Fetch all TVL/burn inputs in parallel so the first rendered total is
+        // complete rather than briefly omitting a still-loading section.
         const burnsPromise = fetchTokenBurnStatsFromAPI().then((result) => {
           setLoadingProgress((previous) => Math.max(previous, 58));
           return result;
@@ -106,11 +107,15 @@ export default function Dashboard() {
             setLoadingProgress((previous) => Math.max(previous, 92));
             return null;
           });
+        const vaultPromise: Promise<VaultTvl | null> = fetch('/api/vaultTvl')
+          .then(async (r) => (r.ok ? ((await r.json()) as VaultTvl) : null))
+          .catch(() => null);
 
-        const [burnsResult, poolsResult, syncStatusResult] = await Promise.all([
+        const [burnsResult, poolsResult, syncStatusResult, vaultResult] = await Promise.all([
           burnsPromise,
           poolsPromise,
           syncStatusPromise,
+          vaultPromise,
         ]);
 
         if (burnsResult) {
@@ -130,10 +135,12 @@ export default function Dashboard() {
         } else {
           setLastDeploymentCompletedAt(null);
         }
+        setVaultTvl(vaultResult);
       } catch (error) {
         console.error('[Dashboard] Failed to load data:', error);
         setPools([]);
         setWarnings([]);
+        setVaultTvl(null);
         setLastDeploymentCompletedAt(null);
       } finally {
         if (isInitialLoad) {
@@ -208,7 +215,13 @@ export default function Dashboard() {
             </div>
           </div>
         ) : burnStats && burnStats.burnAddresses.length > 0 ? (
-          <BurnStats stats={burnStats} tokenSymbol={process.env.NEXT_PUBLIC_TOKEN_SYMBOL} pools={pools} warnings={warnings} />
+          <BurnStats
+            stats={burnStats}
+            tokenSymbol={process.env.NEXT_PUBLIC_TOKEN_SYMBOL}
+            pools={pools}
+            vault={vaultTvl}
+            warnings={warnings}
+          />
         ) : (
           <div className="p-8 bg-yellow-900 border border-yellow-700 rounded-lg">
             <p className="text-yellow-200">No burn statistics available</p>

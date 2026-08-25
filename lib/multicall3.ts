@@ -28,10 +28,18 @@ export async function executeMulticall3(
   calls: Multicall3Call[],
   blockTag = 'latest',
 ): Promise<Multicall3Result[]> {
+  return executeMulticall3WithRpcUrls(getRpcUrls(network), calls, blockTag);
+}
+
+export async function executeMulticall3WithRpcUrls(
+  rpcUrls: string[],
+  calls: Multicall3Call[],
+  blockTag = 'latest',
+): Promise<Multicall3Result[]> {
   if (calls.length === 0) return [];
 
   const target = String(process.env.MULTICALL3_ADDRESS || DEFAULT_MULTICALL3_ADDRESS).trim();
-  const result = await rpcCall(getRpcUrls(network), {
+  const result = await rpcCall(rpcUrls, {
     jsonrpc: '2.0',
     id: 1,
     method: 'eth_call',

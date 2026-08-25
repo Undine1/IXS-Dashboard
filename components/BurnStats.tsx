@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { Pool, TokenBurnStats, TvlPrivateEntry, TvlPublicDeal } from '@/types';
+import { Pool, TokenBurnStats, TvlPrivateEntry, TvlPublicDeal, VaultTvl } from '@/types';
 import { formatValue, formatAddress, formatUsd, formatNumber } from '@/lib/utils';
 import { PRIVATE_ENTRY as DEFAULT_PRIVATE_ENTRY, PUBLIC_DEALS as DEFAULT_PUBLIC_DEALS, TYPE_LABELS } from '@/lib/tvlConfig';
 import { getTotalSupply } from '@/lib/supply';
@@ -13,6 +13,7 @@ interface BurnStatsProps {
   stats: TokenBurnStats;
   tokenSymbol?: string;
   pools?: Pool[];
+  vault?: VaultTvl | null;
   warnings?: string[];
 }
 
@@ -64,6 +65,19 @@ function toFiniteNumberOrNull(value: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+function formatNavUpdatedAt(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
 }
 
 function formatHolderAddress(address: string): string {
@@ -148,7 +162,13 @@ function CollapsiblePanel({ open, children }: CollapsiblePanelProps) {
   );
 }
 
-export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warnings = [] }: BurnStatsProps) {
+export default function BurnStats({
+  stats,
+  tokenSymbol = 'IXS',
+  pools = [],
+  vault = null,
+  warnings = [],
+}: BurnStatsProps) {
   const ethTokenAddress = process.env.NEXT_PUBLIC_ETH_TOKEN_ADDRESS || '';
   const polygonTokenAddress = process.env.NEXT_PUBLIC_POLYGON_TOKEN_ADDRESS || '';
   const baseTokenAddress = process.env.NEXT_PUBLIC_BASE_TOKEN_ADDRESS || '';
@@ -314,6 +334,7 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
 
   const insetListClass ='rounded-xl border border-slate-700 bg-slate-900/30';
   const insetRowClass = 'box-border flex h-11 items-center justify-between gap-3 border-b px-3 text-sm last:border-b-0 border-slate-700/70 hover:bg-slate-800/60';
+  const insetDetailRowClass = 'box-border flex min-h-14 items-center justify-between gap-3 border-b px-3 py-2 text-sm last:border-b-0 border-slate-700/70 hover:bg-slate-800/60';
 
   // --- Calculations ---
   
@@ -351,7 +372,11 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
   const tvlPoolsVal = hasUnknownPoolValues
     ? null
     : poolValues.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-  const totalTvl = tvlPrivateVal === null || tvlPoolsVal === null ? null : tvlPrivateVal + tvlPoolsVal; // Excluded launchpad from TVL
+  const vaultTvlVal = toFiniteNumberOrNull(vault?.valueUsd);
+  const totalTvl = tvlPrivateVal === null || tvlPoolsVal === null || vaultTvlVal === null
+    ? null
+    : tvlPrivateVal + tvlPoolsVal + vaultTvlVal; // Excluded launchpad from TVL
+  const navUpdatedAt = formatNavUpdatedAt(vault?.navUpdatedAt);
   // Platform Volume: sum of Crypto pools (treat pool.value as the pool's USD volume/liquidity)
   const cryptoPools = pools.filter((pool) => pool.type === 'Crypto');
   const poolsByType = pools.reduce<Record<string, Pool[]>>((acc, pool) => {
@@ -679,6 +704,26 @@ export default function BurnStats({ stats, tokenSymbol = 'IXS', pools = [], warn
                             </div>
                           </div>
                         ))}
+
+                        <div className="space-y-2">
+                          <div className="py-1 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-gray-300">
+                            Vaults
+                          </div>
+                          <div className={insetListClass}>
+                            <div className={insetDetailRowClass}>
+                              <div className={`flex items-center ${LAYOUT.itemGap}`}>
+                                <ChainIcon network="blockchain" alt="BNB Chain" />
+                                <div>
+                                  <div className="text-sm font-medium text-white">{vault?.name || 'IXS Vault'}</div>
+                                  <div className="text-[11px] leading-4 text-slate-400">
+                                    BNB Chain{navUpdatedAt ? ` · NAV updated ${navUpdatedAt} UTC` : ''}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-sm font-mono font-bold text-white">{formatUsd(vaultTvlVal, 0)}</div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

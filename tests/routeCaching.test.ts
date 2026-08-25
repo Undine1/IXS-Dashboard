@@ -6,6 +6,7 @@ import * as holderRankingsRoute from '../app/api/holderRankings/route';
 import * as poolVolumeRoute from '../app/api/poolVolume/route';
 import * as poolsRoute from '../app/api/pools/route';
 import * as burnStatsRoute from '../app/api/burnStats/route';
+import * as vaultTvlRoute from '../app/api/vaultTvl/route';
 import * as syncStatusRoute from '../app/api/syncStatus/route';
 import * as metricsRoute from '../app/metrics/route';
 
@@ -24,7 +25,7 @@ test('only deployment-baked API routes are configured for immutable prerendering
   assert.equal(poolVolumeRoute.dynamic, 'force-static');
   assert.equal(poolVolumeRoute.revalidate, false);
 
-  for (const route of [poolsRoute, burnStatsRoute, syncStatusRoute, metricsRoute]) {
+  for (const route of [poolsRoute, burnStatsRoute, vaultTvlRoute, syncStatusRoute, metricsRoute]) {
     assert.equal(route.dynamic, 'force-dynamic');
     assert.equal(route.revalidate, 0);
   }
@@ -112,6 +113,7 @@ test('fresh and debug requests remain token-gated and uncacheable', async () => 
     poolsRoute.GET(new Request('https://example.test/api/pools?fresh=1')),
     poolsRoute.GET(new Request('https://example.test/api/pools?debug=1')),
     burnStatsRoute.GET(new Request('https://example.test/api/burnStats?fresh=1')),
+    vaultTvlRoute.GET(new Request('https://example.test/api/vaultTvl?fresh=1')),
   ]);
 
   for (const response of responses) {

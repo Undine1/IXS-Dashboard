@@ -1,7 +1,8 @@
 /**
- * Hourly snapshot of the on-demand chain reads: pool reserve valuations (TVL)
- * and burn-address balances. Reads are grouped into one Multicall3 eth_call per
- * configured chain, with individual RPC fallback if a whole batch fails.
+ * Hourly snapshot of the on-demand chain reads: pool reserve valuations (TVL),
+ * burn-address balances, and the BSC IXS vault. Reads are grouped into one
+ * Multicall3 eth_call per configured chain, with individual RPC fallback if a
+ * whole batch fails.
  * Running this in CI lets the Vercel routes serve
  * a deployment-baked file instead of fanning out RPC calls per request — the
  * live RPC path in lib/poolsService + lib/burnStatsService remains only as a
@@ -50,17 +51,22 @@ for (const [key, value] of Object.entries(ENV_DEFAULTS)) {
 const SNAPSHOT_FILE = path.join(__dirname, '..', 'public', 'data', 'onchain_snapshot.json');
 
 type SnapshotSection = { generatedAt: string; data: unknown };
-type Snapshot = { pools?: SnapshotSection; burnStats?: SnapshotSection };
+type Snapshot = {
+  pools?: SnapshotSection;
+  burnStats?: SnapshotSection;
+  vaultTvl?: SnapshotSection;
+};
 type FreshSection = { data: unknown; healthy: boolean };
 
 export function mergeSnapshotSections(
   previous: Snapshot | null,
-  fresh: { pools: FreshSection; burnStats: FreshSection },
+  fresh: { pools: FreshSection; burnStats: FreshSection; vaultTvl: FreshSection },
   generatedAt: string,
 ): Snapshot {
   return {
     pools: fresh.pools.healthy ? { generatedAt, data: fresh.pools.data } : previous?.pools,
     burnStats: fresh.burnStats.healthy ? { generatedAt, data: fresh.burnStats.data } : previous?.burnStats,
+    vaultTvl: fresh.vaultTvl.healthy ? { generatedAt, data: fresh.vaultTvl.data } : previous?.vaultTvl,
   };
 }
 
@@ -77,11 +83,13 @@ async function main(): Promise<void> {
   // their module-level configuration.
   const { computePoolsBody } = await import('../lib/poolsService');
   const { computeBurnStats } = await import('../lib/burnStatsService');
+  const { computeVaultTvl } = await import('../lib/vaultTvlService');
   const { prefetchSnapshotRpcReads } = await import('../lib/snapshotRpcBatch');
 
   const prefetchedReads = await prefetchSnapshotRpcReads();
   const poolsResult = await computePoolsBody({ prefetchedReads });
   const burnResult = await computeBurnStats({ prefetchedReads });
+  const vaultResult = await computeVaultTvl();
 
   const generatedAt = new Date().toISOString();
   const previous = readPreviousSnapshot();
@@ -90,6 +98,7 @@ async function main(): Promise<void> {
     {
       pools: { data: poolsResult.body, healthy: poolsResult.healthy },
       burnStats: { data: burnResult.payload, healthy: burnResult.healthy },
+      vaultTvl: { data: vaultResult.payload, healthy: vaultResult.healthy },
     },
     generatedAt,
   );
@@ -98,7 +107,8 @@ async function main(): Promise<void> {
 
   console.log(
     `[onchain-snapshot] pools: ${poolsResult.healthy ? 'refreshed' : 'KEPT PREVIOUS'} (${poolsResult.body.pools.length} pools), ` +
-      `burnStats: ${burnResult.healthy ? 'refreshed' : 'KEPT PREVIOUS'}. Wrote ${SNAPSHOT_FILE}`,
+      `burnStats: ${burnResult.healthy ? 'refreshed' : 'KEPT PREVIOUS'}, ` +
+      `vaultTvl: ${vaultResult.healthy ? 'refreshed' : 'KEPT PREVIOUS'}. Wrote ${SNAPSHOT_FILE}`,
   );
 
   const failures: string[] = [];
@@ -107,6 +117,9 @@ async function main(): Promise<void> {
   }
   if (!burnResult.healthy) {
     failures.push('burnStats section unhealthy: missing or null balances');
+  }
+  if (!vaultResult.healthy) {
+    failures.push('vaultTvl section unhealthy: BSC vault read or contract guards failed');
   }
   if (failures.length > 0) {
     for (const failure of failures) {

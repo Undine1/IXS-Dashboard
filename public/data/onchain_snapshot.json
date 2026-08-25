@@ -109,5 +109,15 @@
         }
       }
     }
+  },
+  "vaultTvl": {
+    "generatedAt": "2026-08-25T19:53:56.000Z",
+    "data": {
+      "name": "IXS Vault",
+      "address": "0xc975a3EeF2e49F8eDdEf585340C43f15300fCB82",
+      "network": "bsc",
+      "valueUsd": 3462.0121214908468,
+      "navUpdatedAt": "2026-08-25T05:59:48.000Z"
+    }
   }
 }

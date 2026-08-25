@@ -4,6 +4,7 @@ import path from 'path';
 import { PRIVATE_ENTRY } from '@/lib/tvlConfig';
 import { getPoolsBody, type PoolsResponseBody } from '@/lib/poolsService';
 import { getBurnStatsBody, type BurnStatsApiResponse } from '@/lib/burnStatsService';
+import { getVaultTvl } from '@/lib/vaultTvlService';
 import { getTotalSupply } from '@/lib/supply';
 
 export const runtime = 'nodejs';
@@ -12,7 +13,7 @@ export const revalidate = 0;
 
 // Public aggregate endpoint with stable shape — external sites consume this
 // (burn/supply figures), so the response fields and CORS headers must not
-// change. Composes the pools and burn-stats services with direct calls; both
+// change. Composes the pools, vault, and burn-stats services with direct calls; all
 // serve from their in-memory caches between hourly refreshes, so a /metrics
 // hit costs no RPC fan-out on a warm instance.
 
@@ -96,19 +97,21 @@ export async function OPTIONS() {
 
 export async function GET() {
   try {
-    const [poolsResult, burnResult] = await Promise.all([
+    const [poolsResult, burnResult, vaultResult] = await Promise.all([
       getPoolsBody(),
       getBurnStatsBody(),
+      getVaultTvl(),
     ]);
 
-    const tvl_usd = Number((computeTvlUsd(poolsResult.body) + readPrivateTvlValue()).toFixed(2));
+    const vaultTvl = Math.max(0, parseFiniteNumber(vaultResult.payload.valueUsd, 0));
+    const tvl_usd = Number((computeTvlUsd(poolsResult.body) + readPrivateTvlValue() + vaultTvl).toFixed(2));
     const total_tokens_burned = computeTotalTokensBurned(burnResult.payload, parseTokenDecimals());
     const total_supply = getTotalSupply();
     const circulating_supply = Math.max(0, total_supply - total_tokens_burned);
 
-    // Degraded inputs (any pool unvalued or burn balance missing) get a short
+    // Degraded inputs (any pool/vault unvalued or burn balance missing) get a short
     // CDN TTL so the published figures recover quickly after an RPC hiccup.
-    const healthy = poolsResult.healthy && burnResult.healthy;
+    const healthy = poolsResult.healthy && burnResult.healthy && vaultResult.healthy;
 
     return NextResponse.json(
       {
