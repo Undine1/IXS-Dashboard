@@ -26,7 +26,7 @@
       "rank": 4,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "3,926,690.80",
+      "totalIxs": "3,925,255.71",
       "label": "Uniswap V4"
     },
     {
@@ -61,7 +61,7 @@
       "rank": 9,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,881,840.68",
+      "totalIxs": "1,879,188.84",
       "label": "Uniswap V2"
     },
     {
@@ -3055,17 +3055,17 @@
     },
     {
       "rank": 437,
+      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
+      "chainsHolding": 1,
+      "totalIxs": "91,666.02",
+      "label": "Contract"
+    },
+    {
+      "rank": 438,
       "holder": "0x4719d656498f67b3c40fb55233bf9734e42e609b",
       "chainsHolding": 1,
       "totalIxs": "91,656.84",
       "label": null
-    },
-    {
-      "rank": 438,
-      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
-      "chainsHolding": 1,
-      "totalIxs": "91,539.52",
-      "label": "Contract"
     },
     {
       "rank": 439,
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12261,
-  "lastRefreshed": "2026-08-25T07:12:23.431Z",
+  "totalRowCount": 12262,
+  "lastRefreshed": "2026-08-25T08:02:02.822Z",
   "source": "rpc-snapshot"
 }
