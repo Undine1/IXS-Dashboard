@@ -18,17 +18,48 @@ afterEach(() => {
 });
 
 test('only deployment-baked API routes are configured for immutable prerendering', () => {
-  assert.equal(holderRankingsRoute.runtime, 'nodejs');
-  assert.equal(holderRankingsRoute.dynamic, 'force-static');
-  assert.equal(holderRankingsRoute.revalidate, false);
-  assert.equal(poolVolumeRoute.runtime, 'nodejs');
-  assert.equal(poolVolumeRoute.dynamic, 'force-static');
-  assert.equal(poolVolumeRoute.revalidate, false);
+  for (const route of [holderRankingsRoute, poolVolumeRoute, syncStatusRoute]) {
+    assert.equal(route.runtime, 'nodejs');
+    assert.equal(route.dynamic, 'force-static');
+    assert.equal(route.revalidate, false);
+  }
 
-  for (const route of [poolsRoute, burnStatsRoute, vaultTvlRoute, syncStatusRoute, metricsRoute]) {
+  for (const route of [poolsRoute, burnStatsRoute, vaultTvlRoute, metricsRoute]) {
     assert.equal(route.dynamic, 'force-dynamic');
     assert.equal(route.revalidate, 0);
   }
+});
+
+test('sync status uses the newest timestamp baked into the deployment', () => {
+  const payload = syncStatusRoute.resolveSyncStatusSnapshots(
+    { lastRefreshed: '2026-08-26T09:05:53.492Z' },
+    { lastUpdated: '2026-08-26T09:05:50.697Z' },
+    {
+      pools: { generatedAt: '2026-08-26T09:05:57.128Z' },
+      burnStats: { generatedAt: '2026-08-26T09:05:57.128Z' },
+      vaultTvl: { generatedAt: '2026-08-25T19:53:56.000Z' },
+    },
+  );
+
+  assert.deepEqual(payload, {
+    ok: true,
+    lastDeploymentCompletedAt: '2026-08-26T09:05:57.128Z',
+    source: 'snapshot',
+  });
+});
+
+test('sync status reports unavailable when every baked timestamp is invalid', () => {
+  const payload = syncStatusRoute.resolveSyncStatusSnapshots(
+    { lastRefreshed: 'not-a-date' },
+    { lastUpdated: null },
+    { pools: { generatedAt: '' } },
+  );
+
+  assert.deepEqual(payload, {
+    ok: true,
+    lastDeploymentCompletedAt: null,
+    source: 'unavailable',
+  });
 });
 
 test('static holder rankings route preserves the baked snapshot contract', async () => {
