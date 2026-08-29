@@ -9,7 +9,6 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --import tsx --test tests/*.test.ts",
-    "probe:eth-call-many": "tsx ./scripts/probe_eth_call_many.ts",
     "verify:pool-meta": "tsx ./scripts/verify_pool_meta.ts",
     "update:holder-rankings": "node ./scripts/update_holder_rankings.js",
     "update:onchain-snapshot": "tsx ./scripts/update_onchain_snapshot.ts"
