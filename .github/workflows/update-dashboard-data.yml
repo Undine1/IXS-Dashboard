@@ -8,14 +8,24 @@ name: Update Dashboard Data
 
 on:
   schedule:
-    # Two expressions preserve the hourly cadence while giving the daily
-    # keepalive a stable event marker even when GitHub delays runner startup.
+    # Keep the existing native cron as an independent fallback. The guard
+    # below deduplicates late cron events against watchdog-triggered work.
     - cron: '23 0 * * *'
     - cron: '23 1-23 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      watchdog:
+        description: 'External scheduler invocation (fail closed on uncertain history)'
+        type: boolean
+        default: false
+      force:
+        description: 'Manually refresh even if data is fresh (ignored for watchdog runs)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   update:
@@ -41,7 +51,24 @@ jobs:
           persist-credentials: true
           token: ${{ secrets.GH_PAT }}
 
+      # This runs after acquiring concurrency AND checking out the live tip.
+      # A duplicate skips setup, npm ci, all RPC, artifacts and data commits.
+      - name: Check whether a refresh is due
+        id: freshness
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DASHBOARD_WATCHDOG: ${{ inputs.watchdog || false }}
+          DASHBOARD_FORCE: ${{ inputs.force || false }}
+        run: node ./scripts/check_dashboard_refresh.js
+
+      # Stable name used by both schedulers to distinguish actual attempts
+      # (including failed installs) from successful guard-only/no-op runs.
+      - name: Begin dashboard refresh attempt
+        if: ${{ steps.freshness.outputs.refresh == 'true' }}
+        run: echo "Refresh admitted by guard (${{ steps.freshness.outputs.reason }})"
+
       - name: Setup Node.js
+        if: ${{ steps.freshness.outputs.refresh == 'true' }}
         uses: actions/setup-node@v6
         with:
           node-version: '24.18.1'
@@ -49,6 +76,7 @@ jobs:
 
       - name: Install dependencies
         id: install
+        if: ${{ steps.freshness.outputs.refresh == 'true' }}
         run: |
           if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f yarn.lock ]; then
             npm ci
@@ -58,69 +86,13 @@ jobs:
           fi
 
       - name: Ping Chainstack backup RPC (daily)
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '23 0 * * *' }}
+        if: ${{ steps.install.outcome == 'success' }}
         env:
           BACKUP_CHAINSTACK_BASE_RPC_URL: ${{ secrets.BACKUP_CHAINSTACK_BASE_RPC_URL }}
-        run: |
-          node <<'NODE'
-          const url = String(process.env.BACKUP_CHAINSTACK_BASE_RPC_URL || '').trim();
-
-          if (!url) {
-            console.log('Chainstack backup RPC not configured; skipping keepalive');
-            process.exit(0);
-          }
-
-          async function main() {
-            const response = await fetch(url, {
-              method: 'POST',
-              signal: AbortSignal.timeout(15000),
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'eth_blockNumber',
-                params: [],
-                id: 'chainstack-keepalive',
-              }),
-            });
-
-            const text = await response.text();
-
-            if (!response.ok) {
-              console.log(`::warning::Chainstack keepalive returned HTTP ${response.status}`);
-              console.log(text);
-              return;
-            }
-
-            const payload = JSON.parse(text);
-
-            if (payload && payload.error) {
-              console.log(
-                `::warning::Chainstack keepalive RPC error: ${
-                  payload.error.message || JSON.stringify(payload.error)
-                }`,
-              );
-              return;
-            }
-
-            const blockNumber =
-              typeof payload.result === 'string' ? Number.parseInt(payload.result, 16) : Number.NaN;
-
-            if (Number.isFinite(blockNumber)) {
-              console.log(`Chainstack keepalive ok at block ${blockNumber}`);
-              return;
-            }
-
-            console.log('Chainstack keepalive ok');
-          }
-
-          main().catch((error) => {
-            console.log(
-              `::warning::Chainstack keepalive request failed: ${error.message || String(error)}`,
-            );
-          });
-          NODE
+        run: node ./scripts/ping_backup_rpc.js
 
       - name: Run pool updater
+        if: ${{ steps.install.outcome == 'success' }}
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
@@ -243,8 +215,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git status --porcelain | grep -qE "public/data/(pool_volume|pool_volume_checkpoint|holder_rankings|onchain_snapshot)\.json"; then
+          if git status --porcelain | grep -qE 'public/data/(pool_volume|pool_volume_checkpoint|holder_rankings|onchain_snapshot)\.json|data/scheduler_control\.json'; then
             git add public/data/pool_volume.json public/data/pool_volume_checkpoint.json public/data/holder_rankings.json public/data/onchain_snapshot.json || true
+            if [ -f data/scheduler_control.json ]; then git add data/scheduler_control.json; fi
             git commit -m "data: update pool volume and holder rankings [skip ci]" || echo "No changes to commit"
             branch="${GITHUB_REF_NAME:-main}"
             max_attempts=5
@@ -273,7 +246,7 @@ jobs:
           fi
 
       - name: Upload run artifacts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         uses: actions/upload-artifact@v7
         with:
           name: dashboard-data-artifacts

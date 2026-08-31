@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --import tsx --test tests/*.test.ts",
+    "typecheck:scheduler": "tsc --noEmit -p workers/scheduler/tsconfig.json && tsc --noEmit --allowJs --checkJs --strict --target ES2022 --module commonjs --skipLibCheck scripts/check_dashboard_refresh.js scripts/ping_backup_rpc.js",
     "verify:pool-meta": "tsx ./scripts/verify_pool_meta.ts",
     "update:holder-rankings": "node ./scripts/update_holder_rankings.js",
     "update:onchain-snapshot": "tsx ./scripts/update_onchain_snapshot.ts"

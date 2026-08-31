@@ -99,7 +99,8 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - The first holder rankings run is the expensive bootstrap. Later runs only scan blocks after the last saved checkpoint.
 
 ## GitHub Actions
-- `.github/workflows/update-dashboard-data.yml` runs hourly (at minute 23 — off the congested top of the hour, where GitHub delays or drops scheduled runs). The daily 00:23 UTC schedule event sends a lightweight `eth_blockNumber` keepalive request to the Chainstack backup Base RPC when configured (manual runs also exercise it); the other hourly events skip that standalone call even if runner startup is delayed. Every run executes the pool volume updater, the holder rankings updater, and the on-chain snapshot (pool reserve valuations + burn balances), then commits the served data files back to `main` in a single push so Vercel builds the new data once per run. The holder rankings incremental state is persisted separately on the `refs/data-state` ref (single orphan commit, no history) rather than in `main`, so the repo doesn't accumulate a ~1 MB state version every hour.
+- `.github/workflows/update-dashboard-data.yml` is scheduled hourly at minute 23. An early freshness/attempt guard inside the existing concurrency lock skips duplicate work before dependency installation or RPC. The optional Cloudflare watchdog checks GitHub every ten minutes and dispatches this same workflow after a missed slot; it ships disabled until account/token setup. See [scheduling policy, load limits, and activation](docs/dashboard_scheduling.md).
+- Each admitted refresh runs the pool-volume, holder-ranking, and on-chain snapshot updaters, then commits the served data in one push so Vercel builds it once. The Chainstack backup keepalive attempts one `eth_blockNumber` per UTC day regardless of trigger, recorded in the separate `data/scheduler_control.json`. Holder incremental state stays on `refs/data-state` (single orphan commit, no history), avoiding a ~1 MB state version every hour in `main`.
 - Because of the snapshot, Vercel makes no RPC calls in steady state — its RPC keys are only used by the live fallback paths.
 - The deployment-baked holder-ranking, pool-volume, and sync-status API responses are prerendered and retained by Vercel's CDN for the lifetime of that immutable deployment; publishing refreshed data creates a new deployment/cache namespace. Sync status therefore reflects the served artifacts without a runtime GitHub request or rate-limit dependency.
 - Authorized live pool/burn fallbacks batch reads into one Multicall3 request per involved chain; any failed batch or subcall falls back to the existing individual provider path.
@@ -126,6 +127,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 ## Additional docs
 - [docs/pool_volume_automation.md](docs/pool_volume_automation.md)
 - [docs/holder_rankings_automation.md](docs/holder_rankings_automation.md)
+- [docs/dashboard_scheduling.md](docs/dashboard_scheduling.md)
 
 ## Repository notes
 - **Git history was squashed to a single root commit on 2026-06-14.** The repo had

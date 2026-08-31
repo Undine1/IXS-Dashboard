@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "ixs-dashboard-scheduler",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-31",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "send_metrics": false,
+  "triggers": {
+    "crons": ["7,17,27,37,47,57 * * * *"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    // Enable only after installing this repository's scoped dispatch secret.
+    "ENABLED": "false"
+  },
+  "secrets": {
+    "required": ["GITHUB_TOKEN"]
+  }
+}
