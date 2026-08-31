@@ -7,6 +7,7 @@ import { Pool, PoolsApiResponse, TokenBurnStats, VaultTvl } from '@/types';
 
 interface SyncStatusResponse {
   ok?: boolean;
+  // Legacy API field name: this is a saved snapshot time, not deployment time.
   lastDeploymentCompletedAt?: string | null;
 }
 
@@ -17,7 +18,7 @@ export default function Dashboard() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [vaultTvl, setVaultTvl] = useState<VaultTvl | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [lastDeploymentCompletedAt, setLastDeploymentCompletedAt] = useState<string | null>(null);
+  const [lastSnapshotSyncAt, setLastSnapshotSyncAt] = useState<string | null>(null);
   // The loading screen only gates the very first load; hourly background
   // refreshes keep the rendered dashboard visible.
   const initialLoadRef = useRef(true);
@@ -42,8 +43,8 @@ export default function Dashboard() {
         ? 'Warning'
         : 'Healthy';
 
-  const lastSync = lastDeploymentCompletedAt
-    ? new Date(lastDeploymentCompletedAt).toLocaleString('en-US', {
+  const lastSync = lastSnapshotSyncAt
+    ? new Date(lastSnapshotSyncAt).toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -131,9 +132,9 @@ export default function Dashboard() {
         }
 
         if (syncStatusResult?.ok) {
-          setLastDeploymentCompletedAt(syncStatusResult.lastDeploymentCompletedAt || null);
+          setLastSnapshotSyncAt(syncStatusResult.lastDeploymentCompletedAt || null);
         } else {
-          setLastDeploymentCompletedAt(null);
+          setLastSnapshotSyncAt(null);
         }
         setVaultTvl(vaultResult);
       } catch (error) {
@@ -141,7 +142,7 @@ export default function Dashboard() {
         setPools([]);
         setWarnings([]);
         setVaultTvl(null);
-        setLastDeploymentCompletedAt(null);
+        setLastSnapshotSyncAt(null);
       } finally {
         if (isInitialLoad) {
           setLoadingProgress(100);
@@ -191,8 +192,11 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="ixs-dashboard-status-card rounded-2xl border border-white/15 bg-white/6 px-4 py-3 backdrop-blur-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Last Sync</p>
+              <div
+                className="ixs-dashboard-status-card rounded-2xl border border-white/15 bg-white/6 px-4 py-3 backdrop-blur-sm"
+                title="Latest saved snapshot timestamp. Live fallback reads do not update this time."
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Last snapshot sync</p>
                 <p className="mt-2 text-sm font-semibold text-white">{loading ? 'Syncing...' : lastSync}</p>
               </div>
             </div>

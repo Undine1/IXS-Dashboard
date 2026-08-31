@@ -62,6 +62,19 @@ test('sync status reports unavailable when every baked timestamp is invalid', ()
   });
 });
 
+test('live fallback timestamps do not advance the saved snapshot sync time', () => {
+  const savedAt = '2026-08-31T07:04:35.842Z';
+  const payload = syncStatusRoute.resolveSyncStatusSnapshots(null, null, {
+    burnStats: {
+      generatedAt: savedAt,
+      data: { lastUpdated: Date.parse('2026-08-31T14:30:00.000Z') },
+    },
+  });
+
+  assert.equal(payload.lastDeploymentCompletedAt, savedAt);
+  assert.equal(payload.source, 'snapshot');
+});
+
 test('static holder rankings route preserves the baked snapshot contract', async () => {
   const response = await holderRankingsRoute.GET();
   const payload = await response.json();

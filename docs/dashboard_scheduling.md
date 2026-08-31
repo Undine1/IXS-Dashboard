@@ -5,7 +5,7 @@
 1. Add the Actions freshness/cooldown guard before Node setup, dependency installation, or RPC. Keep the existing live-tip checkout and non-cancelling concurrency group.
 2. Make the backup-provider keepalive independent of the trigger: one attempted ping per UTC day, recorded separately from all accounting state.
 3. Add an independent Cloudflare Cron Worker that checks GitHub metadata every ten minutes and dispatches the existing workflow only when due.
-4. Run regression tests, ESLint, both runtime typechecks, a Next production build, and a Wrangler dry-run. Push the verified revision and verify Vercel's Git deployment. Enable the Worker only with dashboard-scoped credentials.
+4. Run regression tests, ESLint, both runtime typechecks, a Next production build, and an offline Worker-runtime transport check in addition to bundling. Push the verified revision and verify Vercel's Git deployment. Enable the Worker only with dashboard-scoped credentials.
 
 The Worker ships **disabled** (`ENABLED="false"`). Committing it does not activate Cloudflare. The Actions guard is active as soon as the workflow reaches `main`.
 
@@ -23,7 +23,7 @@ The Worker ships **disabled** (`ENABLED="false"`). Committing it does not activa
 
 The watcher reads `holder_rankings.json`, `pool_volume.json`, and `onchain_snapshot.json` from **one immutable `main` SHA**. It checks holder `lastRefreshed`, every required pool's own timestamp and embedded checkpoint, and `generatedAt` for pools, burn stats, and vault TVL. Missing/invalid/future dates are not treated as fresh. `navUpdatedAt` is deliberately excluded: a weekly NAV update is different from fetching the current vault state.
 
-The UI's maximum Last Sync timestamp is not an all-products health signal. Nor is an old Vercel deployment evidence that blockchain data needs refreshing. This scheduler does not poll the deployed UI, and cannot create an RPC loop merely because a Vercel build is delayed.
+The UI's **Last snapshot sync** is the newest timestamp in the published snapshots, not an all-products health signal or the time a visitor loaded the page. The pools, burn and vault routes can fall back to live reads when a snapshot exceeds its configured maximum age (six hours by default); those reads do not advance the saved snapshot timestamp. Nor is an old Vercel deployment evidence that blockchain data needs refreshing. This scheduler does not poll the deployed UI, and cannot create an RPC loop merely because a Vercel build is delayed.
 
 Pool timestamps can describe committed **partial progress**, not proof that an entire backlog is complete. Consequently, job outcomes and the `Begin dashboard refresh attempt` step are also checked. Balance/volume arithmetic, checkpoint semantics, and the holder state ref are untouched.
 
@@ -44,6 +44,8 @@ Do not copy RPC keys, the broad `GH_PAT`, or credentials from another repository
    ```
 
    Account/deployment credentials must already be set securely for the commands above. The committed default stays disabled: a future ordinary deployment without the enable override safely disables dispatch again. Do not assume pushing this repository redeploys the Worker; its deployment is separate from Vercel.
+
+   For dashboard-managed deployment, saving variables or secrets can create a version without activating it. Under **Deployments**, promote the version containing `ENABLED=true` and the encrypted `GITHUB_TOKEN` to 100%; verify the active version's bindings, not only the latest saved settings.
 
 4. In Cloudflare's Cron/Workers Logs view, confirm `dashboard-watchdog` events. On a fresh repository, expect `skip` with `attempt-cooldown` or `data-fresh`. After a missed hourly slot, expect one `dispatch`, then the existing GitHub updater to succeed. Confirm the following delayed native run skips setup/install/updaters if it is too soon.
 5. Verify the new data commit is deployed by Vercel and the served snapshot matches. An external scheduler improves trigger reliability, not GitHub runner or Vercel availability.
@@ -71,6 +73,8 @@ wrangler deploy --dry-run --config workers/scheduler/wrangler.jsonc --outdir wor
 ```
 
 `worker-configuration.d.ts` is generated with the installed Wrangler; do not edit it. The Worker has a separate TypeScript environment so its runtime types cannot leak into Next.js.
+
+The GitHub transport must use `redirect: 'manual'` and reject non-2xx responses, including every redirect, without following `Location` or retrying a dispatch. Do not replace this with `redirect: 'error'`: [workerd rejects that mode before making a request](https://github.com/cloudflare/workerd/blob/main/src/workerd/api/http.c%2B%2B#L445), even though Node accepts it. A build, typecheck or injected fetch mock does not validate the Worker runtime's request options. Before deploying transport changes, also test the shared client and bundled Worker with native workerd `fetch`, fake credentials and mocked outbound services (no live GitHub dispatch/RPC); check both successful requests and refused redirects. Use an already-installed approved runtime, and report its version/compatibility-date limits instead of silently installing tools.
 
 Metadata outages/rate limits cause the **external** watchdog to log an error and make no dispatch. A watchdog-triggered Actions preflight also fails closed. Native scheduled/manual runs deliberately retain their prior refresh behavior if the new metadata guard is unavailable, avoiding a new dependency that could suppress the original refresh path. This degraded fallback can do an extra sequential refresh; it cannot bypass the existing concurrency lock.
 

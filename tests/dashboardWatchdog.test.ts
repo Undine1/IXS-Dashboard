@@ -14,13 +14,17 @@ function fakeGitHub({ age = 90, failed = false, active = false, oldActive = fals
     const url = String(input);
     calls.push({ url, init });
     assert.ok(url.startsWith(`https://api.github.com/repos/${REPOSITORY}/`));
-    assert.equal(init?.redirect, 'error');
+    assert.equal(init?.redirect, 'manual');
     assert.equal(new Headers(init?.headers).get('authorization'), `Bearer ${env.GITHUB_TOKEN}`);
     if (url.includes('/dispatches')) {
       assert.equal(init?.method, 'POST');
       assert.deepEqual(JSON.parse(String(init?.body)), { ref: 'main', inputs: { watchdog: true, force: false } });
       if (dispatchThrows) throw new Error('uncertain result with secret response');
-      return new Response(null, { status: dispatchStatus });
+      return new Response(null, {
+        status: dispatchStatus,
+        headers: dispatchStatus >= 300 && dispatchStatus < 400
+          ? { Location: 'https://redirect.invalid/private-destination' } : undefined,
+      });
     }
     if (new URL(url).searchParams.has('status')) return Response.json({ total_count: oldActive ? 1 : 0, workflow_runs: [] });
     if (url.includes('/runs?')) return Response.json({ workflow_runs: [{ id: 123, updated_at: ago(age - 1), status: active ? 'queued' : 'completed', conclusion: failed ? 'failure' : 'success' }] });
@@ -83,6 +87,47 @@ test('ambiguous POST timeout is not retried and does not expose its raw error', 
   const result = await runWatchdog(env, github);
   assert.deepEqual(result, { action: 'error', reason: 'github-request-failed', requests: 12 });
   assert.equal(github.calls.filter(({ init }) => init?.method === 'POST').length, 1);
+});
+
+for (const status of [301, 302, 303, 307, 308]) {
+  for (const method of ['GET', 'POST'] as const) {
+    test(`GitHub ${method} rejects HTTP ${status} without following, retrying or leaking credentials`, async () => {
+      const path = `/repos/${REPOSITORY}/${method === 'POST' ? 'actions/workflows/update-dashboard-data.yml/dispatches' : 'test'}`;
+      const location = 'https://redirect.invalid/private-destination';
+      let calls = 0;
+      let cancelled = false;
+      const client = createGitHubClient({
+        token: env.GITHUB_TOKEN,
+        fetchImpl: async (input, init) => {
+          calls++;
+          assert.equal(String(input), `https://api.github.com${path}`);
+          assert.equal(init?.method, method);
+          assert.equal(init?.redirect, 'manual');
+          assert.equal(new Headers(init?.headers).get('authorization'), `Bearer ${env.GITHUB_TOKEN}`);
+          return new Response(new ReadableStream({
+            start(controller) { controller.enqueue(new TextEncoder().encode('private redirect response')); },
+            cancel() { cancelled = true; },
+          }), { status, headers: { Location: location } });
+        },
+      });
+
+      await assert.rejects(
+        client.request(path, method === 'POST' ? { body: { ref: 'main' } } : {}),
+        { code: `github-http-${status}`, message: `github-http-${status}` },
+      );
+      assert.equal(calls, 1);
+      assert.equal(client.requestCount(), 1);
+      assert.equal(cancelled, true, 'discard the redirect body without reading it');
+    });
+  }
+}
+
+test('a redirected workflow dispatch is an error, not success or a second POST', async () => {
+  const github = fakeGitHub({ dispatchStatus: 302 });
+  const result = await runWatchdog(env, github);
+  assert.deepEqual(result, { action: 'error', reason: 'github-http-302', requests: 12 });
+  assert.equal(github.calls.filter(({ init }) => init?.method === 'POST').length, 1);
+  assert.ok(github.calls.every(({ url }) => new URL(url).origin === 'https://api.github.com'));
 });
 
 test('GitHub 401/403/429/503 and malformed metadata never dispatch or retry', async () => {

@@ -107,7 +107,9 @@ function createGitHubClient({ token, fetchImpl = fetch, now = Date.now }) {
     try {
       const response = await fetchImpl(`https://api.github.com${path}`, {
         method: body === undefined ? 'GET' : 'POST',
-        redirect: 'error',
+        // workerd rejects redirect: 'error' before making a request. Manual
+        // mode also prevents forwarding credentials; reject every 3xx below.
+        redirect: 'manual',
         cache: 'no-store',
         signal: controller.signal,
         headers: {
