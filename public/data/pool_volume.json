@@ -2,26 +2,26 @@
   "pools": {
     "0xd093a031df30f186976a1e2936b16d95ca7919d6": {
       "total_usd": 3791716.571082,
-      "lastUpdated": "2026-09-01T09:48:08.408Z",
+      "lastUpdated": "2026-09-01T11:08:09.252Z",
       "chain": "polygon",
       "usdc": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
     },
     "0xd22a820dc52f1cacea7a5c86da16757f434f43c6": {
       "total_usd": 3075756.8177679973,
-      "lastUpdated": "2026-09-01T09:48:08.860Z",
+      "lastUpdated": "2026-09-01T11:08:09.963Z",
       "chain": "base",
       "usdc": "0x833589fCd6eDb6E08f4c7C32D4f71b54bdA02913"
     }
   },
   "checkpoints": {
     "0xd093a031df30f186976a1e2936b16d95ca7919d6": {
-      "lastTimestamp": 1788256087,
-      "lastBlock": 93034037
+      "lastTimestamp": 1788260888,
+      "lastBlock": 93037237
     },
     "0xd22a820dc52f1cacea7a5c86da16757f434f43c6": {
-      "lastTimestamp": 1788256088,
-      "lastBlock": 50733370
+      "lastTimestamp": 1788260889,
+      "lastBlock": 50735771
     }
   },
-  "lastUpdated": "2026-09-01T09:48:08.860Z"
+  "lastUpdated": "2026-09-01T11:08:09.963Z"
 }
