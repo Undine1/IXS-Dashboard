@@ -324,13 +324,11 @@ export default function BurnStats({
     .slice(0, HOLDER_DISPLAY_LIMIT);
   const holderRowsVisible = 10;
   const holderRowHeightPx = 56;
-  // The sticky column header lives inside the scroll viewport, so its height is
-  // budgeted on top of the rows for exactly holderRowsVisible rows to show. The
-  // header is pinned to this exact height (not line-height/padding derived) and
-  // the viewport's frame border lives on an outer wrapper, so the viewport's
-  // clientHeight equals this max-height exactly — flush at any display scaling.
+  // The column header sits outside the rows' scroll viewport, so rows can never
+  // paint behind it. Both regions reserve the same stable scrollbar gutter to
+  // keep their grid columns aligned across classic and overlay scrollbars.
   const holderHeaderHeightPx = 33;
-  const holderListMaxHeightPx = holderRowsVisible * holderRowHeightPx + holderHeaderHeightPx;
+  const holderRowsMaxHeightPx = holderRowsVisible * holderRowHeightPx;
 
   const insetListClass ='rounded-xl border border-slate-700 bg-slate-900/30';
   const insetRowClass = 'box-border flex h-11 items-center justify-between gap-3 border-b px-3 text-sm last:border-b-0 border-slate-700/70 hover:bg-slate-800/60';
@@ -784,75 +782,66 @@ export default function BurnStats({
                         </button>
                       </div>
 
-                      {/* Outer frame carries the border/background/rounding and
-                          clips the scrollbar to the rounded corners; the inner
-                          element does the scrolling with no border, so its
-                          clientHeight equals max-height exactly. */}
-                      <div className="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-900/30">
-                      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px bg-slate-900" aria-hidden />
-                      <div
-                        className="modern-scrollbar overflow-y-auto"
-                        style={{ maxHeight: `${holderListMaxHeightPx}px` }}
-                      >
-                        {/* Sticky header inside the scroll viewport, so its
-                            columns share the rows' coordinate space — no
-                            scrollbar-width measuring needed — and it stays
-                            visible while scrolling. Fixed height so exactly
-                            holderRowsVisible rows fit below it. The opaque fill,
-                            plus the frame's one-pixel top-edge mask, prevents
-                            rows showing through a fractional compositor seam. */}
+                      {/* The header and rows are separate regions inside one
+                          clipped frame. The header reserves the same scrollbar
+                          gutter as the rows, keeping their columns aligned. */}
+                      <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900/30">
                         <div
-                          className="sticky top-0 z-10 grid grid-cols-12 items-center gap-2 border-b border-slate-700/70 bg-slate-900 px-4 text-xs font-bold uppercase tracking-wide text-gray-300"
+                          className="modern-scrollbar grid grid-cols-12 items-center gap-2 overflow-y-hidden border-b border-slate-700/70 bg-slate-900 px-4 text-xs font-bold uppercase tracking-wide text-gray-300"
                           style={{ height: `${holderHeaderHeightPx}px` }}
                         >
                           <span className="col-span-1 text-left" aria-hidden />
                           <span className="col-span-5 pl-5 text-left">holder</span>
                           <span className="col-span-6 text-right">tokens</span>
                         </div>
-                        {holderLoading ? (
-                          <div className="p-4 text-sm text-gray-400">Loading holder rankings...</div>
-                        ) : visibleHolderRows.length === 0 ? (
-                          <div className="p-4 text-sm text-gray-400">No holders found for that search.</div>
-                        ) : (
-                          <div>
-                            {visibleHolderRows.map((row) => (
-                              <div
-                                key={`${row.rank}-${row.holder}`}
-                                className="box-border grid min-h-14 grid-cols-12 items-center gap-2 border-b px-4 py-2 text-sm last:border-b-0 border-slate-700/70 hover:bg-slate-800/60"
-                              >
-                                <span className="col-span-1 text-left font-semibold tabular-nums text-gray-100">{row.rank}</span>
-                                {/* Label takes whatever space is free up to the
-                                    amount and truncates only on real collision —
-                                    long labels can no longer bleed into the
-                                    amounts column on narrow screens. */}
-                                <div className="col-span-11 flex min-w-0 items-baseline gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleCopyHolderAddress(row.holder)}
-                                    title={copiedHolderAddress === row.holder ? 'Copied' : 'Click to copy full address'}
-                                    aria-label={`Copy address ${row.holder}`}
-                                    className={`flex min-w-0 flex-1 items-baseline gap-2 pl-5 text-left font-mono text-sm transition-colors ${
-                                      copiedHolderAddress === row.holder
-                                        ? 'text-emerald-300'
-                                        : 'text-cyan-300'
-                                    }`}
-                                  >
-                                    <span className="shrink-0 font-mono text-sm text-current">
-                                      {formatHolderAddress(row.holder)}
-                                    </span>
-                                    {row.label ? (
-                                      <span className="min-w-0 truncate text-[11px] font-medium text-gray-400">
-                                        {row.label}
+                        <div
+                          className="modern-scrollbar overflow-y-auto"
+                          style={{ maxHeight: `${holderRowsMaxHeightPx}px` }}
+                        >
+                          {holderLoading ? (
+                            <div className="p-4 text-sm text-gray-400">Loading holder rankings...</div>
+                          ) : visibleHolderRows.length === 0 ? (
+                            <div className="p-4 text-sm text-gray-400">No holders found for that search.</div>
+                          ) : (
+                            <div>
+                              {visibleHolderRows.map((row) => (
+                                <div
+                                  key={`${row.rank}-${row.holder}`}
+                                  className="box-border grid min-h-14 grid-cols-12 items-center gap-2 border-b px-4 py-2 text-sm last:border-b-0 border-slate-700/70 hover:bg-slate-800/60"
+                                >
+                                  <span className="col-span-1 text-left font-semibold tabular-nums text-gray-100">{row.rank}</span>
+                                  {/* Label takes whatever space is free up to the
+                                      amount and truncates only on real collision —
+                                      long labels can no longer bleed into the
+                                      amounts column on narrow screens. */}
+                                  <div className="col-span-11 flex min-w-0 items-baseline gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleCopyHolderAddress(row.holder)}
+                                      title={copiedHolderAddress === row.holder ? 'Copied' : 'Click to copy full address'}
+                                      aria-label={`Copy address ${row.holder}`}
+                                      className={`flex min-w-0 flex-1 items-baseline gap-2 pl-5 text-left font-mono text-sm transition-colors ${
+                                        copiedHolderAddress === row.holder
+                                          ? 'text-emerald-300'
+                                          : 'text-cyan-300'
+                                      }`}
+                                    >
+                                      <span className="shrink-0 font-mono text-sm text-current">
+                                        {formatHolderAddress(row.holder)}
                                       </span>
-                                    ) : null}
-                                  </button>
-                                  <span className="shrink-0 text-right font-mono font-bold text-white">{row.totalIxs}</span>
+                                      {row.label ? (
+                                        <span className="min-w-0 truncate text-[11px] font-medium text-gray-400">
+                                          {row.label}
+                                        </span>
+                                      ) : null}
+                                    </button>
+                                    <span className="shrink-0 text-right font-mono font-bold text-white">{row.totalIxs}</span>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <label className="block">
