@@ -788,7 +788,8 @@ export default function BurnStats({
                           clips the scrollbar to the rounded corners; the inner
                           element does the scrolling with no border, so its
                           clientHeight equals max-height exactly. */}
-                      <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900/30">
+                      <div className="relative overflow-hidden rounded-xl border border-slate-700 bg-slate-900/30">
+                      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px bg-slate-900" aria-hidden />
                       <div
                         className="modern-scrollbar overflow-y-auto"
                         style={{ maxHeight: `${holderListMaxHeightPx}px` }}
@@ -797,9 +798,11 @@ export default function BurnStats({
                             columns share the rows' coordinate space — no
                             scrollbar-width measuring needed — and it stays
                             visible while scrolling. Fixed height so exactly
-                            holderRowsVisible rows fit below it. */}
+                            holderRowsVisible rows fit below it. The opaque fill,
+                            plus the frame's one-pixel top-edge mask, prevents
+                            rows showing through a fractional compositor seam. */}
                         <div
-                          className="sticky top-0 z-10 grid grid-cols-12 items-center gap-2 border-b border-slate-700/70 bg-slate-900/95 px-4 text-xs font-bold uppercase tracking-wide text-gray-300 backdrop-blur-sm"
+                          className="sticky top-0 z-10 grid grid-cols-12 items-center gap-2 border-b border-slate-700/70 bg-slate-900 px-4 text-xs font-bold uppercase tracking-wide text-gray-300"
                           style={{ height: `${holderHeaderHeightPx}px` }}
                         >
                           <span className="col-span-1 text-left" aria-hidden />
