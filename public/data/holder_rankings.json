@@ -12,7 +12,7 @@
       "rank": 2,
       "holder": "0x5a58505a96d1dbf8df91cb21b54419fc36e93fde",
       "chainsHolding": 1,
-      "totalIxs": "7,031,395.53",
+      "totalIxs": "7,073,729.62",
       "label": "Wormhole Bridge"
     },
     {
@@ -227,30 +227,30 @@
     },
     {
       "rank": 33,
+      "holder": "0xce90767d34d7090e809bbec8f5213b1c0865eb0a",
+      "chainsHolding": 1,
+      "totalIxs": "685,344.41",
+      "label": null
+    },
+    {
+      "rank": 34,
       "holder": "0xf34534c01e262d002113861a495fd3fa3b740c13",
       "chainsHolding": 1,
       "totalIxs": "659,439.38",
       "label": null
     },
     {
-      "rank": 34,
+      "rank": 35,
       "holder": "0xa8af2bf6779b13405ecb9a920fab21baed6abd1a",
       "chainsHolding": 1,
       "totalIxs": "649,706.29",
       "label": null
     },
     {
-      "rank": 35,
+      "rank": 36,
       "holder": "0xc0f21a34acfc0b23c004b8ad7a40acfa739b80c9",
       "chainsHolding": 1,
       "totalIxs": "648,861.64",
-      "label": null
-    },
-    {
-      "rank": 36,
-      "holder": "0xce90767d34d7090e809bbec8f5213b1c0865eb0a",
-      "chainsHolding": 1,
-      "totalIxs": "645,920.16",
       "label": null
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12243,
-  "lastRefreshed": "2026-09-05T02:18:18.246Z",
+  "lastRefreshed": "2026-09-05T03:38:26.904Z",
   "source": "rpc-snapshot"
 }
