@@ -61,12 +61,17 @@ function getPacingSettings(env = process.env) {
     Number.isFinite(Number(env.RPC_MIN_INTERVAL_MS)) &&
     Number(env.RPC_MIN_INTERVAL_MS) >= 0;
 
+  const budgetRaw = String(env.RPC_ALCHEMY_BUDGET_CUPS ?? '').trim();
+  const alchemyBudgetCups = budgetRaw === '' ? null : Number(budgetRaw);
+  if (alchemyBudgetCups != null && (!Number.isFinite(alchemyBudgetCups) || alchemyBudgetCups <= 0)) {
+    throw new Error('RPC_ALCHEMY_BUDGET_CUPS must be a positive dashboard allocation');
+  }
+  const requestedAlchemyTargetCups = finitePositiveOr(env.RPC_ALCHEMY_TARGET_CUPS, DEFAULT_ALCHEMY_TARGET_CUPS);
   return {
     legacyOverrideMs: hasLegacyOverride ? Number(env.RPC_MIN_INTERVAL_MS) : null,
-    alchemyTargetCups: finitePositiveOr(
-      env.RPC_ALCHEMY_TARGET_CUPS,
-      DEFAULT_ALCHEMY_TARGET_CUPS,
-    ),
+    requestedAlchemyTargetCups,
+    alchemyBudgetCups,
+    alchemyTargetCups: Math.min(requestedAlchemyTargetCups, alchemyBudgetCups ?? Infinity),
     alchemyMinIntervalMs: finiteNonNegativeOr(
       env.RPC_ALCHEMY_MIN_INTERVAL_MS,
       DEFAULT_ALCHEMY_MIN_INTERVAL_MS,
@@ -77,12 +82,14 @@ function getPacingSettings(env = process.env) {
 
 function getRpcPacingGapMs(url, method, env = process.env) {
   const settings = getPacingSettings(env);
-  if (settings.legacyOverrideMs != null) return settings.legacyOverrideMs;
+  if (settings.legacyOverrideMs != null && (getRpcProviderLabel(url) !== 'alchemy' || settings.alchemyBudgetCups == null)) {
+    return settings.legacyOverrideMs;
+  }
   if (getRpcProviderLabel(url) !== 'alchemy') return settings.providerMinIntervalMs;
 
   const { computeUnits } = getAlchemyComputeUnits(method);
   return Math.max(
-    settings.alchemyMinIntervalMs,
+    settings.legacyOverrideMs ?? settings.alchemyMinIntervalMs,
     Math.ceil((computeUnits / settings.alchemyTargetCups) * 1000),
   );
 }

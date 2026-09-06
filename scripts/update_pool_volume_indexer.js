@@ -16,6 +16,11 @@ const {
   getRpcUsageRunId,
   writeRpcUsageComponent,
 } = require('./rpc_run_usage');
+const {
+  readRpcResponse,
+  sanitizeRpcMessage,
+  createProviderCooldowns,
+} = require('./rpc_transport');
 
 function loadEnvLocal() {
   try {
@@ -81,6 +86,53 @@ const latestBlockNumberCache = new Map();
 const disabledProviders = new Map();
 const providerRangeCeilings = createProviderRangeCeilingTracker();
 const rpcRunUsage = createRpcRunUsageTracker();
+const providerCooldowns = createProviderCooldowns();
+const finalizedBlockCache = new Map();
+let runDeadlineAt = Infinity;
+
+function setRunDeadline(deadlineAt = Infinity) {
+  runDeadlineAt = deadlineAt;
+}
+
+function assertRunBudget(waitMs = 0) {
+  if (Date.now() + Math.max(0, waitMs) >= runDeadlineAt) {
+    const error = new Error('Pool scan reached its cooperative run deadline; completed checkpoints are preserved');
+    error.code = 'RPC_RUN_DEADLINE';
+    throw error;
+  }
+}
+
+function sanitizeRpcError(error) {
+  const clean = new Error(sanitizeRpcMessage(error && error.message ? error.message : String(error)));
+  for (const key of ['code', 'status', 'maxLogRange', 'suppressAlertFile', 'retryCountRecorded']) {
+    if (error && error[key] !== undefined) clean[key] = error[key];
+  }
+  if (error && Array.isArray(error.providerErrors)) {
+    clean.providerErrors = error.providerErrors.map((message) => sanitizeRpcMessage(message));
+  }
+  return clean;
+}
+
+function invalidRpcResponse(message) {
+  const error = new Error(message);
+  error.code = 'RPC_INVALID_RESPONSE';
+  return error;
+}
+
+function validateRpcEnvelope(value, expectedId) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      value.jsonrpc !== '2.0' || value.id !== expectedId) {
+    throw invalidRpcResponse('Invalid JSON-RPC response envelope or request id');
+  }
+  const hasResult = Object.prototype.hasOwnProperty.call(value, 'result');
+  const hasError = Object.prototype.hasOwnProperty.call(value, 'error');
+  if (hasResult === hasError) throw invalidRpcResponse('JSON-RPC response must contain exactly one result or error');
+  if (hasError && (!value.error || typeof value.error !== 'object' ||
+      !Number.isInteger(value.error.code) || typeof value.error.message !== 'string')) {
+    throw invalidRpcResponse('Invalid JSON-RPC error envelope');
+  }
+  return value;
+}
 
 // Equal jitter: half the exponential step is a guaranteed floor, the other
 // half is randomized. Full jitter (random 0..exp) can roll near-zero waits
@@ -98,9 +150,13 @@ async function requestWithRetries(url, opts = {}, context = {}) {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      assertRunBudget();
       await rpcRunUsage.beforeAttempt(url, method);
+      assertRunBudget();
       apiCallCount += 1;
-      const res = await fetch(url, opts);
+      const res = await readRpcResponse(url, opts, {
+        timeoutMs: Math.min(Number(process.env.RPC_REQUEST_TIMEOUT_MS || 15000), runDeadlineAt - Date.now()),
+      });
 
       // Retry on 429 or 5xx
       if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
@@ -124,12 +180,12 @@ async function requestWithRetries(url, opts = {}, context = {}) {
         if (attempt === maxAttempts) {
           let responseText = '';
           try {
-            responseText = (await res.text()).replace(/\s+/g, ' ').trim();
+            responseText = sanitizeRpcMessage((await res.text()).replace(/\s+/g, ' ').trim());
           } catch {
             responseText = '';
           }
           const err = new Error(
-            `Request ${url} returned ${res.status}${res.statusText ? ` ${res.statusText}` : ''}${
+            `Request ${getProviderLabel(url)} returned ${res.status}${res.statusText ? ` ${res.statusText}` : ''}${
               responseText ? `: ${responseText}` : ''
             }; retries exhausted after ${maxAttempts} attempts`,
           );
@@ -139,18 +195,20 @@ async function requestWithRetries(url, opts = {}, context = {}) {
           else if (res.status === 408 || res.status === 504) err.code = 'RPC_TIMEOUT';
           else err.code = `RPC_HTTP_${res.status}`;
           err.status = res.status;
-          err.url = url;
           err.suppressAlertFile = true;
           err.retryCountRecorded = true;
           throw err;
         }
-        console.warn(`Request ${url} returned ${res.status}; attempt ${attempt}/${maxAttempts}, retrying after ${waitMs}ms`);
+        console.warn(`Request ${getProviderLabel(url)} returned ${res.status}; attempt ${attempt}/${maxAttempts}, retrying after ${waitMs}ms`);
+        assertRunBudget(waitMs);
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
 
       return res;
     } catch (err) {
+      err = sanitizeRpcError(err);
+      if (err.code === 'RPC_RUN_DEADLINE') throw err;
       if (!(err && err.retryCountRecorded)) {
         retryCount += 1;
       }
@@ -160,7 +218,7 @@ async function requestWithRetries(url, opts = {}, context = {}) {
         }
         // write alert file before throwing so workflow can detect
         try {
-          const a = { alert: true, reasons: [`request-failed: ${url}`, err && err.message], ts: new Date().toISOString(), apiCallCount, retryCount };
+          const a = { alert: true, reasons: [`request-failed: ${getProviderLabel(url)}`, err && err.message], ts: new Date().toISOString(), apiCallCount, retryCount };
           fs.writeFileSync(ALERT_FILE, JSON.stringify(a, null, 2));
         } catch (e) {
           console.error('Failed to write alert file', e && e.message);
@@ -168,7 +226,8 @@ async function requestWithRetries(url, opts = {}, context = {}) {
         throw err;
       }
       const waitMs = computeRetryDelayMs(attempt, baseDelay, maxDelay);
-      console.warn(`Request error for ${url}; attempt ${attempt}/${maxAttempts}, retrying after ${waitMs}ms`, err && err.message);
+      console.warn(`Request error for ${getProviderLabel(url)}; attempt ${attempt}/${maxAttempts}, retrying after ${waitMs}ms`, err && err.message);
+      assertRunBudget(waitMs);
       await new Promise((r) => setTimeout(r, waitMs));
     }
   }
@@ -177,8 +236,11 @@ async function requestWithRetries(url, opts = {}, context = {}) {
 
 function classifyRpcErrorMessage(message) {
   const txt = String(message || '').toLowerCase();
-  if (inferMaxLogRangeFromError(message) != null) return 'RPC_RANGE_LIMIT';
-  if (txt.includes('limit') || txt.includes('rate')) return 'RPC_RATE_LIMIT';
+  if (inferMaxLogRangeFromError(message) != null ||
+      /block range|range.{0,30}(?:exceed|limit|large|wide)|(?:response|result|log).{0,30}(?:size|too many|limit|exceed)|too many (?:results|logs)/.test(txt)) {
+    return 'RPC_RANGE_LIMIT';
+  }
+  if (/rate.?limit|too many requests|throughput|quota|thrott|compute units per second/.test(txt)) return 'RPC_RATE_LIMIT';
   if (txt.includes('timeout') || txt.includes('timed out')) return 'RPC_TIMEOUT';
   if (txt.includes('too many requests')) return 'RPC_RATE_LIMIT';
   return 'RPC_ERROR';
@@ -189,6 +251,7 @@ function shouldDisableProviderForRun(error) {
   const status = Number((error && error.status) || Number.NaN);
   const message = String((error && error.message) || '').toLowerCase();
   if ([401, 403, 429].includes(status)) return true;
+  if (code === 'RPC_RANGE_LIMIT' || code === 'RPC_RANGE_CEILING') return false;
   if (code === 'RPC_RATE_LIMIT' || code === 'RPC_FORBIDDEN' || code === 'RPC_UNAUTHORIZED') return true;
   return /429|too many requests|rate limit|rate-limited|thrott|quota|forbidden|unauthorized/.test(message);
 }
@@ -327,7 +390,7 @@ async function alchemyCall(chain, method, params) {
 
   let lastErr = null;
   const providerErrors = [];
-  for (const url of urls) {
+  for (const url of providerCooldowns.order(urls, method)) {
     const providerLabel = getProviderLabel(url);
     const providerHost = getProviderHost(url);
     const disabledInfo = getDisabledProviderInfo(url, method);
@@ -340,7 +403,7 @@ async function alchemyCall(chain, method, params) {
       continue;
     }
     try {
-      const payload = { jsonrpc: '2.0', id: Date.now(), method, params };
+      const payload = { jsonrpc: '2.0', id: 1, method, params };
       const res = await requestWithRetries(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -354,23 +417,29 @@ async function alchemyCall(chain, method, params) {
           responseText = '';
         }
         const err = new Error(
-          `Alchemy HTTP ${res.status} ${res.statusText} at ${url}${responseText ? `: ${responseText}` : ''}`,
+          sanitizeRpcMessage(`Alchemy HTTP ${res.status} ${res.statusText} at ${url}${responseText ? `: ${responseText}` : ''}`),
         );
         err.code = `ALCHEMY_HTTP_${res.status}`;
+        err.status = res.status;
         throw err;
       }
-      const j = await res.json();
+      const j = validateRpcEnvelope(await res.json(), payload.id);
       if (j && j.error) {
         const msg = j.error.message || JSON.stringify(j.error);
-        const err = new Error(`Alchemy ${method} error at ${url}: ${msg}`);
-        err.code = 'ALCHEMY_ERROR';
+        const err = new Error(sanitizeRpcMessage(`Alchemy ${method} error at ${url}: ${msg}`));
+        err.code = classifyRpcErrorMessage(msg);
         throw err;
       }
+      validateRpcMethodResult(method, params, j.result);
+      providerCooldowns.succeeded(url, method);
       return j.result;
     } catch (e) {
+      e = sanitizeRpcError(e);
+      if (e.code === 'RPC_RUN_DEADLINE') throw e;
       providerErrors.push(`${providerLabel}@${providerHost} code=${(e && e.code) || 'unknown'} msg=${(e && e.message) || String(e)}`);
       console.warn(`[pool-volume] ${chain} ${method}: provider ${providerLabel} (${providerHost}) failed: ${(e && e.message) || String(e)}`);
       disableProviderForRun(url, method, e);
+      providerCooldowns.failed(url, method, e);
       lastErr = e;
       continue;
     }
@@ -388,18 +457,15 @@ async function alchemyCall(chain, method, params) {
   throw lastErr || new Error(`Alchemy call failed for ${method}`);
 }
 
-async function getBlockByTimestamp(ts, chain) {
-  return getBlockByTimestampRpc(ts, chain);
-}
-
 function asRpcHex(n) {
   return `0x${Math.max(0, Math.floor(Number(n) || 0)).toString(16)}`;
 }
 
 function fromRpcHex(value) {
-  if (typeof value !== 'string' || !value.startsWith('0x')) return Number.NaN;
+  if (typeof value !== 'string' || !/^0x[0-9a-f]+$/i.test(value)) return Number.NaN;
   try {
-    return Number(BigInt(value));
+    const parsed = Number(BigInt(value));
+    return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : Number.NaN;
   } catch {
     return Number.NaN;
   }
@@ -412,7 +478,92 @@ function addrToTopic(addr) {
 }
 
 function logKey(log) {
-  return `${(log && log.transactionHash) || ''}:${(log && log.logIndex) || ''}`;
+  return `${String(log.transactionHash).toLowerCase()}:${fromRpcHex(log.logIndex)}`;
+}
+
+const HASH_PATTERN = /^0x[0-9a-f]{64}$/i;
+const RAW_VALUE_PATTERN = /^0x[0-9a-f]+$/i;
+
+function transferFingerprint(transfer) {
+  return JSON.stringify([
+    String(transfer.hash).toLowerCase(), fromRpcHex(transfer.blockNum),
+    String(transfer.from).toLowerCase(), String(transfer.to).toLowerCase(),
+    String(transfer.rawContract.address).toLowerCase(), String(getAssetTransferRawValue(transfer)),
+  ]);
+}
+
+function logFingerprint(log) {
+  return JSON.stringify([
+    logKey(log), String(log.blockHash).toLowerCase(), fromRpcHex(log.blockNumber),
+    String(log.address).toLowerCase(), log.topics.map((topic) => topic.toLowerCase()), String(BigInt(log.data)),
+  ]);
+}
+
+function validateRpcMethodResult(method, params, result) {
+  if (method === 'eth_blockNumber') {
+    if (!Number.isFinite(fromRpcHex(result))) throw invalidRpcResponse('Invalid eth_blockNumber result');
+    return;
+  }
+  if (method === 'eth_getBlockByNumber') {
+    if (!result || !Number.isFinite(fromRpcHex(result.number)) ||
+        !Number.isFinite(fromRpcHex(result.timestamp)) || !HASH_PATTERN.test(result.hash)) {
+      throw invalidRpcResponse('Missing or invalid block header');
+    }
+    if (RAW_VALUE_PATTERN.test(params[0]) && fromRpcHex(result.number) !== fromRpcHex(params[0])) {
+      throw invalidRpcResponse('Block header does not match the requested block');
+    }
+    return;
+  }
+  if (method === 'eth_getLogs') {
+    if (!Array.isArray(result)) throw invalidRpcResponse('eth_getLogs result must be an array');
+    const filter = params[0];
+    const seen = new Set();
+    for (const log of result) {
+      if (!log || !HASH_PATTERN.test(log.transactionHash) || !HASH_PATTERN.test(log.blockHash) ||
+          !Number.isFinite(fromRpcHex(log.logIndex)) || !Number.isFinite(fromRpcHex(log.blockNumber)) ||
+          !HASH_PATTERN.test(log.data) || !isValidAddress(log.address) ||
+          !Array.isArray(log.topics) || log.topics.length !== 3 ||
+          log.topics.some((topic) => !HASH_PATTERN.test(topic)) || log.removed !== false) {
+        throw invalidRpcResponse('Malformed ERC-20 transfer log');
+      }
+      const block = fromRpcHex(log.blockNumber);
+      if (block < fromRpcHex(filter.fromBlock) || block > fromRpcHex(filter.toBlock) ||
+          (filter.address && log.address.toLowerCase() !== String(filter.address).toLowerCase()) ||
+          (filter.topics || []).some((topic, index) => topic != null && log.topics[index].toLowerCase() !== topic.toLowerCase())) {
+        throw invalidRpcResponse('Transfer log does not match the requested filter');
+      }
+      const key = logKey(log);
+      if (seen.has(key)) throw invalidRpcResponse('Duplicate transfer log in one RPC result');
+      seen.add(key);
+    }
+    return;
+  }
+  if (method === 'alchemy_getAssetTransfers') {
+    if (!result || typeof result !== 'object' || Array.isArray(result) || !Array.isArray(result.transfers) ||
+        (result.pageKey != null && typeof result.pageKey !== 'string')) {
+      throw invalidRpcResponse('Invalid Asset Transfers page');
+    }
+    const filter = params[0];
+    const seen = new Set();
+    for (const transfer of result.transfers) {
+      const block = fromRpcHex(transfer && transfer.blockNum);
+      if (!transfer || !HASH_PATTERN.test(transfer.hash) || !Number.isFinite(block) ||
+          !isValidAddress(transfer.from) || !isValidAddress(transfer.to) || transfer.category !== 'erc20' ||
+          !transfer.rawContract || !isValidAddress(transfer.rawContract.address) ||
+          !RAW_VALUE_PATTERN.test(transfer.rawContract.value)) {
+        throw invalidRpcResponse('Malformed Asset Transfers ERC-20 event');
+      }
+      const key = getAssetTransferKey(transfer);
+      if (block < fromRpcHex(filter.fromBlock) || block > fromRpcHex(filter.toBlock) ||
+          !filter.contractAddresses.some((address) => address.toLowerCase() === transfer.rawContract.address.toLowerCase()) ||
+          (filter.fromAddress && transfer.from.toLowerCase() !== filter.fromAddress.toLowerCase()) ||
+          (filter.toAddress && transfer.to.toLowerCase() !== filter.toAddress.toLowerCase())) {
+        throw invalidRpcResponse('Asset transfer does not match the requested filter');
+      }
+      if (seen.has(key)) throw invalidRpcResponse('Duplicate event in one Asset Transfers page');
+      seen.add(key);
+    }
+  }
 }
 
 function getProviderHost(url) {
@@ -441,7 +592,7 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
   let lastErr = null;
   const providerErrors = [];
   const retryRangeCeilings = [];
-  for (const url of urls) {
+  for (const url of providerCooldowns.order(urls, method)) {
     const providerLabel = getProviderLabel(url);
     const providerHost = getProviderHost(url);
     const disabledInfo = getDisabledProviderInfo(url, method);
@@ -468,7 +619,7 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
     }
 
     try {
-      const payload = { jsonrpc: '2.0', id: Date.now(), method, params };
+      const payload = { jsonrpc: '2.0', id: 1, method, params };
       const res = await requestWithRetries(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -482,21 +633,26 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
           responseText = '';
         }
         const err = new Error(
-          `RPC HTTP ${res.status} ${res.statusText} at ${url}${responseText ? `: ${responseText}` : ''}`,
+          sanitizeRpcMessage(`RPC HTTP ${res.status} ${res.statusText} at ${url}${responseText ? `: ${responseText}` : ''}`),
         );
-        if (res.status === 403) err.code = 'RPC_FORBIDDEN';
+        if (res.status === 401) err.code = 'RPC_UNAUTHORIZED';
+        else if (res.status === 403) err.code = 'RPC_FORBIDDEN';
         else if (res.status === 429) err.code = 'RPC_RATE_LIMIT';
         else if (res.status === 408 || res.status === 504) err.code = 'RPC_TIMEOUT';
+        else if (res.status === 400 && classifyRpcErrorMessage(responseText) === 'RPC_RANGE_LIMIT') err.code = 'RPC_RANGE_LIMIT';
         else err.code = `RPC_HTTP_${res.status}`;
+        err.status = res.status;
         throw err;
       }
-      const j = await res.json();
+      const j = validateRpcEnvelope(await res.json(), payload.id);
       if (j && j.error) {
         const msg = j.error.message || JSON.stringify(j.error);
-        const err = new Error(`RPC ${method} error at ${url}: ${msg}`);
+        const err = new Error(sanitizeRpcMessage(`RPC ${method} error at ${url}: ${msg}`));
         err.code = classifyRpcErrorMessage(msg);
         throw err;
       }
+      validateRpcMethodResult(method, params, j.result);
+      providerCooldowns.succeeded(url, method);
       if (providerErrors.length > 0) {
         console.warn(
           `[pool-volume] ${chain} ${method}: using fallback provider ${providerLabel} (${providerHost}) after previous failures: ${providerErrors.join(' | ')}`,
@@ -504,6 +660,8 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
       }
       return j.result;
     } catch (e) {
+      e = sanitizeRpcError(e);
+      if (e.code === 'RPC_RUN_DEADLINE') throw e;
       const code = (e && e.code) || 'unknown';
       const message = (e && e.message) || String(e);
       providerErrors.push(`${providerLabel}@${providerHost} code=${code} msg=${message}`);
@@ -516,6 +674,7 @@ async function rpcCallWithUrls(chain, method, params, urls, missingUrlCode = 'RP
         providerRangeCeilings.remember(chain, method, url, providerMaxRange);
       }
       const disabled = disableProviderForRun(url, method, e);
+      providerCooldowns.failed(url, method, e);
       if (inferredMaxRange != null && !disabled) {
         retryRangeCeilings.push(inferredMaxRange);
       }
@@ -570,6 +729,16 @@ async function getLatestBlockState(chain) {
   return latestBlock;
 }
 
+async function getFinalizedBlockState(chain) {
+  if (!finalizedBlockCache.has(chain)) {
+    const block = await rpcCall(chain, 'eth_getBlockByNumber', ['finalized', false]);
+    finalizedBlockCache.set(chain, {
+      number: fromRpcHex(block.number), timestamp: fromRpcHex(block.timestamp), hash: block.hash.toLowerCase(),
+    });
+  }
+  return finalizedBlockCache.get(chain);
+}
+
 async function getBlockByNumberRpc(chain, blockNumber) {
   const block = await rpcCall(chain, 'eth_getBlockByNumber', [asRpcHex(blockNumber), false]);
   if (!block || block.number == null || block.timestamp == null) {
@@ -584,33 +753,7 @@ async function getBlockByNumberRpc(chain, blockNumber) {
     err.code = 'RPC_INVALID_BLOCK';
     throw err;
   }
-  return { number: num, timestamp: ts };
-}
-
-async function getBlockByTimestampRpc(ts, chain) {
-  const targetTs = Number(ts);
-  if (!Number.isFinite(targetTs) || targetTs < 0) {
-    const err = new Error(`Invalid timestamp for RPC block lookup: ${ts}`);
-    err.code = 'RPC_INVALID_TIMESTAMP';
-    throw err;
-  }
-  const latest = await getLatestBlockState(chain);
-  if (targetTs >= latest.timestamp) return latest.number;
-
-  let low = 0;
-  let high = latest.number;
-  let best = 0;
-  while (low <= high) {
-    const mid = Math.floor((low + high) / 2);
-    const b = await getBlockByNumberRpc(chain, mid);
-    if (b.timestamp <= targetTs) {
-      best = b.number;
-      low = mid + 1;
-    } else {
-      high = mid - 1;
-    }
-  }
-  return best;
+  return { number: num, timestamp: ts, hash: block.hash.toLowerCase() };
 }
 
 // Free-tier eth_getLogs providers cap the block span per request (Alchemy's
@@ -662,7 +805,7 @@ async function fetchTransferLogsRpc(chain, usdcAddr, fromBlock, endBlock, pairTo
     'RPC_LOG_FALLBACK_MISSING_URL',
     `No log-scan fallback configured for chain=${chain}. Set BACKUP_INFURA_API_KEY or BACKUP_CHAINSTACK_BASE_RPC_URL.`,
   );
-  return Array.isArray(logs) ? logs : [];
+  return logs;
 }
 
 function getAssetTransferKey(transfer) {
@@ -676,27 +819,23 @@ function getAssetTransferKey(transfer) {
     (transfer && transfer.rawContract && transfer.rawContract.logIndex) ??
     '',
   ).toLowerCase();
-  if (txHash) return `${txHash}:${logIndex}`;
-
-  return JSON.stringify({
-    blockNum: transfer && transfer.blockNum,
-    from: transfer && transfer.from,
-    to: transfer && transfer.to,
-    value: transfer && transfer.rawContract && transfer.rawContract.value,
-  });
+  if (HASH_PATTERN.test(txHash) && Number.isFinite(fromRpcHex(logIndex))) {
+    return `${txHash}:${fromRpcHex(logIndex)}`;
+  }
+  throw invalidRpcResponse('Asset transfer is missing a unique event identity');
 }
 
 function getAssetTransferRawValue(transfer) {
-  try {
-    return BigInt(
-      (transfer && transfer.rawContract && transfer.rawContract.value) || '0x0',
-    );
-  } catch {
-    return 0n;
-  }
+  const value = transfer && transfer.rawContract && transfer.rawContract.value;
+  if (!RAW_VALUE_PATTERN.test(value)) throw invalidRpcResponse('Invalid raw ERC-20 transfer value');
+  return BigInt(value);
 }
 
 async function fetchPoolAssetTransfersPage(chain, usdcAddr, pairAddr, fromBlock, toBlock, direction, pageKey) {
+  const configuredPageSize = Number(process.env.POOL_VOLUME_ASSET_TRANSFERS_PAGE_SIZE || 1000);
+  if (!Number.isInteger(configuredPageSize) || configuredPageSize < 1 || configuredPageSize > 1000) {
+    throw new Error('POOL_VOLUME_ASSET_TRANSFERS_PAGE_SIZE must be an integer between 1 and 1000');
+  }
   const params = {
     fromBlock: asRpcHex(fromBlock),
     toBlock: asRpcHex(toBlock),
@@ -704,7 +843,7 @@ async function fetchPoolAssetTransfersPage(chain, usdcAddr, pairAddr, fromBlock,
     contractAddresses: [usdcAddr],
     withMetadata: false,
     excludeZeroValue: true,
-    maxCount: asRpcHex(Math.max(1, Number(process.env.POOL_VOLUME_ASSET_TRANSFERS_PAGE_SIZE || 1000))),
+    maxCount: asRpcHex(configuredPageSize),
   };
 
   if (direction === 'outgoing') {
@@ -719,19 +858,22 @@ async function fetchPoolAssetTransfersPage(chain, usdcAddr, pairAddr, fromBlock,
 
   const result = await alchemyCall(chain, 'alchemy_getAssetTransfers', [params]);
   return {
-    pageKey: result && typeof result.pageKey === 'string' ? result.pageKey : null,
-    transfers: Array.isArray(result && result.transfers) ? result.transfers : [],
+    pageKey: result.pageKey || null,
+    transfers: result.transfers,
   };
 }
 
 async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6, onProgress) {
-  const seen = new Set();
+  const seen = new Map();
   let totalRaw = 0n;
 
   for (const direction of ['outgoing', 'incoming']) {
     let pageKey = null;
+    const pageKeys = new Set();
+    const directionEvents = new Set();
 
     while (true) {
+      assertRunBudget();
       const page = await fetchPoolAssetTransfersPage(
         chain,
         usdcAddr,
@@ -744,8 +886,16 @@ async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, p
 
       for (const transfer of page.transfers) {
         const key = getAssetTransferKey(transfer);
-        if (seen.has(key)) continue;
-        seen.add(key);
+        if (directionEvents.has(key)) throw invalidRpcResponse('Duplicate event across Asset Transfers pages');
+        directionEvents.add(key);
+        const fingerprint = transferFingerprint(transfer);
+        if (seen.has(key)) {
+          if (seen.get(key) !== fingerprint || transfer.from.toLowerCase() !== transfer.to.toLowerCase()) {
+            throw invalidRpcResponse('Conflicting transfer identity between incoming and outgoing pages');
+          }
+          continue;
+        }
+        seen.set(key, fingerprint);
         totalRaw += getAssetTransferRawValue(transfer);
       }
 
@@ -753,6 +903,8 @@ async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, p
         break;
       }
 
+      if (pageKeys.has(page.pageKey)) throw invalidRpcResponse('Repeated Asset Transfers pagination cursor');
+      pageKeys.add(page.pageKey);
       pageKey = page.pageKey;
     }
   }
@@ -761,9 +913,10 @@ async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, p
   // atomically once the full range is summed: a mid-scan failure throws
   // before this call and commits nothing, leaving the eth_getLogs fallback a
   // clean range to rescan (no partial double-count).
-  if (typeof onProgress === 'function') onProgress(endBlock, totalRaw);
+  assertRunBudget();
+  if (typeof onProgress === 'function') await onProgress(endBlock, totalRaw);
 
-  return Number(totalRaw) / Math.pow(10, Number(decimals) || 6);
+  return Number(totalRaw) / Math.pow(10, Number(decimals));
 }
 
 const DEFAULT_RPC_LOG_BLOCK_CHUNKS = {
@@ -808,7 +961,7 @@ function getRpcLogChunkConfig(chain, env = process.env) {
 async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6, onProgress) {
   const { configuredMaxChunk, configuredMinChunk } = getRpcLogChunkConfig(chain);
   const pairTopic = addrToTopic(pairAddr);
-  const seen = new Set();
+  const seen = new Map();
   let totalRaw = 0n;
   let chunkSize = configuredMaxChunk;
   // Ceiling learned from a provider's "range too large" error (e.g. Alchemy
@@ -818,6 +971,7 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
   let learnedMaxChunk = configuredMaxChunk;
 
   for (let from = startBlock; from <= endBlock;) {
+    assertRunBudget();
     const to = Math.min(endBlock, from + chunkSize - 1);
 
     try {
@@ -827,13 +981,15 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
       const merged = outgoing.concat(incoming);
       for (const log of merged) {
         const k = logKey(log);
-        if (seen.has(k)) continue;
-        seen.add(k);
-        try {
-          totalRaw += BigInt(log.data || '0x0');
-        } catch {
-          // ignore malformed log payload
+        const fingerprint = logFingerprint(log);
+        if (seen.has(k)) {
+          if (seen.get(k) !== fingerprint || log.topics[1].toLowerCase() !== log.topics[2].toLowerCase()) {
+            throw invalidRpcResponse('Conflicting transfer identity between incoming and outgoing logs');
+          }
+          continue;
         }
+        seen.set(k, fingerprint);
+        totalRaw += BigInt(log.data);
       }
 
       from = to + 1;
@@ -843,18 +999,21 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
       // progress: the next run resumes from `to`+1 instead of rescanning
       // (double-count) or dropping the window. Chunks are disjoint block
       // ranges, so the per-chunk delta is exactly this window's contribution.
-      if (typeof onProgress === 'function') onProgress(to, totalRaw - beforeChunkRaw);
+      assertRunBudget();
+      if (typeof onProgress === 'function') await onProgress(to, totalRaw - beforeChunkRaw);
 
       const growCeiling = Math.min(configuredMaxChunk, learnedMaxChunk);
       if (merged.length === 0 && chunkSize < growCeiling) {
         chunkSize = Math.min(growCeiling, chunkSize * 2);
       }
     } catch (error) {
-      if (error && error.code === 'POOL_STATE_PERSIST_FAILED') {
+      if (error && ['POOL_STATE_PERSIST_FAILED', 'POOL_PROGRESS_FAILED', 'RPC_RUN_DEADLINE', 'RPC_INVALID_RESPONSE'].includes(error.code)) {
         throw error;
       }
 
       const inferredMaxChunk = inferMaxLogRangeFromError(error);
+      const hasRangePressure = error.code === 'RPC_RANGE_LIMIT' ||
+        (error.providerErrors || []).some((message) => /code=RPC_RANGE_(?:LIMIT|CEILING)\b/.test(message));
       if (inferredMaxChunk != null) {
         learnedMaxChunk = Math.min(learnedMaxChunk, inferredMaxChunk);
       }
@@ -864,12 +1023,15 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
       // alongside Alchemy's 10-block 400): retrying the smaller span lets the
       // range-capped provider serve the scan. Only give up on a pure access
       // error, where no smaller chunk would help.
-      if (inferredMaxChunk == null && isProviderAccessError(error)) {
+      if (inferredMaxChunk == null && !hasRangePressure && isProviderAccessError(error)) {
         throw new Error(
           `Failed eth_getLogs scan for ${chain} blocks ${from}-${to}: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );
+      }
+      if (inferredMaxChunk == null && !hasRangePressure) {
+        throw new Error(`Failed eth_getLogs scan for ${chain} blocks ${from}-${to}: ${sanitizeRpcMessage(error)}`);
       }
       if (chunkSize <= configuredMinChunk) {
         throw new Error(
@@ -898,7 +1060,7 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
     }
   }
 
-  return Number(totalRaw) / Math.pow(10, Number(decimals) || 6);
+  return Number(totalRaw) / Math.pow(10, Number(decimals));
 }
 
 function readJson(p, fallback) {
@@ -915,6 +1077,7 @@ function toEpochSeconds(v) {
 
 function appendAlertReason(reason, makeAlert = false) {
   if (!reason) return;
+  reason = sanitizeRpcMessage(reason);
   try {
     const a = readJson(ALERT_FILE, { alert: false, reasons: [] });
     a.alert = Boolean(a.alert || makeAlert);
@@ -1043,7 +1206,7 @@ function persistPoolState(poolsMap, checkpoint) {
 function commitPoolProgress(
   poolsMap,
   checkpoint,
-  { addr, legacyCheckpointKey, endTs, windowEndBlock, increment },
+  { addr, legacyCheckpointKey, endTs, windowEndBlock, increment, totalUsd, finalizedAnchor, blockHash, preservePublished = false },
   persist = persistPoolState,
 ) {
   const hadPool = Object.prototype.hasOwnProperty.call(poolsMap, addr);
@@ -1058,10 +1221,14 @@ function commitPoolProgress(
   const currentPool = poolsMap[addr] && typeof poolsMap[addr] === 'object' ? poolsMap[addr] : {};
   poolsMap[addr] = {
     ...currentPool,
-    total_usd: Number(currentPool.total_usd || 0) + increment,
-    lastUpdated: new Date().toISOString(),
+    total_usd: preservePublished ? currentPool.total_usd : totalUsd === undefined ? Number(currentPool.total_usd || 0) + increment : totalUsd,
+    lastUpdated: preservePublished ? currentPool.lastUpdated : new Date().toISOString(),
   };
-  checkpoint[addr] = { lastTimestamp: endTs, lastBlock: windowEndBlock };
+  checkpoint[addr] = preservePublished
+    ? { ...(previousCheckpoint || previousLegacyCheckpoint) }
+    : { lastTimestamp: endTs, lastBlock: windowEndBlock };
+  if (finalizedAnchor) checkpoint[addr].finalized = { ...finalizedAnchor };
+  if (blockHash && !preservePublished) checkpoint[addr].blockHash = blockHash;
   if (legacyCheckpointKey) delete checkpoint[legacyCheckpointKey];
 
   try {
@@ -1080,6 +1247,119 @@ function commitPoolProgress(
   }
 }
 
+function legacyTotalToRaw(value, decimals) {
+  const total = Number(value);
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18 ||
+      !Number.isFinite(total) || total < 0 || total >= 1e21) {
+    throw new Error('Invalid pool total or token decimals; refusing to reset accumulated volume');
+  }
+  return BigInt(total.toFixed(decimals).replace('.', ''));
+}
+
+async function scanPoolRange(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals, onProgress) {
+  try {
+    await sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals, onProgress);
+    return 'alchemy-asset-transfers';
+  } catch (error) {
+    if (['POOL_STATE_PERSIST_FAILED', 'POOL_PROGRESS_FAILED', 'RPC_RUN_DEADLINE'].includes(error && error.code)) throw error;
+    console.warn(`[pool-volume] ${chain}: Asset Transfers failed; falling back to eth_getLogs: ${sanitizeRpcMessage(error)}`);
+    await sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals, onProgress);
+    return 'rpc-logs-fallback';
+  }
+}
+
+// The finalized anchor is trusted only after checking its block hash. Everything
+// after it is provisional and replaced on the next run, including previously
+// published transfers that were removed by a reorganization.
+async function refreshPoolWithAnchor(options, dependencies = {}) {
+  const { poolsMap, checkpoint, addr, legacyCheckpointKey, chain, pairAddr, usdcAddr, decimals, latest, finalized } = options;
+  const getBlock = dependencies.getBlock || getBlockByNumberRpc;
+  const scan = dependencies.scan || scanPoolRange;
+  const persist = dependencies.persist || persistPoolState;
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) throw new Error('Invalid pool token decimals');
+  const existing = checkpoint[addr] || checkpoint[legacyCheckpointKey];
+  const lastBlock = existing && existing.lastBlock;
+  if (!Number.isSafeInteger(lastBlock) || lastBlock < 0) {
+    throw new Error('Pool is missing a valid block checkpoint; operator recovery is required before scanning');
+  }
+  if (latest.number < lastBlock || finalized.number > latest.number) {
+    throw new Error('RPC head is behind the saved checkpoint or finalized head; preserving existing pool state');
+  }
+  let anchor;
+  let anchorBlock;
+  if (Object.prototype.hasOwnProperty.call(existing, 'finalized')) {
+    anchor = existing.finalized;
+    if (!anchor || !Number.isSafeInteger(anchor.lastBlock) || anchor.lastBlock < 0 || anchor.lastBlock > lastBlock ||
+        !HASH_PATTERN.test(anchor.blockHash) || typeof anchor.totalRaw !== 'string' || !/^\d+$/.test(anchor.totalRaw)) {
+      throw new Error('Invalid finalized pool anchor; operator recovery is required');
+    }
+  } else {
+    // A legacy total is accepted as a baseline, never reconstructed by scanning
+    // old blocks. Its checkpoint must already be finalized before migration.
+    if (lastBlock > finalized.number) {
+      throw new Error('Legacy pool checkpoint is not finalized yet; preserving existing total until safe migration');
+    }
+    anchorBlock = await getBlock(chain, lastBlock);
+    anchor = { lastBlock, blockHash: anchorBlock.hash, totalRaw: String(legacyTotalToRaw(poolsMap[addr].total_usd, decimals)) };
+  }
+  if (anchor.lastBlock > finalized.number) throw new Error('Finalized RPC head regressed behind the pool anchor');
+  if (!anchorBlock) anchorBlock = await getBlock(chain, anchor.lastBlock);
+  if (anchorBlock.number !== anchor.lastBlock || anchorBlock.hash.toLowerCase() !== anchor.blockHash.toLowerCase()) {
+    throw new Error('Finalized pool anchor hash mismatch; preserving totals and requiring operator recovery');
+  }
+  anchor = { ...anchor, blockHash: anchor.blockHash.toLowerCase() };
+  let canonicalRaw = BigInt(anchor.totalRaw);
+  const previousTotal = poolsMap[addr].total_usd;
+  const sources = new Set();
+  const save = (endBlock, raw, block, finalizedAnchor, canonical = false) => commitPoolProgress(poolsMap, checkpoint, {
+    addr, legacyCheckpointKey, endTs: block.timestamp, windowEndBlock: endBlock,
+    totalUsd: Number(raw) / Math.pow(10, decimals), finalizedAnchor, blockHash: block.hash,
+    preservePublished: canonical && endBlock < lastBlock,
+  }, persist);
+
+  if (anchor.lastBlock < finalized.number) {
+    sources.add(await scan(anchor.lastBlock + 1, finalized.number, pairAddr, usdcAddr, chain, decimals, async (endBlock, deltaRaw) => {
+      try {
+        if (!Number.isSafeInteger(endBlock) || endBlock <= anchor.lastBlock || endBlock > finalized.number) {
+          throw new Error('Finalized scan progress is outside the pinned canonical range');
+        }
+        // Re-read before every durable promotion, including intermediate log
+        // windows. A finality violation during pagination must not attach newly
+        // counted transfers to a stale, previously cached finalized hash.
+        const block = await getBlock(chain, endBlock);
+        const verifiedFinalized = endBlock === finalized.number ? block : await getBlock(chain, finalized.number);
+        if (block.number !== endBlock || verifiedFinalized.number !== finalized.number ||
+            verifiedFinalized.hash.toLowerCase() !== finalized.hash.toLowerCase()) {
+          throw new Error('Finalized block changed during pool scan; canonical promotion refused');
+        }
+        const nextRaw = canonicalRaw + deltaRaw;
+        const nextAnchor = { lastBlock: endBlock, blockHash: block.hash, totalRaw: String(nextRaw) };
+        save(endBlock, nextRaw, block, nextAnchor, true);
+        canonicalRaw = nextRaw;
+        anchor = nextAnchor;
+      } catch (error) {
+        if (!['POOL_STATE_PERSIST_FAILED', 'RPC_RUN_DEADLINE'].includes(error.code)) error.code = 'POOL_PROGRESS_FAILED';
+        throw error;
+      }
+    }));
+  }
+
+  let tentativeRaw = 0n;
+  if (anchor.lastBlock < latest.number) {
+    sources.add(await scan(anchor.lastBlock + 1, latest.number, pairAddr, usdcAddr, chain, decimals,
+      async (_endBlock, deltaRaw) => { tentativeRaw += deltaRaw; }));
+  }
+  assertRunBudget();
+  // Do not use a header cache here: a reorg during two-direction pagination
+  // could otherwise publish transfers from different branches at one height.
+  const verifiedLatest = await getBlock(chain, latest.number);
+  if (verifiedLatest.number !== latest.number || verifiedLatest.hash.toLowerCase() !== latest.hash.toLowerCase()) {
+    throw new Error('Latest block changed during pool scan; tentative transfers discarded, finalized progress preserved');
+  }
+  save(latest.number, canonicalRaw + tentativeRaw, latest, anchor);
+  return { source: [...sources].join('+') || 'checkpoint-verified', totalUsdc: poolsMap[addr].total_usd - previousTotal };
+}
+
 async function main() {
   if (!ALCHEMY_API_KEY && !BACKUP_INFURA_API_KEY && !BACKUP_CHAINSTACK_BASE_RPC_URL) {
     throw new Error(
@@ -1087,9 +1367,14 @@ async function main() {
     );
   }
 
+  const budgetMs = Number(process.env.RPC_RUN_BUDGET_MS || 17 * 60 * 1000);
+  if (!Number.isFinite(budgetMs) || budgetMs <= 0) throw new Error('RPC_RUN_BUDGET_MS must be positive');
+  setRunDeadline(Date.now() + budgetMs);
   const now = Math.floor(Date.now() / 1000);
   const legacyCheckpoint = readJson(CHECKPOINT, {});
-  const poolsRaw = readJson(POOL_FILE, {});
+  let poolsRaw;
+  try { poolsRaw = JSON.parse(fs.readFileSync(POOL_FILE, 'utf8')); }
+  catch { throw new Error('Unable to read canonical pool state; refusing to reset accumulated totals'); }
   // Normalize pool file formats:
   // - legacy: object where keys are pool addresses
   // - modern: { pools: { <addr>: { ... } }, lastUpdated: ... }
@@ -1106,6 +1391,9 @@ async function main() {
     } else {
       poolsMap = poolsRaw;
     }
+  }
+  if (!poolsMap || typeof poolsMap !== 'object' || Array.isArray(poolsMap) || Object.keys(poolsMap).length === 0) {
+    throw new Error('Canonical pool state contains no tracked pools; refusing to overwrite it');
   }
   const checkpoint = selectAuthoritativeCheckpoint(poolsRaw, legacyCheckpoint);
 
@@ -1160,102 +1448,25 @@ async function main() {
       startTs = checkpointStartTs || poolLastUpdatedTs || (now - Number(process.env.WINDOW_SECONDS || 3600));
       const endTs = Math.floor(Date.now() / 1000);
 
-      if (startTs >= endTs) {
-        console.log(`Skipping ${addr}: checkpoint start (${startTs}) is not before end (${endTs})`);
-        checkpoint[addr] = { lastTimestamp: endTs, lastBlock: poolCheckpoint.lastBlock || null };
-        if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
-        persistPoolState(poolsMap, checkpoint);
-        successfulPoolCount += 1;
-        continue;
-      }
-
       console.log('Processing', addr, 'Start ts', startTs, 'end ts', endTs);
 
       // validate addresses before making API calls
       if (!isValidAddress(usdcAddr) || !isValidAddress(pairAddr)) {
         console.warn(`Skipping ${addr}: invalid address format (usdc=${usdcAddr}, pair=${pairAddr})`);
         appendAlertReason(`invalid-address: ${addr} usdc=${usdcAddr} pair=${pairAddr}`, true);
-        // save checkpoint to avoid reprocessing this bad entry repeatedly
-        checkpoint[addr] = { lastTimestamp: endTs || now, lastBlock: null };
-        if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
-        persistPoolState(poolsMap, checkpoint);
         failedPoolCount += 1;
         continue;
       }
 
-      let startBlock;
-      let endBlock;
-      let source = 'alchemy-asset-transfers';
-      startBlock = checkpointStartBlock != null ? checkpointStartBlock + 1 : await getBlockByTimestamp(startTs, chain);
-      // This index is cumulative and resumes from a concrete block checkpoint,
-      // so the current head number is the exact end cursor we need. Resolving
-      // the current wall-clock timestamp back to a block fetched that same head
-      // and then fetched the full block solely to rediscover its number.
-      endBlock = await getLatestBlockNumberForRun(chain);
-      if (!Number.isFinite(startBlock) || !Number.isFinite(endBlock)) {
-        const err = new Error(`Invalid block range resolved: start=${startBlock}, end=${endBlock}`);
-        err.code = 'INVALID_BLOCK_RANGE';
-        throw err;
-      }
-      if (startBlock > endBlock) {
-        console.log(`Skipping ${addr}: no new blocks since checkpoint (start=${startBlock}, end=${endBlock})`);
-        checkpoint[addr] = {
-          lastTimestamp: endTs,
-          lastBlock: clampCheckpointBlock(checkpointStartBlock, endBlock),
-        };
-        if (checkpoint[legacyCheckpointKey]) delete checkpoint[legacyCheckpointKey];
-        persistPoolState(poolsMap, checkpoint);
-        successfulPoolCount += 1;
-        continue;
-      }
-      console.log('Block range', startBlock, endBlock);
-      const tokenDecimals = Number(pool.usdc_decimals || pool.decimals || process.env.USDC_DECIMALS || 6);
-
-      if (!poolsMap[addr]) {
-        poolsMap[addr] = { address: addr, total_usd: 0, lastUpdated: null };
-      }
-
-      // Commit each scanned window incrementally: add its volume delta AND
-      // advance the checkpoint to its last block in one authoritative file, so a
-      // scan interrupted partway through a large backlog (e.g. the free-tier
-      // eth_getLogs fallback rate-limiting mid-run) keeps its progress. The
-      // next run resumes from lastBlock+1, so no window is rescanned (which
-      // would double-count) or lost. Volume and checkpoint move together, so a
-      // crash between windows can only lose the *uncommitted* tail, which the
-      // next run re-scans cleanly.
-      let runTotalUsdc = 0;
-      const commitProgress = (windowEndBlock, windowRaw) => {
-        const increment = Number(windowRaw) / Math.pow(10, tokenDecimals);
-        commitPoolProgress(
-          poolsMap,
-          checkpoint,
-          { addr, legacyCheckpointKey, endTs, windowEndBlock, increment },
-        );
-        runTotalUsdc += increment;
-      };
-
-      try {
-        await sumTokenTransfersViaAlchemyAssetTransfers(
-          startBlock,
-          endBlock,
-          pairAddr,
-          usdcAddr,
-          chain,
-          tokenDecimals,
-          commitProgress,
-        );
-      } catch (error) {
-        if (error && error.code === 'POOL_STATE_PERSIST_FAILED') {
-          throw error;
-        }
-        console.warn(
-          `[pool-volume] ${chain}: alchemy_getAssetTransfers failed, falling back to eth_getLogs: ${
-            error && error.message ? error.message : String(error)
-          }`,
-        );
-        source = 'infura-rpc-logs-fallback';
-        await sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, tokenDecimals, commitProgress);
-      }
+      const finalized = await getFinalizedBlockState(chain);
+      const latest = await getLatestBlockState(chain);
+      const startBlock = checkpointStartBlock != null ? checkpointStartBlock + 1 : null;
+      const endBlock = latest.number;
+      const tokenDecimals = Number(pool.usdc_decimals ?? pool.decimals ?? process.env.USDC_DECIMALS ?? 6);
+      const { source, totalUsdc: runTotalUsdc } = await refreshPoolWithAnchor({
+        poolsMap, checkpoint, addr, legacyCheckpointKey, chain, pairAddr, usdcAddr,
+        decimals: tokenDecimals, latest, finalized,
+      });
 
       console.log(`Total USDC transfers for ${addr} (${source}):`, runTotalUsdc);
 
@@ -1271,10 +1482,11 @@ async function main() {
     } catch (e) {
       failedPoolCount += 1;
       appendAlertReason(
-        `pool-error: pool=${addr} chain=${chain} code=${(e && e.code) || 'unknown'} msg=${(e && e.message) || String(e)}`,
+        `pool-error: pool=${addr} chain=${chain} code=${(e && e.code) || 'unknown'} msg=${sanitizeRpcMessage(e)}`,
         false
       );
-      console.error('Error processing', rawAddr, e);
+      console.error('Error processing', rawAddr, sanitizeRpcError(e));
+      if (e && e.code === 'RPC_RUN_DEADLINE') throw e;
       // if retries were exhausted earlier, the alert file should already exist.
     }
   }
@@ -1335,7 +1547,7 @@ function flushRpcUsageTelemetry() {
 if (require.main === module) {
   main()
     .catch((e) => {
-      console.error(e);
+      console.error(sanitizeRpcError(e));
       process.exitCode = 1;
     })
     .finally(flushRpcUsageTelemetry);
@@ -1374,4 +1586,12 @@ module.exports = {
   providerRangeCeilings,
   getRpcLogChunkConfig,
   rpcRunUsage,
+  providerCooldowns,
+  validateRpcEnvelope,
+  validateRpcMethodResult,
+  refreshPoolWithAnchor,
+  legacyTotalToRaw,
+  setRunDeadline,
+  assertRunBudget,
+  requestWithRetries,
 };

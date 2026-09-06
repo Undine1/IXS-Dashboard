@@ -56,8 +56,11 @@ Create a `.env.local` in the project root.
 - `POLYGON_USDC` - optional override of the tracked USDC token address for pool volume jobs
 - `RPC_LOG_BLOCK_CHUNK_POLYGON` / `RPC_LOG_BLOCK_CHUNK_BASE` - optional initial pool-volume fallback spans (defaults `3000` / `5000`; provider errors still shrink adaptively)
 - `RPC_MIN_LOG_BLOCK_CHUNK_POLYGON` / `RPC_MIN_LOG_BLOCK_CHUNK_BASE` - optional per-chain pool-volume fallback floors; `RPC_MIN_LOG_BLOCK_CHUNK` remains the shared fallback
-- `RPC_ALCHEMY_TARGET_CUPS` - optional pool/holder updater pacing target (default `600`); method-weighted Alchemy pacing leaves throughput headroom while other providers retain a 100 ms per-provider gap
-- `RPC_MIN_INTERVAL_MS` - optional legacy fixed pacing override for every pool/holder RPC provider; `0` disables pacing
+- `RPC_ALCHEMY_TARGET_CUPS` - optional pool/holder updater pacing target (default `600`); method-weighted Alchemy pacing uses the chosen allocation while other providers retain a 100 ms per-provider gap
+- `RPC_ALCHEMY_BUDGET_CUPS` - optional allocation for this dashboard after reserving account capacity for other apps; caps the requested target and faster legacy pacing overrides
+- `RPC_REQUEST_TIMEOUT_MS` / `RPC_PROVIDER_COOLDOWN_MS` - updater request/body deadline (default 15 seconds) and temporary preference for healthy alternatives after exhausted transient failures (default 30 seconds)
+- `RPC_RUN_BUDGET_MS` - cooperative scan deadline; CI supplies separate pool and holder budgets with time reserved for persistence
+- `RPC_MIN_INTERVAL_MS` - optional legacy fixed pacing override for every pool/holder RPC provider; `0` disables pacing unless an explicit Alchemy allocation is set
 - `NEXT_PUBLIC_TOTAL_SUPPLY` (or `TOTAL_SUPPLY`) - optional override of the 180M IXS max supply; read by both the dashboard and `/metrics` via `lib/supply.ts` so they cannot drift
 
 The pool-volume, holder-ranking, and on-chain snapshot updaters auto-load `.env.local` when environment variables are not already exported.
@@ -96,11 +99,14 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 - The pool volume updater uses Alchemy Asset Transfers first, falls back to JSON-RPC log scans through Infura and then optional Chainstack URLs when needed, and persists per-pool checkpoints.
 - The holder rankings updater uses Alchemy Asset Transfers pagination when available, falls back to standard JSON-RPC if needed, keeps cumulative per-holder balances in `data/holder_rankings_state.json`, and writes a public top-500 snapshot. Any non-Transfer balance exceptions are kept in a durable retry queue and reconciled in Multicall3 batches at the exact saved scan block; individual exact-block reads retain the failure fallback.
 - The public holder ranking excludes zero/dead/token-contract addresses by default and supports extra exclusions through env vars.
-- The first holder rankings run is the expensive bootstrap. Later runs only scan blocks after the last saved checkpoint.
+- The first holder rankings run is the expensive bootstrap. Later runs resume finalized progress and replace the recent unfinalized tail from its saved baseline.
+- RPC responses and pagination must validate before a checkpoint advances. Completed windows survive provider fallback; the incomplete window is restored before replay, preventing double counting.
+- A hash-verified finalized baseline protects incremental totals. The latest tail is restored and replayed each run, so recent reorgs can replace prior events without reducing displayed freshness. Existing pool totals and v2 holder balances are preserved during migration; older unhashed history cannot be retroactively verified. See the [implementation plan and counting invariants](docs/rpc_stability_plan.md).
 
 ## GitHub Actions
 - `.github/workflows/update-dashboard-data.yml` is scheduled hourly at minute 23. An early freshness/attempt guard inside the existing concurrency lock skips duplicate work before dependency installation or RPC. The optional Cloudflare watchdog checks GitHub every ten minutes and dispatches this same workflow after a missed slot; it ships disabled until account/token setup. See [scheduling policy, load limits, and activation](docs/dashboard_scheduling.md).
 - Each admitted refresh runs the pool-volume, holder-ranking, and on-chain snapshot updaters, then commits the served data in one push so Vercel builds it once. The Chainstack backup keepalive attempts one `eth_blockNumber` per UTC day regardless of trigger, recorded in the separate `data/scheduler_control.json`. Holder incremental state stays on `refs/data-state` (single orphan commit, no history), avoiding a ~1 MB state version every hour in `main`.
+- Holder-state access failures stop the holder scan instead of triggering a rebuild. A confirmed missing ref requires the manual `bootstrap_holder_state` workflow input on `main`; state writes use a lease against the exact restored revision. Pool and on-chain snapshots can still progress independently.
 - Because of the snapshot, Vercel makes no RPC calls in steady state — its RPC keys are only used by the live fallback paths.
 - The deployment-baked holder-ranking, pool-volume, and sync-status API responses are prerendered and retained by Vercel's CDN for the lifetime of that immutable deployment; publishing refreshed data creates a new deployment/cache namespace. Sync status therefore reflects the served artifacts without a runtime GitHub request or rate-limit dependency.
 - Authorized live pool/burn fallbacks batch reads into one Multicall3 request per involved chain; any failed batch or subcall falls back to the existing individual provider path.

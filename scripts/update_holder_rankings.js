@@ -14,6 +14,11 @@ const {
   encodeAggregate3Call,
   decodeAggregate3Result,
 } = require('../lib/multicall3Codec');
+const {
+  readRpcResponse,
+  sanitizeRpcMessage,
+  createProviderCooldowns,
+} = require('./rpc_transport');
 
 function loadEnvLocal() {
   try {
@@ -46,7 +51,7 @@ function loadEnvLocal() {
   }
 }
 
-loadEnvLocal();
+if (require.main === module) loadEnvLocal();
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const DEAD_ADDRESS = '0x000000000000000000000000000000000000dead';
@@ -138,6 +143,30 @@ let retryCount = 0;
 const disabledProviders = new Map();
 const providerRangeCeilings = createProviderRangeCeilingTracker();
 const rpcRunUsage = createRpcRunUsageTracker();
+const providerCooldowns = createProviderCooldowns();
+let activeRunDeadline = null;
+
+function holderError(code, message) {
+  return Object.assign(new Error(sanitizeRpcMessage(message)), { code });
+}
+
+function createHolderRunDeadline(value = process.env.RPC_RUN_BUDGET_MS, now = Date.now) {
+  const parsed = Number(value || 32 * 60 * 1000);
+  const deadline = now() + (Number.isFinite(parsed) && parsed > 0 ? parsed : 32 * 60 * 1000);
+  return () => {
+    if (now() >= deadline) {
+      throw holderError('HOLDER_RUN_BUDGET_EXHAUSTED', 'Holder run time budget exhausted at a safe checkpoint; resume next run');
+    }
+  };
+}
+
+function checkRunDeadline() {
+  if (activeRunDeadline) activeRunDeadline();
+}
+
+function isTerminalHolderError(error) {
+  return error && [HOLDER_STATE_PERSIST_FAILED, 'HOLDER_RUN_BUDGET_EXHAUSTED'].includes(error.code);
+}
 
 function ensureDirectory(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -324,7 +353,14 @@ function shouldDisableProviderForRun(error) {
   const message = String((error && error.message) || '').toLowerCase();
   if ([401, 403, 429].includes(status)) return true;
   if (['RPC_UNAUTHORIZED', 'RPC_FORBIDDEN', 'RPC_RATE_LIMIT'].includes(code)) return true;
-  return /429|too many requests|rate limit|rate-limited|thrott|quota|forbidden|unauthorized/.test(message);
+  if (/too many requests|rate limit|rate-limited|thrott|quota|forbidden|unauthorized/.test(message)) return true;
+  // Range errors often quote the requested block numbers. A block containing
+  // "429" is not evidence of throttling: keep this provider eligible for the
+  // smaller range. Actual HTTP access errors and explicit rate/auth signals
+  // above remain authoritative even if the message also mentions a range.
+  if (['RPC_RANGE_LIMIT', 'RPC_RANGE_CEILING'].includes(code) || inferMaxLogRangeFromError(error) != null ||
+      /block range|range (?:limit|too large)|query returned more than|response size (?:exceeded|limit)/.test(message)) return false;
+  return /429/.test(message);
 }
 
 function disableProviderForRun(url, method, error) {
@@ -356,9 +392,10 @@ async function requestWithRetries(url, options = {}, context = {}) {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
+      checkRunDeadline();
       await rpcRunUsage.beforeAttempt(url, method);
       rpcCallCount += 1;
-      const response = await fetch(url, options);
+      const response = await readRpcResponse(url, options);
       if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
         if (response.status === 429) {
           rateLimitAttempts += 1;
@@ -381,6 +418,7 @@ async function requestWithRetries(url, options = {}, context = {}) {
 
       return response;
     } catch (error) {
+      if (isTerminalHolderError(error)) throw error;
       if (attempt === maxAttempts) throw error;
 
       retryCount += 1;
@@ -389,7 +427,106 @@ async function requestWithRetries(url, options = {}, context = {}) {
     }
   }
 
-  throw new Error(`Request retries exhausted for ${url}`);
+  throw holderError('RPC_RETRIES_EXHAUSTED', `Request retries exhausted for ${url}`);
+}
+
+function isRpcQuantity(value) {
+  return typeof value === 'string' && /^0x(?:0|[1-9a-f][0-9a-f]*)$/i.test(value);
+}
+
+function requireRpcResult(condition, message) {
+  if (!condition) throw holderError('RPC_INVALID_RESPONSE', message);
+}
+
+function validateBlockHeader(value, expectedNumber) {
+  requireRpcResult(value && typeof value === 'object' && !Array.isArray(value), 'Missing RPC block header');
+  requireRpcResult(isRpcQuantity(value.number) && /^0x[0-9a-f]{64}$/i.test(value.hash || ''), 'Malformed RPC block header');
+  const blockNumber = Number(BigInt(value.number));
+  requireRpcResult(Number.isSafeInteger(blockNumber), 'Unsafe RPC block number');
+  requireRpcResult(expectedNumber == null || blockNumber === expectedNumber, 'RPC returned the wrong block header');
+  return { blockNumber, blockHash: value.hash.toLowerCase() };
+}
+
+function validateTransferLogs(logs, tokenAddress, fromBlock, toBlock) {
+  requireRpcResult(Array.isArray(logs), 'eth_getLogs result must be an array');
+  const seen = new Map();
+  const blocks = new Map();
+  for (const log of logs) {
+    requireRpcResult(log && typeof log === 'object' && !Array.isArray(log), 'Malformed Transfer log');
+    requireRpcResult(isValidAddress(log.address) && (!tokenAddress || log.address.toLowerCase() === tokenAddress.toLowerCase()), 'Unexpected Transfer log contract');
+    requireRpcResult(Array.isArray(log.topics) && log.topics.length === 3 &&
+      String(log.topics[0]).toLowerCase() === TRANSFER_TOPIC0 &&
+      log.topics.slice(1).every((topic) => /^0x0{24}[0-9a-f]{40}$/i.test(topic)), 'Malformed Transfer log topics');
+    requireRpcResult(/^0x[0-9a-f]{64}$/i.test(log.data || '') &&
+      /^0x[0-9a-f]{64}$/i.test(log.blockHash || '') &&
+      /^0x[0-9a-f]{64}$/i.test(log.transactionHash || '') &&
+      isRpcQuantity(log.blockNumber) && isRpcQuantity(log.logIndex) && log.removed === false, 'Malformed or removed Transfer log');
+    const block = Number(BigInt(log.blockNumber));
+    requireRpcResult(Number.isSafeInteger(block) && (fromBlock == null || block >= fromBlock) &&
+      (toBlock == null || block <= toBlock), 'Transfer log outside requested block range');
+    const hash = log.blockHash.toLowerCase();
+    requireRpcResult(!blocks.has(block) || blocks.get(block) === hash, 'Conflicting block hashes in Transfer logs');
+    blocks.set(block, hash);
+    const key = `${hash}:${BigInt(log.logIndex)}`;
+    const fingerprint = JSON.stringify([log.transactionHash.toLowerCase(), log.address.toLowerCase(), log.topics.map((topic) => topic.toLowerCase()), log.data.toLowerCase()]);
+    requireRpcResult(!seen.has(key) || seen.get(key).fingerprint === fingerprint, 'Conflicting duplicate Transfer log');
+    if (!seen.has(key)) seen.set(key, { log, fingerprint });
+  }
+  return [...seen.values()].map(({ log }) => log).sort((left, right) =>
+    Number(BigInt(left.blockNumber) - BigInt(right.blockNumber)) ||
+    Number(BigInt(left.logIndex) - BigInt(right.logIndex)));
+}
+
+function validateAssetTransfersPage(result, tokenAddress, fromBlock, toBlock) {
+  requireRpcResult(result && typeof result === 'object' && !Array.isArray(result) &&
+    Array.isArray(result.transfers), 'Alchemy Transfers result must contain a transfers array');
+  requireRpcResult(result.pageKey == null || (typeof result.pageKey === 'string' && result.pageKey.trim().length > 0), 'Malformed Alchemy page key');
+  for (const transfer of result.transfers) {
+    requireRpcResult(transfer && typeof transfer === 'object' && !Array.isArray(transfer) &&
+      isValidAddress(transfer.from) && isValidAddress(transfer.to) &&
+      typeof transfer.uniqueId === 'string' && transfer.uniqueId.length > 0 &&
+      /^0x[0-9a-f]{64}$/i.test(transfer.hash || '') && isRpcQuantity(transfer.blockNum), 'Malformed Alchemy ERC-20 transfer');
+    const raw = transfer.rawContract;
+    requireRpcResult(raw && typeof raw === 'object' && !Array.isArray(raw) &&
+      isValidAddress(raw.address) && (!tokenAddress || raw.address.toLowerCase() === tokenAddress.toLowerCase()) &&
+      typeof raw.value === 'string' && /^0x[0-9a-f]+$/i.test(raw.value) && BigInt(raw.value) < 2n ** 256n,
+    'Malformed Alchemy transfer raw contract');
+    requireRpcResult(transfer.category === 'erc20', 'Unexpected Alchemy transfer category');
+    const block = Number(BigInt(transfer.blockNum));
+    requireRpcResult(Number.isSafeInteger(block) && (fromBlock == null || block >= fromBlock) &&
+      (toBlock == null || block <= toBlock), 'Alchemy transfer outside requested block range');
+  }
+  return { transfers: result.transfers, pageKey: result.pageKey || null };
+}
+
+function parseRpcEnvelope(payload, method, params, requestId) {
+  requireRpcResult(payload && typeof payload === 'object' && !Array.isArray(payload) &&
+    payload.jsonrpc === '2.0' && payload.id === requestId, `Invalid JSON-RPC envelope for ${method}`);
+  if (Object.prototype.hasOwnProperty.call(payload, 'error')) {
+    requireRpcResult(!Object.prototype.hasOwnProperty.call(payload, 'result') && payload.error &&
+      typeof payload.error.message === 'string', `Malformed JSON-RPC error for ${method}`);
+    throw holderError('RPC_REMOTE_ERROR', `RPC ${method} error: ${payload.error.message}`);
+  }
+  requireRpcResult(Object.prototype.hasOwnProperty.call(payload, 'result') && payload.result != null,
+    `Missing JSON-RPC result for ${method}`);
+  const result = payload.result;
+  if (method === 'eth_getLogs') {
+    const filter = params[0] || {};
+    return validateTransferLogs(result, filter.address, fromRpcHex(filter.fromBlock), fromRpcHex(filter.toBlock));
+  }
+  if (method === 'alchemy_getAssetTransfers') {
+    const filter = params[0] || {};
+    return validateAssetTransfersPage(result, filter.contractAddresses && filter.contractAddresses[0],
+      fromRpcHex(filter.fromBlock), fromRpcHex(filter.toBlock));
+  }
+  if (method === 'eth_getBlockByNumber') {
+    validateBlockHeader(result, isRpcQuantity(params[0]) ? fromRpcHex(params[0]) : undefined);
+  } else if (method === 'eth_blockNumber') {
+    requireRpcResult(isRpcQuantity(result) && Number.isSafeInteger(Number(BigInt(result))), 'Invalid eth_blockNumber result');
+  } else if (method === 'eth_call' || method === 'eth_getCode') {
+    requireRpcResult(typeof result === 'string' && /^0x(?:[0-9a-f]{2})*$/i.test(result), `Invalid ${method} hex result`);
+  }
+  return result;
 }
 
 async function rpcCall(chain, method, params, deps = {}) {
@@ -405,7 +542,7 @@ async function rpcCall(chain, method, params, deps = {}) {
   const providerErrors = [];
   const retryRangeCeilings = [];
 
-  for (const url of urls) {
+  for (const url of providerCooldowns.order(urls, method)) {
     const disabledInfo = getDisabledProviderInfo(url, method);
     if (disabledInfo) {
       const disabledError = new Error(
@@ -431,12 +568,13 @@ async function rpcCall(chain, method, params, deps = {}) {
     }
 
     try {
+      const requestId = Date.now();
       const response = await request(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jsonrpc: '2.0',
-          id: Date.now(),
+          id: requestId,
           method,
           params,
         }),
@@ -444,7 +582,7 @@ async function rpcCall(chain, method, params, deps = {}) {
 
       if (!response.ok) {
         const text = await response.text();
-        const error = new Error(`RPC HTTP ${response.status} ${response.statusText} at ${url}: ${text}`);
+        const error = holderError('RPC_HTTP_ERROR', `RPC HTTP ${response.status} ${response.statusText} at ${url}: ${text}`);
         error.status = response.status;
         if (response.status === 401) error.code = 'RPC_UNAUTHORIZED';
         else if (response.status === 403) error.code = 'RPC_FORBIDDEN';
@@ -453,13 +591,12 @@ async function rpcCall(chain, method, params, deps = {}) {
       }
 
       const payload = await response.json();
-      if (payload && payload.error) {
-        const message = payload.error.message || JSON.stringify(payload.error);
-        throw new Error(`RPC ${method} error at ${url}: ${message}`);
-      }
-
-      return payload.result;
+      const result = parseRpcEnvelope(payload, method, params, requestId);
+      providerCooldowns.succeeded(url, method);
+      return result;
     } catch (error) {
+      if (isTerminalHolderError(error)) throw error;
+      providerCooldowns.failed(url, method, error);
       const inferredMaxRange = method === 'eth_getLogs' ? inferMaxLogRangeFromError(error) : null;
       const providerMaxRange = method === 'eth_getLogs'
         ? inferExplicitProviderRangeCeiling(error)
@@ -476,7 +613,7 @@ async function rpcCall(chain, method, params, deps = {}) {
     }
   }
 
-  const aggregate = new Error(
+  const aggregate = holderError('RPC_ALL_PROVIDERS_FAILED',
     `RPC ${method} failed for ${chain}; providers tried: ${providerErrors
       .map((error) => error.message)
       .join(' | ')}`,
@@ -495,7 +632,7 @@ async function alchemyCall(chain, method, params) {
   }
 
   let lastError = null;
-  for (const url of urls) {
+  for (const url of providerCooldowns.order(urls, method)) {
     const disabledInfo = getDisabledProviderInfo(url, method);
     if (disabledInfo) {
       lastError = new Error(
@@ -505,12 +642,13 @@ async function alchemyCall(chain, method, params) {
     }
 
     try {
+      const requestId = Date.now();
       const response = await requestWithRetries(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jsonrpc: '2.0',
-          id: Date.now(),
+          id: requestId,
           method,
           params,
         }),
@@ -518,7 +656,7 @@ async function alchemyCall(chain, method, params) {
 
       if (!response.ok) {
         const text = await response.text();
-        const error = new Error(
+        const error = holderError('RPC_HTTP_ERROR',
           `Alchemy HTTP ${response.status} ${response.statusText} for ${method} at ${url}: ${text}`,
         );
         error.status = response.status;
@@ -529,13 +667,12 @@ async function alchemyCall(chain, method, params) {
       }
 
       const payload = await response.json();
-      if (payload && payload.error) {
-        const message = payload.error.message || JSON.stringify(payload.error);
-        throw new Error(`Alchemy ${method} error for ${chain} at ${url}: ${message}`);
-      }
-
-      return payload.result;
+      const result = parseRpcEnvelope(payload, method, params, requestId);
+      providerCooldowns.succeeded(url, method);
+      return result;
     } catch (error) {
+      if (isTerminalHolderError(error)) throw error;
+      providerCooldowns.failed(url, method, error);
       disableProviderForRun(url, method, error);
       lastError = error;
     }
@@ -627,6 +764,12 @@ async function getLatestBlockRpc(chain) {
   return latestBlock;
 }
 
+async function getBlockHeaderRpc(chain, tag) {
+  const rpcTag = typeof tag === 'number' ? asRpcHex(tag) : tag;
+  const result = await rpcCall(chain, 'eth_getBlockByNumber', [rpcTag, false]);
+  return validateBlockHeader(result, typeof tag === 'number' ? tag : undefined);
+}
+
 async function contractExistsAtBlock(chain, address, blockNumber) {
   const code = await rpcCall(chain, 'eth_getCode', [address, asRpcHex(blockNumber)]);
   return typeof code === 'string' && code !== '0x' && code !== '0x0';
@@ -666,7 +809,7 @@ async function fetchTransferLogs(chain, tokenAddress, fromBlock, toBlock) {
     },
   ]);
 
-  return Array.isArray(result) ? result : [];
+  return validateTransferLogs(result, tokenAddress, fromBlock, toBlock);
 }
 
 function normalizeTopicAddress(topicValue) {
@@ -970,6 +1113,9 @@ function ensureChainState(state, config, latestBlock) {
       : {};
 
   state.chains[config.chain] = chainState;
+  if (chainState.tokenAddress && chainState.tokenAddress.toLowerCase() !== config.address.toLowerCase()) {
+    throw holderError('HOLDER_TOKEN_CHANGED', `Saved ${config.chain} holder state belongs to a different token`);
+  }
   normalizePendingBalanceReconcile(chainState);
   chainState.tokenAddress = config.address;
   chainState.decimals = config.decimals;
@@ -999,6 +1145,7 @@ async function fetchAssetTransfersPage(chain, tokenAddress, fromBlock, toBlock, 
     contractAddresses: [tokenAddress],
     withMetadata: false,
     excludeZeroValue: true,
+    order: 'asc',
     maxCount: asRpcHex(Math.max(1, Number(process.env.HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE || 1000))),
   };
 
@@ -1007,10 +1154,7 @@ async function fetchAssetTransfersPage(chain, tokenAddress, fromBlock, toBlock, 
   }
 
   const result = await alchemyCall(chain, 'alchemy_getAssetTransfers', [params]);
-  return {
-    pageKey: result && typeof result.pageKey === 'string' ? result.pageKey : null,
-    transfers: Array.isArray(result && result.transfers) ? result.transfers : [],
-  };
+  return validateAssetTransfersPage(result, tokenAddress, fromBlock, toBlock);
 }
 
 async function processChainViaAlchemyAssetTransfers(state, chainState, config, latestBlock, contractStartBlock, deps = {}) {
@@ -1018,6 +1162,7 @@ async function processChainViaAlchemyAssetTransfers(state, chainState, config, l
   // real Alchemy fetcher and the disk persister.
   const fetchPage = deps.fetchPage || fetchAssetTransfersPage;
   const persist = deps.persist || persistState;
+  const checkDeadline = deps.checkDeadline || checkRunDeadline;
   // Checkpoint by block number, never by Alchemy pageKey. Alchemy pageKeys are
   // session-scoped: persisting one and replaying it in a later run silently
   // RESTARTS pagination from fromBlock, re-applying the whole history on top of
@@ -1057,21 +1202,39 @@ async function processChainViaAlchemyAssetTransfers(state, chainState, config, l
   let logsApplied = 0;
 
   for (let from = startBlock; from <= latestBlock; ) {
+    checkDeadline();
     const to = Math.min(latestBlock, from + windowSize - 1);
 
     // Paginate this window to completion within this run. pageKey lives only in
     // memory here and is never persisted.
     let pageKey = null;
+    const seenPageKeys = new Set();
+    const seenTransfers = new Map();
+    let previousBlock = from;
     do {
-      const page = await fetchPage(config.chain, config.address, from, to, pageKey);
+      checkDeadline();
+      const page = validateAssetTransfersPage(
+        await fetchPage(config.chain, config.address, from, to, pageKey), config.address, from, to,
+      );
+      requireRpcResult(!page.pageKey || (!seenPageKeys.has(page.pageKey) && page.transfers.length > 0),
+        'Alchemy pagination repeated a cursor or made no progress');
+      if (page.pageKey) seenPageKeys.add(page.pageKey);
       for (const transfer of page.transfers) {
+        const fingerprint = JSON.stringify([transfer.hash.toLowerCase(), transfer.blockNum.toLowerCase(),
+          transfer.from.toLowerCase(), transfer.to.toLowerCase(), BigInt(transfer.rawContract.value).toString()]);
+        const prior = seenTransfers.get(transfer.uniqueId);
+        requireRpcResult(!prior || prior === fingerprint, 'Conflicting duplicate Alchemy transfer');
+        if (prior) continue;
+        requireRpcResult(Number(BigInt(transfer.blockNum)) >= previousBlock, 'Alchemy transfer pages are out of block order');
+        previousBlock = Number(BigInt(transfer.blockNum));
+        seenTransfers.set(transfer.uniqueId, fingerprint);
         if (applyAssetTransfer(state, config.chain, transfer)) {
           logsApplied += 1;
         }
+        const processedLogCount = toNonNegativeInteger(chainState.processedLogCount) ?? 0;
+        chainState.processedLogCount = processedLogCount + 1;
       }
       logsFetched += page.transfers.length;
-      const processedLogCount = toNonNegativeInteger(chainState.processedLogCount) ?? 0;
-      chainState.processedLogCount = processedLogCount + page.transfers.length;
       pageKey = page.pageKey;
     } while (pageKey);
 
@@ -1082,6 +1245,7 @@ async function processChainViaAlchemyAssetTransfers(state, chainState, config, l
     chainState.latestBlockAtRun = latestBlock;
     from = to + 1;
     persistHolderState(state, persist);
+    if (deps.onCheckpoint) deps.onCheckpoint();
   }
 
   return {
@@ -1149,6 +1313,7 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
   const fetchLogs = deps.fetchLogs || fetchTransferLogs;
   const persist = deps.persist || persistState;
   const logBudget = deps.logBudget || fallbackLogBudget;
+  const checkDeadline = deps.checkDeadline || checkRunDeadline;
   chainState.contractStartBlock = contractStartBlock;
 
   const lastScannedBlock = toNonNegativeInteger(chainState.lastScannedBlock);
@@ -1200,10 +1365,13 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
 
     let logs;
     try {
+      checkDeadline();
       logBudget.consume(config.chain, cursor, endBlock);
-      logs = await fetchLogs(config.chain, config.address, cursor, endBlock);
+      logs = validateTransferLogs(await fetchLogs(config.chain, config.address, cursor, endBlock),
+        config.address, cursor, endBlock);
     } catch (error) {
-      if (error && error.code === 'HOLDER_LOG_BUDGET_EXHAUSTED') {
+      if (error && ['HOLDER_LOG_BUDGET_EXHAUSTED', 'HOLDER_RUN_BUDGET_EXHAUSTED', 'RPC_INVALID_RESPONSE'].includes(error.code)) {
+        if (batchesSinceSave > 0) persistHolderState(state, persist);
         throw error;
       }
 
@@ -1217,6 +1385,7 @@ async function processChainViaStandardRpcLogs(state, chainState, config, latestB
       }
 
       if (chunkSize <= effectiveMinChunk) {
+        if (batchesSinceSave > 0) persistHolderState(state, persist);
         throw new Error(
           `[holder-rankings] ${config.chain}: failed scanning blocks ${cursor}-${endBlock}: ${
             error instanceof Error ? error.message : String(error)
@@ -1325,6 +1494,7 @@ async function reconcileFlaggedBalances(state, config, chainState, deps = {}) {
   const blockTag = asRpcHex(scannedBlock);
   const callRpc = deps.rpcCall || rpcCall;
   const persist = deps.persist || persistState;
+  const checkDeadline = deps.checkDeadline || checkRunDeadline;
   const multicallAddress = String(
     process.env.MULTICALL3_ADDRESS || DEFAULT_MULTICALL3_ADDRESS,
   ).trim();
@@ -1336,6 +1506,7 @@ async function reconcileFlaggedBalances(state, config, chainState, deps = {}) {
 
   const successful = new Map();
   for (let offset = 0; offset < addresses.length; offset += batchSize) {
+    checkDeadline();
     const batchAddresses = addresses.slice(offset, offset + batchSize);
     const calls = batchAddresses.map((address) => ({
       target: config.address,
@@ -1358,6 +1529,7 @@ async function reconcileFlaggedBalances(state, config, chainState, deps = {}) {
         );
       }
     } catch (error) {
+      if (isTerminalHolderError(error)) throw error;
       console.warn(
         `[holder-rankings] ${config.chain}: balanceOf Multicall3 batch failed; using individual reads @ block ${scannedBlock}: ${
           error && error.message ? error.message : String(error)
@@ -1389,6 +1561,7 @@ async function reconcileFlaggedBalances(state, config, chainState, deps = {}) {
           );
           raw = parseBalanceOfResult(result);
         } catch (error) {
+          if (isTerminalHolderError(error)) throw error;
           console.warn(
             `[holder-rankings] ${config.chain}: balanceOf reconciliation failed for ${address} (left queued at 0): ${
               error && error.message ? error.message : String(error)
@@ -1424,7 +1597,7 @@ async function reconcileFlaggedBalances(state, config, chainState, deps = {}) {
   return { reconciled, failed };
 }
 
-async function processChain(state, config, deps = {}) {
+async function scanChainRange(state, config, deps = {}) {
   if (!isValidAddress(config.address)) {
     throw new Error(`Invalid token address for ${config.chain}: ${config.address}`);
   }
@@ -1444,7 +1617,7 @@ async function processChain(state, config, deps = {}) {
   let summary;
 
   while (true) {
-    const attemptSnapshot = snapshotChainState(state, config.chain);
+    let attemptSnapshot = snapshotChainState(state, config.chain);
 
     try {
       if (getAlchemyRpcUrl(config.chain)) {
@@ -1460,7 +1633,14 @@ async function processChain(state, config, deps = {}) {
             config,
             latestBlock,
             contractStartBlock,
-            deps.alchemyScan,
+            {
+              ...deps.alchemyScan,
+              checkDeadline: deps.checkDeadline || (deps.alchemyScan && deps.alchemyScan.checkDeadline),
+              onCheckpoint: () => {
+                attemptSnapshot = snapshotChainState(state, config.chain);
+                if (deps.alchemyScan && deps.alchemyScan.onCheckpoint) deps.alchemyScan.onCheckpoint();
+              },
+            },
           );
           break;
         } catch (error) {
@@ -1487,6 +1667,7 @@ async function processChain(state, config, deps = {}) {
             chainState.contractStartBlock = contractStartBlock;
           }
           persistHolderState(state, persist);
+          if (error && error.code === 'HOLDER_RUN_BUDGET_EXHAUSTED') throw error;
 
           console.warn(
             `[holder-rankings] ${config.chain}: alchemy_getAssetTransfers failed${
@@ -1507,7 +1688,7 @@ async function processChain(state, config, deps = {}) {
         config,
         latestBlock,
         contractStartBlock,
-        deps.standardScan,
+        { ...deps.standardScan, checkDeadline: deps.checkDeadline || (deps.standardScan && deps.standardScan.checkDeadline) },
       );
       break;
     } catch (error) {
@@ -1527,6 +1708,7 @@ async function processChain(state, config, deps = {}) {
   const recon = await reconcileFlaggedBalances(state, config, chainState, {
     rpcCall: deps.reconcileRpcCall || deps.rpcCall,
     persist,
+    checkDeadline: deps.checkDeadline,
   });
   if (recon.reconciled || recon.failed) {
     summary = { ...summary, reconciled: recon.reconciled, reconcileFailed: recon.failed };
@@ -1534,19 +1716,197 @@ async function processChain(state, config, deps = {}) {
   return summary;
 }
 
+function captureCanonicalAnchor(state, chain, header) {
+  const snapshot = snapshotChainState(state, chain);
+  return {
+    blockNumber: header.blockNumber,
+    blockHash: header.blockHash,
+    balances: snapshot.balances,
+    pendingBalanceReconcile: getPendingBalanceReconcile(state, chain).slice(),
+    processedLogCount: toNonNegativeInteger(snapshot.chainState.processedLogCount) || 0,
+  };
+}
+
+function restoreCanonicalAnchor(state, chainState, chain, anchor) {
+  clearChainBalances(state, chain);
+  for (const [address, raw] of Object.entries(anchor.balances)) {
+    applyAuthoritativeBalance(state, chain, address, BigInt(raw));
+  }
+  chainState.lastScannedBlock = anchor.blockNumber;
+  chainState.processedLogCount = anchor.processedLogCount;
+  chainState.pendingBalanceReconcile = anchor.pendingBalanceReconcile.slice();
+  normalizePendingBalanceReconcile(chainState);
+}
+
+function validateCanonicalHeader(header) {
+  requireRpcResult(header && Number.isSafeInteger(header.blockNumber) && header.blockNumber >= 0 &&
+    /^0x[0-9a-f]{64}$/i.test(header.blockHash || ''), 'Invalid canonical holder checkpoint header');
+}
+
+function validateReorgState(reorg, chainState) {
+  requireRpcResult(reorg && typeof reorg === 'object' && ['canonical', 'tail'].includes(reorg.phase), 'Invalid holder recovery phase');
+  if (reorg.anchor) {
+    validateCanonicalHeader(reorg.anchor);
+    requireRpcResult(reorg.anchor.balances && typeof reorg.anchor.balances === 'object' && !Array.isArray(reorg.anchor.balances) &&
+      Object.entries(reorg.anchor.balances).every(([address, raw]) => isValidAddress(address) && typeof raw === 'string' && /^[1-9][0-9]*$/.test(raw)) &&
+      Array.isArray(reorg.anchor.pendingBalanceReconcile) && reorg.anchor.pendingBalanceReconcile.every(isValidAddress) &&
+      Number.isSafeInteger(reorg.anchor.processedLogCount) && reorg.anchor.processedLogCount >= 0, 'Invalid holder recovery balances');
+  }
+  if (reorg.phase === 'tail') {
+    requireRpcResult(Boolean(reorg.anchor), 'Missing canonical holder baseline');
+  } else {
+    validateCanonicalHeader(reorg.canonicalTarget);
+    const checkpoint = toNonNegativeInteger(chainState.lastScannedBlock);
+    requireRpcResult(checkpoint == null || (checkpoint <= reorg.canonicalTarget.blockNumber &&
+      (!reorg.anchor || checkpoint >= reorg.anchor.blockNumber)), 'Holder canonical progress is outside its recorded target');
+  }
+}
+
+async function verifyCanonicalHeader(chain, expected, getBlockHeader) {
+  validateCanonicalHeader(expected);
+  const current = await getBlockHeader(chain, expected.blockNumber);
+  validateCanonicalHeader(current);
+  if (current.blockNumber !== expected.blockNumber || current.blockHash.toLowerCase() !== expected.blockHash.toLowerCase()) {
+    throw holderError('HOLDER_CANONICAL_MISMATCH', `Canonical ${chain} checkpoint hash changed at block ${expected.blockNumber}; keeping the published snapshot and requiring recovery`);
+  }
+}
+
+// Only the recent unfinalized tail is replayed. The canonical baseline and its
+// pending reconciliation queue are persisted together. During a long canonical
+// catch-up, its finalized target proves that completed windows can safely resume
+// from their ordinary durable checkpoint without discarding already fetched work.
+async function processChain(state, config, deps = {}) {
+  const getBlockHeader = deps.getBlockHeader || getBlockHeaderRpc;
+  const persist = deps.persist || persistState;
+  const checkDeadline = deps.checkDeadline || checkRunDeadline;
+  checkDeadline();
+  const finalized = await getBlockHeader(config.chain, 'finalized');
+  const latest = await getBlockHeader(config.chain, 'latest');
+  validateCanonicalHeader(finalized);
+  validateCanonicalHeader(latest);
+  requireRpcResult(finalized.blockNumber <= latest.blockNumber, 'Finalized holder block is ahead of latest');
+  let chainState = ensureChainState(state, config, latest.blockNumber);
+  let reorg = chainState.reorg;
+
+  if (reorg) {
+    validateReorgState(reorg, chainState);
+    if (reorg.anchor) {
+      requireRpcResult(finalized.blockNumber >= reorg.anchor.blockNumber, 'RPC finalized head is behind the saved holder baseline');
+      await verifyCanonicalHeader(config.chain, reorg.anchor, getBlockHeader);
+    }
+    if (reorg.phase === 'canonical') {
+      requireRpcResult(finalized.blockNumber >= reorg.canonicalTarget.blockNumber, 'RPC finalized head is behind canonical holder progress');
+      await verifyCanonicalHeader(config.chain, reorg.canonicalTarget, getBlockHeader);
+    } else {
+      restoreCanonicalAnchor(state, chainState, config.chain, reorg.anchor);
+    }
+  } else {
+    // A legacy snapshot has no old block hash. Trust its existing balances once,
+    // only after finality reaches its checkpoint; never replay history over them.
+    // Hash checks from this point forward cannot diagnose pre-migration damage.
+    const legacyBlock = toNonNegativeInteger(chainState.lastScannedBlock);
+    let anchor = null;
+    if (legacyBlock != null) {
+      if (legacyBlock > finalized.blockNumber) {
+        throw holderError('HOLDER_FINALITY_PENDING', `Waiting for ${config.chain} finality to reach saved holder block ${legacyBlock}`);
+      }
+      const legacyHeader = await getBlockHeader(config.chain, legacyBlock);
+      validateCanonicalHeader(legacyHeader);
+      requireRpcResult(legacyHeader.blockNumber === legacyBlock, 'RPC returned the wrong legacy holder checkpoint');
+      const recon = await reconcileFlaggedBalances(state, config, chainState, {
+        rpcCall: deps.reconcileRpcCall || deps.rpcCall, persist, checkDeadline,
+      });
+      if (recon.failed) throw holderError('HOLDER_RECONCILIATION_PENDING', 'Legacy holder balances remain queued for reconciliation');
+      anchor = captureCanonicalAnchor(state, config.chain, legacyHeader);
+    }
+    reorg = { anchor, phase: 'canonical', canonicalTarget: finalized };
+    chainState.reorg = reorg;
+  }
+
+  reorg.phase = 'canonical';
+  reorg.canonicalTarget = finalized;
+  persistHolderState(state, persist);
+  const scanDeps = (target) => ({
+    ...deps, getLatestBlock: async () => target,
+    alchemyScan: { ...deps.alchemyScan, persist: (deps.alchemyScan && deps.alchemyScan.persist) || persist },
+    standardScan: { ...deps.standardScan, persist: (deps.standardScan && deps.standardScan.persist) || persist },
+    persist, checkDeadline,
+  });
+  const canonicalSummary = await scanChainRange(state, config, scanDeps(finalized.blockNumber));
+  if (canonicalSummary.reconcileFailed) {
+    throw holderError('HOLDER_RECONCILIATION_PENDING', 'Canonical holder balances remain queued for reconciliation');
+  }
+  chainState = state.chains[config.chain];
+  reorg = chainState.reorg;
+  // Recheck the target before blessing the newly collected baseline. A deep
+  // inconsistency never replaces the prior public snapshot.
+  await verifyCanonicalHeader(config.chain, finalized, getBlockHeader);
+  reorg.anchor = captureCanonicalAnchor(state, config.chain, finalized);
+  reorg.phase = 'tail';
+  delete reorg.canonicalTarget;
+  persistHolderState(state, persist);
+  checkDeadline();
+  const tailSummary = await scanChainRange(state, config, scanDeps(latest.blockNumber));
+  if (tailSummary.reconcileFailed) {
+    throw holderError('HOLDER_RECONCILIATION_PENDING', 'Recent holder balances remain queued for reconciliation');
+  }
+  // Detect a reorg during this run before publishing; the next invocation can
+  // recover by replaying the tail from the already durable canonical baseline.
+  try {
+    await verifyCanonicalHeader(config.chain, latest, getBlockHeader);
+  } catch (error) {
+    chainState = state.chains[config.chain];
+    restoreCanonicalAnchor(state, chainState, config.chain, chainState.reorg.anchor);
+    persistHolderState(state, persist);
+    throw error;
+  }
+  return {
+    startBlock: canonicalSummary.startBlock,
+    latestBlock: latest.blockNumber,
+    latestBlockHash: latest.blockHash,
+    logsFetched: canonicalSummary.logsFetched + tailSummary.logsFetched,
+    logsApplied: canonicalSummary.logsApplied + tailSummary.logsApplied,
+  };
+}
+
+async function verifyHolderPublication(state, pinnedHeads, deps = {}) {
+  const getBlockHeader = deps.getBlockHeader || getBlockHeaderRpc;
+  const persist = deps.persist || persistState;
+  const checkDeadline = deps.checkDeadline || checkRunDeadline;
+  for (const head of pinnedHeads) {
+    checkDeadline();
+    try {
+      await verifyCanonicalHeader(head.chain, {
+        blockNumber: head.latestBlock, blockHash: head.latestBlockHash,
+      }, getBlockHeader);
+    } catch (error) {
+      const chainState = state.chains[head.chain];
+      restoreCanonicalAnchor(state, chainState, head.chain, chainState.reorg.anchor);
+      persistHolderState(state, persist);
+      throw error;
+    }
+  }
+}
+
 async function main() {
+  activeRunDeadline = createHolderRunDeadline();
   ensureDirectory(STATE_DIR);
   ensureDirectory(OUTPUT_DIR);
 
   const state = normalizeState(readJson(STATE_FILE, createDefaultState()));
   const holderLabels = readHolderLabelRegistry();
+  const pinnedHeads = [];
   for (const config of TOKEN_CONFIGS) {
     const summary = await processChain(state, config);
+    pinnedHeads.push({ chain: config.chain, ...summary });
     console.log(
       `[holder-rankings] ${config.chain}: scanned ${summary.startBlock}-${summary.latestBlock}, fetched ${summary.logsFetched} logs, applied ${summary.logsApplied}`,
     );
   }
 
+  // Earlier chains can reorg while a later chain catches up. Check all pinned
+  // heads again immediately before replacing the public snapshot.
+  await verifyHolderPublication(state, pinnedHeads);
   const completedAt = new Date().toISOString();
   state.updatedAt = completedAt;
   persistHolderState(state);
@@ -1588,7 +1948,7 @@ function flushRpcUsageTelemetry() {
 if (require.main === module) {
   main()
     .catch((error) => {
-      console.error('[holder-rankings] Update failed:', error && error.stack ? error.stack : error);
+      console.error('[holder-rankings] Update failed:', sanitizeRpcMessage(error && error.stack ? error.stack : error));
       process.exitCode = 1;
     })
     .finally(flushRpcUsageTelemetry);
@@ -1630,6 +1990,14 @@ module.exports = {
   getReconcileBatchSize,
   reconcileFlaggedBalances,
   processChain,
+  verifyHolderPublication,
+  scanChainRange,
+  createHolderRunDeadline,
+  validateTransferLogs,
+  validateAssetTransfersPage,
+  parseRpcEnvelope,
+  validateBlockHeader,
+  providerCooldowns,
   rpcCall,
   providerRangeCeilings,
   rpcRunUsage,

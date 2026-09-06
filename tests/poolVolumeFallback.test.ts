@@ -1,6 +1,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { poolLogFixture } from './poolVolumeFixtures';
 
 // This file replays the 2026-07-03 incident (runs 28669908723 / 28676102628):
 // Alchemy's alchemy_getAssetTransfers API 429'd while its core JSON-RPC stayed
@@ -123,13 +124,13 @@ test('incident replay: getLogs succeeds via Alchemy after asset-transfers 429 an
 
   globalThis.fetch = (async (url: string | URL, opts?: { body?: string }) => {
     const host = String(url);
-    const { method } = JSON.parse(String((opts && opts.body) || '{}'));
+    const { method, params } = JSON.parse(String((opts && opts.body) || '{}'));
     const provider = host.includes('alchemy.com') ? 'alchemy' : host.includes('infura.io') ? 'infura' : 'other';
     calls.push({ provider, method });
 
     if (provider === 'infura') return rateLimited();
     if (method === 'alchemy_getAssetTransfers') return rateLimited();
-    if (method === 'eth_getLogs') return jsonResponse({ jsonrpc: '2.0', id: 1, result: [transferLog] });
+    if (method === 'eth_getLogs') return jsonResponse({ jsonrpc: '2.0', id: 1, result: [poolLogFixture(transferLog, params[0])] });
     return jsonResponse({ jsonrpc: '2.0', id: 1, result: null });
   }) as unknown as typeof fetch;
 

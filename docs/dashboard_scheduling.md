@@ -25,7 +25,15 @@ The watcher reads `holder_rankings.json`, `pool_volume.json`, and `onchain_snaps
 
 The UI's **Last snapshot sync** is the newest timestamp in the published snapshots, not an all-products health signal or the time a visitor loaded the page. The pools, burn and vault routes can fall back to live reads when a snapshot exceeds its configured maximum age (six hours by default); those reads do not advance the saved snapshot timestamp. Nor is an old Vercel deployment evidence that blockchain data needs refreshing. This scheduler does not poll the deployed UI, and cannot create an RPC loop merely because a Vercel build is delayed.
 
-Pool timestamps can describe committed **partial progress**, not proof that an entire backlog is complete. Consequently, job outcomes and the `Begin dashboard refresh attempt` step are also checked. Balance/volume arithmetic, checkpoint semantics, and the holder state ref are untouched.
+Pool timestamps can describe committed **partial progress**, not proof that an entire backlog is complete. Consequently, job outcomes and the `Begin dashboard refresh attempt` step are also checked. The scheduler does not perform accounting; the updaters enforce the [checkpoint and reorg invariants](rpc_stability_plan.md).
+
+The workflow reserves time for persistence using per-step limits and cooperative
+scan budgets. Holder-state restoration retries transient failures and validates
+the saved structure. Failure to access the ref stops holder scanning; a confirmed
+absent ref requires `bootstrap_holder_state=true` in a manual dispatch on `main`.
+This input also requests a refresh, and is ignored for watchdog bootstrap purposes.
+State writes use the restored revision as a lease, preserving newer concurrent
+writes. Pool and on-chain snapshot steps remain independent of holder restoration.
 
 The Chainstack keepalive writes only `data/scheduler_control.json` (`lastKeepaliveAttemptDay`), included in the same ordinary data commit. Failure is nonfatal and counts as today's attempted ping. If that control file cannot be saved/pushed, a subsequent run may repeat one cheap ping. No accounting state is used as the keepalive marker.
 

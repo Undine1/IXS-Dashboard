@@ -74,6 +74,20 @@ test('concurrent reservations serialize one shared Alchemy bucket but not Infura
   assert.equal(snapshot.providers.infura.requestCount, 1);
 });
 
+test('an explicit dashboard CU allocation caps the target and cannot be bypassed by the legacy override', () => {
+  const env = { RPC_ALCHEMY_TARGET_CUPS: '600', RPC_ALCHEMY_BUDGET_CUPS: '200' };
+  assert.equal(getRpcPacingGapMs(ALCHEMY_ETH, 'alchemy_getAssetTransfers', env), 600);
+  assert.equal(getRpcPacingGapMs(ALCHEMY_BASE, 'alchemy_getAssetTransfers', { ...env, RPC_MIN_INTERVAL_MS: '0' }), 600);
+  assert.equal(getRpcPacingGapMs(INFURA, 'eth_getLogs', env), 100);
+  const settings = createRpcRunUsageTracker({ env }).snapshot().pacing;
+  assert.equal(settings.requestedAlchemyTargetCups, 600);
+  assert.equal(settings.alchemyBudgetCups, 200);
+  assert.equal(settings.alchemyTargetCups, 200);
+  for (const invalid of ['0', '-5', 'NaN', 'Infinity', 'bad']) {
+    assert.throws(() => getRpcPacingGapMs(ALCHEMY_ETH, 'eth_getLogs', { RPC_ALCHEMY_BUDGET_CUPS: invalid }), /positive dashboard allocation/);
+  }
+});
+
 test('unknown Alchemy methods use a conservative CU estimate and sanitized telemetry keys', () => {
   const tracker = createRpcRunUsageTracker({ env: { RPC_MIN_INTERVAL_MS: '0' } });
   tracker.recordAttempt(ALCHEMY_ETH, 'alchemy_futureMethod');

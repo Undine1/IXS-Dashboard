@@ -52,3 +52,10 @@ Operational notes
   - `API_BASE_DELAY_MS`
   - `API_MAX_DELAY_MS`
 - Check `pool_volume_alert.json` when a CI run fails to identify the failing pool/API call.
+
+Checkpoint integrity and RPC stability
+- Every response/page is validated before its volume and checkpoint are committed. Invalid or incomplete results never mean an empty successful range.
+- A finalized baseline pairs the cumulative total with a verified block hash. Each run replaces the newer tail from that baseline rather than adding it twice; legacy cumulative totals are preserved during migration.
+- Exhausted transient provider failures temporarily prefer healthy alternatives, with recovery paths retained. Range-size errors shrink the requested window rather than disabling an otherwise usable provider.
+- Request deadlines include body consumption, and cooperative scan budgets leave time for saving progress. RPC diagnostics redact keyed URLs before writing logs/artifacts.
+- See [the detailed plan and operational settings](rpc_stability_plan.md), including the optional `RPC_ALCHEMY_BUDGET_CUPS` dashboard allocation.

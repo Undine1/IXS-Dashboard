@@ -22,6 +22,10 @@ on:
         description: 'Manually refresh even if data is fresh (ignored for watchdog runs)'
         type: boolean
         default: false
+      bootstrap_holder_state:
+        description: 'Allow first holder scan only if refs/data-state is confirmed absent (main only)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -37,6 +41,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout repository (use PAT for push)
+        timeout-minutes: 2
         uses: actions/checkout@v6
         with:
           # Check out the live branch tip, not github.sha: that SHA is pinned
@@ -55,20 +60,23 @@ jobs:
       # A duplicate skips setup, npm ci, all RPC, artifacts and data commits.
       - name: Check whether a refresh is due
         id: freshness
+        timeout-minutes: 1
         env:
           GITHUB_TOKEN: ${{ github.token }}
           DASHBOARD_WATCHDOG: ${{ inputs.watchdog || false }}
-          DASHBOARD_FORCE: ${{ inputs.force || false }}
+          DASHBOARD_FORCE: ${{ inputs.force || inputs.bootstrap_holder_state || false }}
         run: node ./scripts/check_dashboard_refresh.js
 
       # Stable name used by both schedulers to distinguish actual attempts
       # (including failed installs) from successful guard-only/no-op runs.
       - name: Begin dashboard refresh attempt
         if: ${{ steps.freshness.outputs.refresh == 'true' }}
+        timeout-minutes: 1
         run: echo "Refresh admitted by guard (${{ steps.freshness.outputs.reason }})"
 
       - name: Setup Node.js
         if: ${{ steps.freshness.outputs.refresh == 'true' }}
+        timeout-minutes: 2
         uses: actions/setup-node@v6
         with:
           node-version: '24.18.1'
@@ -77,6 +85,7 @@ jobs:
       - name: Install dependencies
         id: install
         if: ${{ steps.freshness.outputs.refresh == 'true' }}
+        timeout-minutes: 4
         run: |
           if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ] || [ -f yarn.lock ]; then
             npm ci
@@ -87,12 +96,14 @@ jobs:
 
       - name: Ping Chainstack backup RPC (daily)
         if: ${{ steps.install.outcome == 'success' }}
+        timeout-minutes: 1
         env:
           BACKUP_CHAINSTACK_BASE_RPC_URL: ${{ secrets.BACKUP_CHAINSTACK_BASE_RPC_URL }}
         run: node ./scripts/ping_backup_rpc.js
 
       - name: Run pool updater
-        if: ${{ steps.install.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 20
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
@@ -102,34 +113,33 @@ jobs:
           RPC_LOG_BLOCK_CHUNK_BASE: '5000'
           RPC_MIN_LOG_BLOCK_CHUNK: '10'
           RPC_ALCHEMY_TARGET_CUPS: ${{ vars.RPC_ALCHEMY_TARGET_CUPS || '600' }}
+          RPC_ALCHEMY_BUDGET_CUPS: ${{ vars.RPC_ALCHEMY_BUDGET_CUPS }}
+          RPC_RUN_BUDGET_MS: '1020000'
           WINDOW_SECONDS: '3600'
         run: node ./scripts/update_pool_volume_indexer.js
 
       # The holder rankings incremental state is persisted on the custom ref
       # refs/data-state (not a branch, so it never triggers Vercel/CI and is
       # never pulled by a normal clone) as a single orphan commit — durable but
-      # with no growing history. Restore it before the updater so the scan
-      # resumes from the last checkpoint instead of re-scanning from the token
-      # deployment block. Missing ref (first run / lost ref) → updater
-      # bootstraps from scratch (expensive but self-healing).
+      # with no growing history. Failed restores never start a historical scan.
+      # A confirmed missing ref requires the explicit manual bootstrap input;
+      # only main can read/write this shared production state.
       - name: Restore holder rankings state
+        id: holder_state
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: |
-          mkdir -p data
-          if git fetch --no-tags --depth 1 origin '+refs/data-state:refs/remotes/origin/data-state' 2>/dev/null \
-             && git cat-file -e refs/remotes/origin/data-state:holder_rankings_state.json 2>/dev/null; then
-            git cat-file -p refs/remotes/origin/data-state:holder_rankings_state.json > data/holder_rankings_state.json
-            echo "Restored holder rankings state ($(wc -c < data/holder_rankings_state.json) bytes) from refs/data-state"
-          else
-            echo "::warning::No refs/data-state state found; holder updater will bootstrap from scratch"
-          fi
+        timeout-minutes: 3
+        env:
+          HOLDER_STATE_BOOTSTRAP: ${{ inputs.bootstrap_holder_state || false }}
+          DASHBOARD_WATCHDOG: ${{ inputs.watchdog || false }}
+        run: node ./scripts/holder_state_ref.js restore
 
       # Pool and holder data are independent products: a pool-updater failure
       # must not leave holder rankings stale (and vice versa). Run whenever
       # the job is alive and dependencies installed; the job still reports
       # failure when any step failed.
       - name: Run holder rankings updater
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.holder_state.outputs.ready == 'true' }}
+        timeout-minutes: 35
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
@@ -155,36 +165,22 @@ jobs:
           HOLDER_RANKINGS_BASE_START_BLOCK: ${{ vars.HOLDER_RANKINGS_BASE_START_BLOCK }}
           HOLDER_RANKINGS_POLYGON_START_BLOCK: ${{ vars.HOLDER_RANKINGS_POLYGON_START_BLOCK }}
           RPC_ALCHEMY_TARGET_CUPS: ${{ vars.RPC_ALCHEMY_TARGET_CUPS || '600' }}
+          RPC_ALCHEMY_BUDGET_CUPS: ${{ vars.RPC_ALCHEMY_BUDGET_CUPS }}
+          RPC_RUN_BUDGET_MS: '1920000'
         run: npm run update:holder-rankings
 
       # Persist the (possibly partially updated) state back to refs/data-state
       # as a fresh parentless commit, so the ref always holds exactly one
-      # commit — durable with zero history growth. Runs whenever the updater
-      # could have written progress, mirroring the commit step's philosophy.
+      # commit. The write lease protects the exact ref restored above, and a
+      # lost push receipt is checked before retrying the same commit.
       - name: Persist holder rankings state
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: |
-          state='data/holder_rankings_state.json'
-          if [ ! -f "$state" ]; then
-            echo "::warning::No holder rankings state file to persist"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          blob=$(git hash-object -w "$state")
-          tree=$(printf '100644 blob %s\tholder_rankings_state.json\n' "$blob" | git mktree)
-          commit=$(git commit-tree "$tree" -m "holder rankings state $(date -u +%FT%TZ)")
-          for attempt in 1 2 3; do
-            if git push -f origin "$commit:refs/data-state"; then
-              echo "Persisted holder rankings state to refs/data-state ($commit)"
-              break
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "::error::Failed to persist holder rankings state after 3 attempts"
-              exit 1
-            fi
-            sleep $((attempt * 5))
-          done
+        if: ${{ !cancelled() && steps.holder_state.outputs.ready == 'true' }}
+        timeout-minutes: 3
+        env:
+          HOLDER_STATE_READY: ${{ steps.holder_state.outputs.ready }}
+          HOLDER_STATE_EXPECTED_SHA: ${{ steps.holder_state.outputs.expected_sha }}
+          HOLDER_STATE_BOOTSTRAP: ${{ steps.holder_state.outputs.bootstrap }}
+        run: node ./scripts/holder_state_ref.js persist
 
       # Snapshots the on-demand chain reads (pool reserve valuations, burn
       # balances, and vault TVL) so the Vercel routes serve a deployment-baked file instead
@@ -193,6 +189,7 @@ jobs:
       # run surfaces it.
       - name: Update on-chain snapshot
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 10
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           BACKUP_INFURA_API_KEY: ${{ secrets.BACKUP_INFURA_API_KEY }}
@@ -212,6 +209,7 @@ jobs:
       # resume from checkpoints instead of redoing the window.
       - name: Commit updated data files
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 3
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -247,6 +245,7 @@ jobs:
 
       - name: Upload run artifacts
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 2
         uses: actions/upload-artifact@v7
         with:
           name: dashboard-data-artifacts
@@ -270,6 +269,7 @@ jobs:
       # double-fallback run hit 1570 and false-failed the old 1500 ceiling.)
       - name: Check run alerts and fail if thresholds exceeded
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 1
         env:
           ALERT_INDEXER_CALLS: ${{ vars.ALERT_INDEXER_CALLS || '5000' }}
           ALERT_PROVIDER_BANS: ${{ vars.ALERT_PROVIDER_BANS || '1' }}

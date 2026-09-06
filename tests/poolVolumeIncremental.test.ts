@@ -1,6 +1,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { poolLogFixture } from './poolVolumeFixtures';
 
 // Verifies incremental checkpointing: each scanned window commits its own
 // volume delta + a checkpoint at its last block, so an interrupted scan of a
@@ -58,7 +59,7 @@ test('eth_getLogs scan commits per-window progress and stops at the failing wind
     const logs: Array<{ transactionHash: string; logIndex: string; data: string }> = [];
     if (outgoing && from < 10) logs.push({ transactionHash: `0x${'1'.repeat(64)}`, logIndex: '0x0', data: '0x05' });
     if (outgoing && from >= 10 && from < 20) logs.push({ transactionHash: `0x${'2'.repeat(64)}`, logIndex: '0x0', data: '0x03' });
-    return ok({ jsonrpc: '2.0', id: 1, result: logs });
+    return ok({ jsonrpc: '2.0', id: 1, result: logs.map((log) => poolLogFixture(log, p)) });
   }) as unknown as typeof fetch;
 
   const commits: Array<[number, bigint]> = [];
@@ -91,7 +92,7 @@ test('eth_getLogs scan stops immediately when canonical progress persistence fai
     const logs = outgoing
       ? [{ transactionHash: `0x${'3'.repeat(64)}`, logIndex: '0x0', data: '0x05' }]
       : [];
-    return ok({ jsonrpc: '2.0', id: 1, result: logs });
+    return ok({ jsonrpc: '2.0', id: 1, result: logs.map((log) => poolLogFixture(log, p)) });
   }) as unknown as typeof fetch;
 
   let commitAttempts = 0;
@@ -128,7 +129,7 @@ test('eth_getLogs per-window deltas sum to the same total the return value repor
     const logs: Array<{ transactionHash: string; logIndex: string; data: string }> = [];
     if (outgoing && from < 10) logs.push({ transactionHash: `0x${'a'.repeat(64)}`, logIndex: '0x0', data: '0x07' });
     if (outgoing && from >= 10 && from < 20) logs.push({ transactionHash: `0x${'b'.repeat(64)}`, logIndex: '0x0', data: '0x02' });
-    return ok({ jsonrpc: '2.0', id: 1, result: logs });
+    return ok({ jsonrpc: '2.0', id: 1, result: logs.map((log) => poolLogFixture(log, p)) });
   }) as unknown as typeof fetch;
 
   const commits: bigint[] = [];
@@ -146,7 +147,7 @@ test('asset-transfers path commits once atomically at the range end', async () =
     const outgoing = typeof params.fromAddress === 'string';
     // One outgoing transfer of raw value 12; incoming empty. Single page.
     const transfers = outgoing
-      ? [{ uniqueId: 'x1', rawContract: { value: '0x0c' } }]
+      ? [{ uniqueId: 'x1', hash: `0x${'1'.repeat(64)}`, blockNum: params.fromBlock, from: pair, to: usdc, category: 'erc20', rawContract: { value: '0x0c', address: usdc } }]
       : [];
     return ok({ jsonrpc: '2.0', id: 1, result: { transfers, pageKey: null } });
   }) as unknown as typeof fetch;

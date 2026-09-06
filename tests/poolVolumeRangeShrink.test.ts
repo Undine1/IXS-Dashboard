@@ -1,6 +1,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { poolLogFixture } from './poolVolumeFixtures';
 
 // Replays the base-pool failure from 2026-07-04 (run 28702062547) and verifies
 // the restored free-tier range handling recovers it:
@@ -157,6 +158,7 @@ test('pool RPC uses a query-specific range hint immediately without caching or d
           jsonrpc: '2.0',
           id: 1,
           error: {
+            code: -32005,
             message: 'query limit exceeded; this block range should work: [0x64, 0x6d]',
           },
         });
@@ -213,7 +215,7 @@ test('polygon scan recovers via 10-block Alchemy shrink when Infura 429s (no pub
     }
     alchemyRanges.push(span);
     const hit = from <= 100 && 100 <= to;
-    return ok({ jsonrpc: '2.0', id: 1, result: hit ? [transferLog] : [] });
+    return ok({ jsonrpc: '2.0', id: 1, result: hit ? [poolLogFixture(transferLog, p)] : [] });
   }) as unknown as typeof fetch;
 
   const total = await sumTokenTransfersViaRpc(100, 124, pair, usdc, 'polygon', 6);
@@ -254,7 +256,7 @@ test('base scan rescues via public base.org (large range) before the Alchemy 10-
     const to = parseInt(p.toBlock, 16);
     baseOrgRanges.push(to - from + 1);
     const hit = from <= 100 && 100 <= to;
-    return ok({ jsonrpc: '2.0', id: 1, result: hit ? [transferLog] : [] });
+    return ok({ jsonrpc: '2.0', id: 1, result: hit ? [poolLogFixture(transferLog, p)] : [] });
   }) as unknown as typeof fetch;
 
   // 200-block range on base: base.org should serve it in one chunk after

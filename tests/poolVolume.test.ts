@@ -152,10 +152,10 @@ test('pruneCheckpoint drops stale keys and keeps tracked pools', () => {
   assert.deepEqual(Object.keys(checkpoint).sort(), [pool, `${pool}-polygon`].sort());
 });
 
-test('getAssetTransferRawValue parses hex value and defaults to 0n', () => {
+test('getAssetTransferRawValue parses hex value and rejects missing or malformed values', () => {
   assert.equal(getAssetTransferRawValue({ rawContract: { value: '0x0a' } }), 10n);
-  assert.equal(getAssetTransferRawValue({}), 0n);
-  assert.equal(getAssetTransferRawValue({ rawContract: { value: 'bad' } }), 0n);
+  assert.throws(() => getAssetTransferRawValue({}), /Invalid raw/);
+  assert.throws(() => getAssetTransferRawValue({ rawContract: { value: 'bad' } }), /Invalid raw/);
 });
 
 test('embedded checkpoints are authoritative over a stale compatibility mirror', () => {
@@ -192,7 +192,7 @@ test('latest block number is fetched once per chain per run', async () => {
       statusText: 'OK',
       headers: { get: () => null },
       json: async () => ({ jsonrpc: '2.0', id: 1, result: '0x2a' }),
-      text: async () => '',
+      text: async () => JSON.stringify({ jsonrpc: '2.0', id: 1, result: '0x2a' }),
     };
   }) as unknown as typeof fetch;
 

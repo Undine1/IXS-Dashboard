@@ -30,7 +30,7 @@ How the updater works
    - Falls back to standard JSON-RPC using `ALCHEMY_API_KEY`, then `BACKUP_INFURA_API_KEY`, then `BACKUP_CHAINSTACK_BASE_RPC_URL` on Base if needed.
    - Pages transfer history with `alchemy_getAssetTransfers`, then falls back to `eth_getLogs` if the Alchemy-specific path is unavailable.
    - Checkpoints strictly by block number: it scans bounded block windows and advances `lastScannedBlock` per completed window. It never persists an Alchemy `pageKey` between runs — those are session-scoped, and replaying a stale one silently restarts pagination from the token's first block, re-applying the whole history on top of existing balances (which doubles them). A from-scratch scan (no `lastScannedBlock`) first clears that chain's balances so a rebuild can never stack on top of stale data.
-   - If the Alchemy path fails mid-range, rolls the chain back to its pre-attempt snapshot before falling back to `eth_getLogs`.
+   - If the Alchemy path fails mid-range, restores only the incomplete window before falling back to `eth_getLogs`. Previously completed windows remain saved and are not added again.
    - Applies balance deltas per holder in raw token units.
    - Reconciles any holder whose Transfer-event sum goes negative against the
      authoritative on-chain `balanceOf` (see "Non-standard token" below).
@@ -132,9 +132,15 @@ GitHub Actions setup
 Operational notes
 - The app still reads `/api/holderRankings`; only the data source changed.
 - The snapshot file is the only data served publicly.
-- The state file is not served by Next.js and is not committed to `main`. It is persisted between scheduled runs on the custom ref `refs/data-state` as a single parentless (orphan) commit — durable in the repo but with no growing history, and invisible to Vercel, `on: push` workflows, and normal clones (custom refs are not fetched by default). The workflow restores it before the updater and force-pushes the refreshed state after. It is also uploaded as a per-run CI artifact as a backup. If the ref is ever lost, the next run bootstraps a full rescan from the token deployment block (expensive but self-healing).
+- The state file is not served by Next.js and is not committed to `main`. It is persisted between scheduled runs on `refs/data-state` as one parentless commit and backed up as a CI artifact. The workflow retries and validates restoration, then uses a write lease tied to the restored revision. Failed access never starts a rebuild. A confirmed missing ref requires the explicit manual `bootstrap_holder_state` input on `main`; other branches cannot overwrite production holder state.
 - The holder step runs even when the pool updater step in the same job failed (and vice versa) — the two datasets are independent, so one updater's failure does not leave the other's data stale. The commit step likewise pushes whatever valid progress exists.
 - Vercel deployment for refreshed data is expected to come from Git integration when the workflow pushes to `main` (one push per run covering both updaters).
 - State and snapshot writes use a temp-file replace flow so scheduled runs do not leave partially written JSON behind.
 - On Alchemy Free, `eth_getLogs` is severely block-range limited; the Alchemy Asset Transfers path remains the preferred primary path.
 - By default the public ranking excludes the zero address, `0x...dead`, and the three token contract addresses. Use the exclusion env vars above to add project-specific burn or treasury addresses.
+
+Checkpoint integrity and reorg recovery
+- See [the RPC reliability plan](rpc_stability_plan.md) for the migration, counting invariants, timeout/cooldown controls, and optional dashboard CU allocation.
+- A finalized baseline stores the corresponding balances, reconciliation queue, and block hash. The newer tail is replaced from that baseline on each run, so old and replayed transfers are never stacked.
+- Interrupted canonical scans retain completed windows. The pinned target must still match before their state can be promoted.
+- Existing v2 balances seed the baseline only once finality covers their saved checkpoint. This reorg migration preserves those balances and cannot retroactively prove pre-migration history. The older, separate v1 accuracy migration still performs its existing rebuild; production already uses v2.
