@@ -16,6 +16,47 @@ deployment-baked dashboard snapshots. No packages or provider plans change.
 | Recover recent reorgs | Keep a hash-verified finalized baseline and replay the newer tail from that baseline, replacing the previous tail. | Unchanged reruns are idempotent; replaced tail events are removed; finalized-anchor disagreement stops publication. |
 | Explicit pacing headroom | Optionally cap the requested target with a dashboard-specific CU/s allocation. | The allocation caps every Alchemy chain in the process and survives the legacy fixed-interval override. |
 
+## Audit fixes and acceptance conditions
+
+| Improvement | Implementation | Required evidence |
+| --- | --- | --- |
+| Reject reported fork events | Compare log hashes with canonical headers; compare indexed transfers with the exact multiset of token logs requested by block hash before applying a window. | Orphan events, inconsistent amounts, missing events within a reported block, and conflicting log indices fail before totals advance. |
+| Keep reconciliation on the same fork | Use EIP-1898 `blockHash` with `requireCanonical` for balance calls and their individual fallback. | A partially scanned range reconciles at its actual checkpoint hash, not its original target. |
+| Accept documented terminal pagination | Accept Alchemy's empty-string terminal page key; continue rejecting malformed tokens and cycles. | A valid empty terminal key completes without redundant fallback. |
+| Retain usable range recovery | Preserve an aggregate provider range ceiling even when another provider returns a malformed response. | Shrinking can recover the request; locally conflicting events still fail without publication. |
+| Pin pool units and identity | Store chain, pool, token, and decimals with each raw finalized total; validate legacy metadata before adoption. | Configuration changes cannot silently rescale an existing raw total; ambiguous legacy units stop safely. |
+| Keep providers at cooldown expiry | Classify all providers against one clock reading. | A provider whose cooldown expires during ordering remains available exactly once. |
+
+The holder Alchemy path caps verified windows at 20,000 blocks, preserving any
+smaller configured window. All pages and canonical checks complete before applying
+that window, so an interrupted verification leaves the prior checkpoint intact.
+Headers and hash-bound logs are cached within a scan; failures are not cached as
+successful evidence. The caches are discarded between holder phases/runs and pool
+refreshes.
+
+These checks cost additional RPC: at most one header per distinct reported block
+in a scan, plus one hash-bound token-log read for each distinct block/token checked
+on the indexed path, excluding retries. Empty reported windows do not trigger a
+full block crawl. Existing pacing, provider fallback, and run deadlines apply.
+
+### What canonical verification proves
+
+Standard log scans check that reported events name the canonical hash returned by
+the header provider. Alchemy scans additionally compare event multiplicity,
+transaction, endpoints, and raw amount with hash-bound standard logs for every
+reported block. Self-transfers and repeated delivery cannot add volume twice.
+
+This depends on honest canonical headers and complete RPC results. A range/indexed
+provider omitting an entire transfer-bearing block is not detected by these checks;
+nor does a standard log scan independently prove completeness. Proving absence
+would require an independent completeness source or scanning every relevant block,
+which would materially increase RPC usage. The changes close the observed fork
+inclusion and counting gaps without claiming that stronger guarantee.
+
+The block-hash filters follow [EIP-234](https://eips.ethereum.org/EIPS/eip-234),
+balance reads follow [EIP-1898](https://eips.ethereum.org/EIPS/eip-1898), and empty
+terminal keys match the [Alchemy Transfers response example](https://www.alchemy.com/docs/data/transfers-api/transfers-endpoints/alchemy-get-asset-transfers).
+
 ## Counting invariants
 
 1. The checkpoint and the balances/volume it describes are persisted together.
@@ -46,8 +87,9 @@ headers stops the affected update rather than guessing an undo amount. Recovery
 from confirmed deep corruption requires a separately reviewed rebuild.
 
 The dashboard continues to include the latest successfully scanned tail. Replaying
-that tail and checking headers adds bounded RPC work; it buys reorg correctness
-without switching the displayed data to finalized-only freshness.
+that tail and checking reported events adds RPC work and allows observed reorgs to
+be corrected while retaining current freshness, subject to the provider assumptions
+above.
 
 ## Operational settings
 
@@ -78,3 +120,24 @@ boundaries and migration behavior, then push the verified revision and verify it
 Vercel production deployment. An hourly updater run verifies the scheduled path;
 the production APIs continue to serve the previous committed snapshots until that
 run publishes fresh data.
+
+Audit-fix validation on September 6: all 250 offline tests, ESLint, application and
+scheduler typechecks, and the production build passed. A read-only live replay of
+saved holder history matched the exact balances, checkpoints, and event counts on
+Ethereum (397 blocks / 14 events), Base (2,398 / 7), and Polygon (3,199 / 3).
+Repeating every tail was idempotent. The replay used 81 RPC requests, estimated at
+2,940 Alchemy CU, and wrote no state or public files. This sample started from a
+trusted legacy baseline and used history that is now finalized; it did not
+exercise live failover or balance reconciliation.
+
+Pool checks replayed both current saved tails and a nonempty historical Base tail
+twice. Exact totals/raw anchors and idempotence held, and the existing untagged
+USDC anchors adopted their six-decimal identities without changing history. The
+nonempty sample contained one 6,248,823-raw-unit transfer. These read-only checks
+used 34 RPC requests and an estimated 1,840 Alchemy CU, with filesystem writes
+blocked.
+
+All three configured primary chains also accepted `balanceOf` calls with
+`{blockHash, requireCanonical: true}` at saved finalized checkpoints: six RPC
+requests including headers, estimated at 138 Alchemy CU. This confirms parameter
+compatibility; no live reorg or orphan-hash rejection was induced.

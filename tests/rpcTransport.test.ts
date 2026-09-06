@@ -99,3 +99,13 @@ test('cooldowns skip failing providers on healthy requests but retain every reco
   cooldowns.failed('a', 'eth_getLogs', Object.assign(new Error('invalid range'), { code: 'RPC_INVALID_RESPONSE' }));
   assert.deepEqual(cooldowns.order(urls, 'eth_getLogs'), urls, 'a bad query must not penalize transport health');
 });
+
+test('cooldown expiry during ordering never drops the sole recovery provider', () => {
+  const times = [0, 0, 1];
+  const cooldowns = createProviderCooldowns({ now: () => times.shift() ?? 1, cooldownMs: 1 });
+  const urls = ['recovering-provider'];
+  cooldowns.failed(urls[0], 'eth_getLogs', Object.assign(new Error('timeout'), { code: 'RPC_TIMEOUT' }));
+
+  assert.deepEqual(cooldowns.order(urls, 'eth_getLogs'), urls);
+  assert.deepEqual(cooldowns.order(urls, 'eth_getLogs'), urls, 'the expired provider remains available on the next request');
+});

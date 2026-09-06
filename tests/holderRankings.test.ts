@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import holderRankings from '../scripts/update_holder_rankings.js';
 import holderStateRef from '../scripts/holder_state_ref.js';
+import { createCanonicalTransferVerifier } from '../scripts/canonical_transfer_verifier.js';
 
 const {
   isValidAddress,
@@ -77,6 +78,7 @@ const pager = (pages: any[]) => {
   };
 };
 const noPersist = () => {};
+const fakeTransferVerifier = () => ({ verifyLogs: async () => {}, verifyAssetTransfers: async () => {} });
 const ethConfig = () => ({ chain: 'ethereum', address: TOKEN, decimals: 18 });
 
 test('Retry-After parsing supports seconds, dates, caps, and invalid values', () => {
@@ -284,6 +286,40 @@ test('holder RPC does not cache a query-specific suggested range as a provider c
       request,
     });
     assert.equal(constrainedCalls, 2, 'the filter-specific suggestion must not suppress later queries');
+  } finally {
+    providerRangeCeilings.clear();
+  }
+});
+
+test('holder log scans recover a provider range ceiling when another provider returns malformed data', async () => {
+  const urls = ['https://mixed-range-holder.example/rpc', 'https://mixed-invalid-holder.example/rpc'];
+  const calls: Array<{ url: string; span: number }> = [];
+  const state = createDefaultState();
+  const config = ethConfig();
+  const chainState = ensureChainState(state, config, 19);
+  providerRangeCeilings.clear();
+  const request = async (url: string, options: { body: string }) => {
+    const envelope = JSON.parse(options.body);
+    const filter = envelope.params[0];
+    const from = Number(BigInt(filter.fromBlock));
+    const span = Number(BigInt(filter.toBlock)) - from + 1;
+    calls.push({ url, span });
+    return url === urls[0] && span > 10
+      ? { ok: false, status: 400, text: async () => 'eth_getLogs requests support up to a 10 block range' }
+      : { ok: true, json: async () => ({ jsonrpc: '2.0', id: envelope.id,
+        result: url === urls[1] ? null : [transferLog(ZERO, A, 1n, from)] }) };
+  };
+  try {
+    await processChainViaStandardRpcLogs(state, chainState, config, 19, 0, {
+      fetchLogs: (chain: string, token: string, from: number, to: number) => rpcCall(chain, 'eth_getLogs', [{
+        address: token, fromBlock: hex(BigInt(from)), toBlock: hex(BigInt(to)), topics: [TRANSFER_TOPIC],
+      }], { urls, request }),
+      persist: noPersist, logBudget: createFallbackLogBudget(10),
+    });
+    assert.deepEqual(calls, [{ url: urls[0], span: 20 }, { url: urls[1], span: 20 },
+      { url: urls[0], span: 10 }, { url: urls[0], span: 10 }]);
+    assert.equal(state.holders[A].ethereum, '2');
+    assert.equal(chainState.lastScannedBlock, 19);
   } finally {
     providerRangeCeilings.clear();
   }
@@ -786,6 +822,27 @@ test('a failed Multicall batch falls back to exact-block individual reads', asyn
   assert.deepEqual(getPendingBalanceReconcile(state, 'ethereum'), []);
 });
 
+test('balance reconciliation resolves its block reference from the actual durable checkpoint', async () => {
+  const state = createDefaultState();
+  const config = ethConfig();
+  const chainState = ensureChainState(state, config, 50);
+  chainState.lastScannedBlock = 7;
+  enqueuePendingBalanceReconcile(state, 'ethereum', A);
+  const blockReference = { blockHash: `0x${abiWord(8)}`, requireCanonical: true };
+  await reconcileFlaggedBalances(state, config, chainState, {
+    blockReference: async (number: number) => {
+      assert.equal(number, 7);
+      return blockReference;
+    },
+    rpcCall: async (_chain: string, _method: string, params: unknown[]) => {
+      assert.deepEqual(params[1], blockReference);
+      return encodeMulticallResults([{ success: true, returnData: `0x${abiWord(9)}` }]);
+    },
+    persist: noPersist,
+  });
+  assert.equal(state.holders[A].ethereum, '9');
+});
+
 test('reconciliation persistence failure leaves the durable queue retryable', async () => {
   const config = ethConfig();
   const initial = createDefaultState();
@@ -1006,6 +1063,34 @@ test('Transfer log validation rejects removed, foreign, malformed and conflictin
   assert.throws(() => validateTransferLogs([valid, { ...transferLog(ZERO, B, 1n, 5), blockHash: `0x${'f'.repeat(64)}` }], TOKEN, 0, 10), /Conflicting block hashes/);
 });
 
+test('block-hash Transfer log requests reject responses from a different block', () => {
+  const log = transferLog(ZERO, A, 5n, 5);
+  const payload = { jsonrpc: '2.0', id: 7, result: [log] };
+  const filter = { address: TOKEN, blockHash: log.blockHash, topics: [TRANSFER_TOPIC] };
+  assert.deepEqual(parseRpcEnvelope(payload, 'eth_getLogs', [filter], 7), [log]);
+  assert.throws(() => parseRpcEnvelope(payload, 'eth_getLogs',
+    [{ ...filter, blockHash: `0x${abiWord(999)}` }], 7), /requested block hash/);
+  assert.throws(() => parseRpcEnvelope(payload, 'eth_getLogs',
+    [{ ...filter, fromBlock: '0x0' }], 7), /Invalid blockHash/);
+});
+
+test('locally conflicting Transfer logs abort without shrinking or persisting the range', async () => {
+  const state = createDefaultState();
+  const config = ethConfig();
+  const chainState = ensureChainState(state, config, 19);
+  const valid = transferLog(ZERO, A, 5n, 5);
+  let calls = 0;
+  let writes = 0;
+  await assert.rejects(() => processChainViaStandardRpcLogs(state, chainState, config, 19, 0, {
+    fetchLogs: async () => { calls += 1; return [valid, { ...valid, data: `0x${abiWord(6)}` }]; },
+    persist: () => { writes += 1; }, logBudget: createFallbackLogBudget(10),
+  }), /Conflicting duplicate/);
+  assert.equal(calls, 1);
+  assert.equal(writes, 0);
+  assert.equal(chainState.lastScannedBlock, undefined);
+  assert.deepEqual(state.holders, {});
+});
+
 test('Alchemy transfer validation requires complete raw ERC-20 data and the requested contract/range', () => {
   const valid = xfer(ZERO, A, 5n, 5);
   assert.deepEqual(validateAssetTransfersPage({ transfers: [valid] }, TOKEN, 0, 10).transfers, [valid]);
@@ -1014,6 +1099,33 @@ test('Alchemy transfer validation requires complete raw ERC-20 data and the requ
     { ...valid, rawContract: { value: null, address: TOKEN } },
     { ...valid, rawContract: { value: '0x1', address: B } }]) {
     assert.throws(() => validateAssetTransfersPage({ transfers: [transfer] }, TOKEN, 0, 10), /Alchemy/);
+  }
+});
+
+test('Alchemy terminal empty page keys preserve the completed window without log fallback', async () => {
+  for (const transfers of [[], [xfer(ZERO, A, 100n, 5)]]) {
+    const state = createDefaultState();
+    const config = ethConfig();
+    let pages = 0;
+    let fallbackCalls = 0;
+    await processChain(state, config, {
+      getLatestBlock: async () => 10, getAlchemyRpcUrl: () => true, persist: noPersist,
+      alchemyScan: {
+        fetchPage: async () => { pages += 1; return { transfers, pageKey: '' }; }, persist: noPersist,
+      },
+      standardScan: {
+        fetchLogs: async () => { fallbackCalls += 1; throw new Error('Unexpected log fallback'); },
+        persist: noPersist, logBudget: createFallbackLogBudget(10),
+      },
+    });
+    assert.equal(pages, 1);
+    assert.equal(fallbackCalls, 0);
+    assert.equal(state.chains.ethereum.lastScannedBlock, 10);
+    assert.equal(state.chains.ethereum.processedLogCount, transfers.length);
+    assert.equal(state.holders[A]?.ethereum, transfers.length ? '100' : undefined);
+  }
+  for (const pageKey of [' ', '\n', {}, 0, false]) {
+    assert.throws(() => validateAssetTransfersPage({ transfers: [], pageKey }, TOKEN, 0, 10), /Malformed Alchemy page key/);
   }
 });
 
@@ -1039,6 +1151,86 @@ test('duplicate Alchemy events across pages are applied once and repeated page k
   }), /repeated a cursor/);
   assert.equal(writes, 0);
   assert.equal(chainState2.lastScannedBlock, undefined);
+});
+
+test('Alchemy verifies the entire paginated window before applying or persisting any transfer', async () => {
+  const state = createDefaultState();
+  const config = ethConfig();
+  const chainState = ensureChainState(state, config, 11);
+  chainState.lastScannedBlock = 10;
+  state.holders[A] = { ethereum: '100' };
+  const first = xfer(A, B, 30n, 11);
+  const second = xfer(A, C, 20n, 11);
+  const blockHash = `0x${abiWord(12)}`;
+  const canonicalLogs = [first, second].map((transfer, index) => ({
+    ...transferLog(transfer.from, transfer.to, BigInt(transfer.rawContract.value), 11),
+    blockHash, transactionHash: transfer.hash, logIndex: hex(BigInt(index)),
+  }));
+  let writes = 0;
+  let evidenceCalls = 0;
+  const verifier = () => createCanonicalTransferVerifier({
+    getBlockHeader: async () => ({ blockNumber: 11, blockHash }),
+    getLogsByHash: async (requestedHash: string, token: string) => {
+      evidenceCalls += 1;
+      assert.equal(requestedHash, blockHash);
+      assert.equal(token, TOKEN);
+      assert.deepEqual(state.holders, { [A]: { ethereum: '100' } });
+      return canonicalLogs;
+    },
+  });
+  await assert.rejects(() => processChainViaAlchemyAssetTransfers(state, chainState, config, 11, 0, {
+    fetchPage: async () => ({ transfers: [first], pageKey: '' }),
+    verifyAssetTransfers: verifier().verifyAssetTransfers,
+    persist: () => { writes += 1; },
+  }), { code: 'RPC_CANONICAL_MISMATCH' });
+  assert.equal(writes, 0);
+  assert.equal(chainState.lastScannedBlock, 10);
+  assert.deepEqual(state.holders, { [A]: { ethereum: '100' } });
+
+  let page = 0;
+  await processChainViaAlchemyAssetTransfers(state, chainState, config, 11, 0, {
+    fetchPage: async () => {
+      assert.deepEqual(state.holders, { [A]: { ethereum: '100' } });
+      page += 1;
+      return page === 1 ? { transfers: [first], pageKey: 'second' }
+        : { transfers: [second], pageKey: '' };
+    },
+    verifyAssetTransfers: verifier().verifyAssetTransfers,
+    persist: () => { writes += 1; },
+  });
+  assert.equal(evidenceCalls, 2, 'each attempt fetches the reported block once across all pages');
+  assert.equal(writes, 1);
+  assert.equal(chainState.lastScannedBlock, 11);
+  assert.equal(state.holders[A].ethereum, '50');
+  assert.equal(state.holders[B].ethereum, '30');
+  assert.equal(state.holders[C].ethereum, '20');
+});
+
+test('verified Alchemy backfills cap oversized operator windows and checkpoint each bounded range', async () => {
+  const previous = process.env.HOLDER_RANKINGS_ASSET_TRANSFERS_BLOCK_WINDOW;
+  process.env.HOLDER_RANKINGS_ASSET_TRANSFERS_BLOCK_WINDOW = '1000000';
+  const state = createDefaultState();
+  const config = ethConfig();
+  const chainState = ensureChainState(state, config, 40000);
+  const ranges: number[][] = [];
+  const checkpoints: number[] = [];
+  let verifications = 0;
+  try {
+    await processChainViaAlchemyAssetTransfers(state, chainState, config, 40000, 0, {
+      fetchPage: async (_chain: string, _token: string, from: number, to: number) => {
+        ranges.push([from, to]);
+        return { transfers: [], pageKey: '' };
+      },
+      verifyAssetTransfers: async () => { verifications += 1; },
+      persist: () => { checkpoints.push(chainState.lastScannedBlock); },
+    });
+    assert.deepEqual(ranges, [[0, 19999], [20000, 39999], [40000, 40000]]);
+    assert.deepEqual(checkpoints, [19999, 39999, 40000]);
+    assert.equal(verifications, 3);
+  } finally {
+    if (previous === undefined) delete process.env.HOLDER_RANKINGS_ASSET_TRANSFERS_BLOCK_WINDOW;
+    else process.env.HOLDER_RANKINGS_ASSET_TRANSFERS_BLOCK_WINDOW = previous;
+  }
 });
 
 test('Alchemy fallback preserves completed windows and rolls back only the incomplete window', async () => {
@@ -1093,6 +1285,7 @@ function recoveryFixture() {
   let durable = JSON.parse(JSON.stringify(state));
   const ranges: number[][] = [];
   const deps = {
+    createTransferVerifier: fakeTransferVerifier,
     getBlockHeader: async (_chain: string, tag: string | number) => header(
       tag === 'finalized' ? control.finalized : tag === 'latest' ? control.latest : Number(tag)),
     getAlchemyRpcUrl: () => false,
@@ -1123,6 +1316,83 @@ test('trusted legacy balances seed a finalized baseline and same-height reruns n
   assert.equal(fixture.state.holders[A].ethereum, '70');
   assert.equal(fixture.state.holders[B].ethereum, '30');
   assert.deepEqual(fixture.ranges, [[11, 12], [11, 12]]);
+});
+
+test('orphaned finalized Transfer logs cannot publish an anchor and a corrected retry resumes cleanly', async () => {
+  const fixture = recoveryFixture();
+  fixture.control.finalized = 11;
+  const orphan = { ...transferLog(A, B, 30n, 11), blockHash: `0x${abiWord(999)}` };
+  let stale = true;
+  const deps = { ...fixture.deps, createTransferVerifier: createCanonicalTransferVerifier,
+    standardScan: { ...fixture.deps.standardScan,
+      fetchLogs: async (_chain: string, _token: string, from: number, to: number) => from <= 11 && to >= 11
+        ? [stale ? orphan : { ...transferLog(A, C, 40n, 11), blockHash: fixture.header(11).blockHash }] : [],
+    },
+  };
+  await assert.rejects(() => processCanonicalChain(fixture.state, fixture.config, deps),
+    { code: 'RPC_CANONICAL_MISMATCH' });
+  assert.equal(fixture.durable().chains.ethereum.lastScannedBlock, 10);
+  assert.equal(fixture.durable().chains.ethereum.reorg.anchor.blockNumber, 10);
+  assert.deepEqual(fixture.durable().holders, { [A]: { ethereum: '100' } });
+  assert.deepEqual(fixture.state.holders, { [A]: { ethereum: '100' } });
+
+  stale = false;
+  const resumed = JSON.parse(JSON.stringify(fixture.durable()));
+  const summary = await processCanonicalChain(resumed, fixture.config, deps);
+  await verifyHolderPublication(resumed, [{ chain: fixture.config.chain, ...summary }], deps);
+  assert.equal(resumed.holders[A].ethereum, '60');
+  assert.equal(resumed.holders[B], undefined);
+  assert.equal(resumed.holders[C].ethereum, '40');
+  assert.equal(resumed.chains.ethereum.reorg.anchor.blockHash, fixture.header(11).blockHash);
+  await processCanonicalChain(resumed, fixture.config, deps);
+  assert.equal(resumed.holders[A].ethereum, '60');
+  assert.equal(resumed.holders[C].ethereum, '40');
+});
+
+test('canonical Alchemy scans fetch hash-bound evidence before promoting their completed window', async () => {
+  const fixture = recoveryFixture();
+  fixture.control.finalized = 11;
+  fixture.control.latest = 11;
+  const transfer = xfer(A, B, 30n, 11);
+  const blockHash = fixture.header(11).blockHash;
+  let evidenceCalls = 0;
+  await processCanonicalChain(fixture.state, fixture.config, {
+    ...fixture.deps, createTransferVerifier: createCanonicalTransferVerifier,
+    getAlchemyRpcUrl: () => true,
+    alchemyScan: { fetchPage: async () => ({ transfers: [transfer], pageKey: '' }) },
+    rpcCall: async (_chain: string, method: string, params: unknown[]) => {
+      evidenceCalls += 1;
+      assert.equal(method, 'eth_getLogs');
+      assert.deepEqual(params, [{ blockHash, address: TOKEN, topics: [TRANSFER_TOPIC] }]);
+      assert.equal(fixture.state.holders[A].ethereum, '100');
+      return [{ ...transferLog(A, B, 30n, 11), blockHash, transactionHash: transfer.hash }];
+    },
+  });
+  assert.equal(evidenceCalls, 1);
+  assert.equal(fixture.state.chains.ethereum.reorg.anchor.balances[A], '70');
+  assert.equal(fixture.state.chains.ethereum.reorg.anchor.balances[B], '30');
+});
+
+test('canonical balance reconciliation keeps Multicall and individual fallbacks pinned to the block hash', async () => {
+  const fixture = recoveryFixture();
+  fixture.control.finalized = 11;
+  const calls: unknown[] = [];
+  const deps = { ...fixture.deps, createTransferVerifier: createCanonicalTransferVerifier,
+    standardScan: { ...fixture.deps.standardScan,
+      fetchLogs: async (_chain: string, _token: string, from: number, to: number) => from <= 11 && to >= 11
+        ? [{ ...transferLog(C, B, 10n, 11), blockHash: fixture.header(11).blockHash }] : [],
+    },
+    reconcileRpcCall: async (_chain: string, method: string, params: unknown[]) => {
+      assert.equal(method, 'eth_call');
+      calls.push(params[1]);
+      if (calls.length === 1) throw new Error('Multicall unavailable');
+      return `0x${abiWord(5)}`;
+    },
+  };
+  await processCanonicalChain(fixture.state, fixture.config, deps);
+  assert.deepEqual(calls, Array(2).fill({ blockHash: fixture.header(11).blockHash, requireCanonical: true }));
+  assert.equal(fixture.state.chains.ethereum.reorg.anchor.balances[C], '5');
+  assert.deepEqual(getPendingBalanceReconcile(fixture.state, 'ethereum'), []);
 });
 
 test('a reorg between runs replaces the complete unfinalized tail while preserving current-head freshness', async () => {
@@ -1367,6 +1637,7 @@ test('seeded holder history matches an independent balance oracle across restart
   let finalized = 0;
   let latest = 0;
   const deps = {
+    createTransferVerifier: createCanonicalTransferVerifier,
     getBlockHeader: async (_chain: string, tag: string | number) => {
       const block = tag === 'finalized' ? finalized : tag === 'latest' ? latest : Number(tag);
       return { blockNumber: block, blockHash: hashes.get(block) };

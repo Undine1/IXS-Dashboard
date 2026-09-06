@@ -14,9 +14,10 @@ process.env.API_BASE_DELAY_MS = '1';
 process.env.API_MAX_DELAY_MS = '1';
 const requireCjs = createRequire(import.meta.url);
 const poolVolume = requireCjs('../scripts/update_pool_volume_indexer.js');
+const { createCanonicalTransferVerifier } = requireCjs('../scripts/canonical_transfer_verifier.js');
 const { validateRpcEnvelope, validateRpcMethodResult, sumTokenTransfersViaRpc,
   sumTokenTransfersViaAlchemyAssetTransfers, rpcCallWithUrls, providerCooldowns, setRunDeadline,
-  classifyRpcErrorMessage, shouldDisableProviderForRun, refreshPoolWithAnchor } = poolVolume;
+  classifyRpcErrorMessage, shouldDisableProviderForRun, refreshPoolWithAnchor, providerRangeCeilings } = poolVolume;
 const originalFetch = globalThis.fetch;
 const pair = `0x${'a'.repeat(40)}`;
 const token = `0x${'b'.repeat(40)}`;
@@ -218,4 +219,124 @@ test('provider errors and their aggregate metadata never expose keyed URLs', asy
     assert.ok(!serialized.includes('/v2/'));
     return true;
   });
+});
+
+test('malformed fallback responses do not mask another provider\'s usable range ceiling', async () => {
+  const previousChunk = process.env.RPC_LOG_BLOCK_CHUNK;
+  process.env.RPC_LOG_BLOCK_CHUNK = '20';
+  try {
+    for (const malformed of [() => success(null), () => new Response('invalid json', { status: 200 })]) {
+      providerRangeCeilings.clear();
+      const requests: Array<[string, number, number]> = [];
+      const commits: Array<[number, bigint]> = [];
+      globalThis.fetch = (async (url, options) => {
+        const requestFilter = JSON.parse(String(options?.body)).params[0];
+        const from = Number(BigInt(requestFilter.fromBlock));
+        const span = Number(BigInt(requestFilter.toBlock)) - from + 1;
+        const provider = String(url).includes('infura') ? 'infura' : 'alchemy';
+        requests.push([provider, from, span]);
+        if (provider === 'alchemy') return malformed();
+        if (span > 10) return response({ error: { code: -32005, message: 'eth_getLogs supports up to a 10 block range' } }, 400);
+        return success([poolLogFixture({ transactionHash: `0x${from.toString(16).padStart(64, '0')}`,
+          logIndex: '0x0', data: '0x01' }, requestFilter)]);
+      }) as typeof fetch;
+      const total = await sumTokenTransfersViaRpc(100, 119, pair, token, 'ethereum', 6,
+        (block: number, raw: bigint) => { commits.push([block, raw]); });
+      assert.equal(total, 2 / 1e6);
+      assert.deepEqual(commits, [[109, 1n], [119, 1n]]);
+      assert.deepEqual(requests, [
+        ['infura', 100, 20], ['alchemy', 100, 20],
+        ['infura', 100, 10], ['infura', 100, 10],
+        ['infura', 110, 10], ['infura', 110, 10],
+      ]);
+    }
+  } finally {
+    process.env.RPC_LOG_BLOCK_CHUNK = previousChunk;
+    providerRangeCeilings.clear();
+  }
+});
+
+test('conflicting local transfer identities remain fatal without smaller-window retries', async () => {
+  const previousChunk = process.env.RPC_LOG_BLOCK_CHUNK;
+  process.env.RPC_LOG_BLOCK_CHUNK = '20';
+  let requests = 0;
+  let commits = 0;
+  globalThis.fetch = (async (_url, options) => {
+    requests += 1;
+    const requestFilter = JSON.parse(String(options?.body)).params[0];
+    return success([poolLogFixture({ transactionHash: `0x${'1'.repeat(64)}`, logIndex: '0x0',
+      data: requestFilter.topics.length === 2 ? '0x01' : '0x02' }, requestFilter)]);
+  }) as typeof fetch;
+  try {
+    await assert.rejects(() => sumTokenTransfersViaRpc(100, 139, pair, token, 'ethereum', 6,
+      () => { commits += 1; }), /Conflicting transfer identity/);
+    assert.equal(requests, 2);
+    assert.equal(commits, 0);
+  } finally {
+    process.env.RPC_LOG_BLOCK_CHUNK = previousChunk;
+  }
+});
+
+test('hash-bound RPC filters reject logs from a different block hash', () => {
+  const log = goodLog();
+  const hashFilter = { address: token, blockHash: log.blockHash, topics: [transferTopic] };
+  assert.doesNotThrow(() => validateRpcMethodResult('eth_getLogs', [hashFilter], [log]));
+  assert.throws(() => validateRpcMethodResult('eth_getLogs', [hashFilter], [{ ...log, blockHash: `0x${'f'.repeat(64)}` }]), /filter/);
+  assert.throws(() => validateRpcMethodResult('eth_getLogs', [{ ...hashFilter, fromBlock: '0x64' }], [log]), /filter/);
+});
+
+test('orphan transfer logs abort the active window and preserve earlier canonical progress', async () => {
+  const header = (number: number) => ({ number, timestamp: number * 12,
+    hash: `0x${number.toString(16).padStart(64, '0')}` });
+  const poolsMap = { [pair]: { total_usd: 1, lastUpdated: 'previous' } };
+  const checkpoint: Record<string, { lastBlock: number; lastTimestamp: number; finalized?: { lastBlock: number; totalRaw: string } }> = {
+    [pair]: { lastBlock: 100, lastTimestamp: 1200 },
+  };
+  let saves = 0;
+  globalThis.fetch = (async (_url, options) => {
+    const body = JSON.parse(String(options?.body));
+    if (body.method === 'alchemy_getAssetTransfers') {
+      return response({ jsonrpc: '2.0', id: 1, error: { code: -32000, message: 'mock enhanced API unavailable' } });
+    }
+    const requestFilter = body.params[0];
+    const from = Number(BigInt(requestFilter.fromBlock));
+    const log = poolLogFixture({ transactionHash: `0x${from.toString(16).padStart(64, '0')}`,
+      logIndex: '0x0', data: '0x01' }, requestFilter);
+    if (from === 111) log.blockHash = `0x${'f'.repeat(64)}`;
+    return success([log]);
+  }) as typeof fetch;
+  await assert.rejects(() => refreshPoolWithAnchor({
+    poolsMap, checkpoint, addr: pair, legacyCheckpointKey: `${pair}-polygon`, chain: 'polygon',
+    pairAddr: pair, usdcAddr: token, decimals: 6, latest: header(121), finalized: header(120),
+  }, { getBlock: async (_chain: string, number: number) => header(number), persist: () => { saves += 1; } }),
+  /canonical|block hash|branch/i);
+  assert.equal(checkpoint[pair].lastBlock, 110);
+  assert.equal(checkpoint[pair].finalized?.lastBlock, 110);
+  assert.equal(checkpoint[pair].finalized?.totalRaw, '1000001');
+  assert.equal(poolsMap[pair].total_usd, 1.000001);
+  assert.equal(saves, 1);
+});
+
+test('Asset Transfers events must match the canonical logs before their range is committed', async () => {
+  const header = (number: number) => ({ number, timestamp: number * 12,
+    hash: `0x${number.toString(16).padStart(64, '0')}` });
+  const hashQueries: Array<[string, string]> = [];
+  const verifier = createCanonicalTransferVerifier({
+    getBlockHeader: async (number: number) => header(number),
+    getLogsByHash: async (blockHash: string, tokenAddress: string) => {
+      hashQueries.push([blockHash, tokenAddress]);
+      return [{ ...goodLog(), data: `0x${'2'.padStart(64, '0')}`, topics: [transferTopic, topic, `0x${'0'.repeat(24)}${token.slice(2)}`] }];
+    },
+    checkDeadline: () => {},
+    pinnedHeaders: [header(109)],
+  });
+  let commits = 0;
+  globalThis.fetch = (async (_url, options) => {
+    const requestFilter = JSON.parse(String(options?.body)).params[0];
+    return success({ transfers: requestFilter.fromAddress ? [goodTransfer()] : [] });
+  }) as typeof fetch;
+  await assert.rejects(() => sumTokenTransfersViaAlchemyAssetTransfers(100, 109, pair, token, 'polygon', 6,
+    () => { commits += 1; }, verifier), /canonical|match|transfer/i);
+  assert.equal(commits, 0);
+  assert.deepEqual(hashQueries, [[header(100).hash, token]]);
 });

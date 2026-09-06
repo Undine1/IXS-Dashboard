@@ -121,11 +121,12 @@ function createProviderCooldowns(options = {}) {
   return {
     order(urls, method) {
       const unique = [...new Set(urls)];
+      const orderedAt = now();
       // Prefer healthy providers, but retain cooling alternatives at the end.
       // They are reached only if healthier alternatives fail. This avoids
       // removing the sole recovering provider from a request's fallback path.
-      return unique.filter((url) => (until.get(key(url, method)) || 0) <= now())
-        .concat(unique.filter((url) => (until.get(key(url, method)) || 0) > now())
+      return unique.filter((url) => (until.get(key(url, method)) || 0) <= orderedAt)
+        .concat(unique.filter((url) => (until.get(key(url, method)) || 0) > orderedAt)
           .sort((a, b) => until.get(key(a, method)) - until.get(key(b, method))));
     },
     failed(url, method, error) {

@@ -21,6 +21,7 @@ const {
   sanitizeRpcMessage,
   createProviderCooldowns,
 } = require('./rpc_transport');
+const { createCanonicalTransferVerifier } = require('./canonical_transfer_verifier');
 
 function loadEnvLocal() {
   try {
@@ -49,7 +50,7 @@ function loadEnvLocal() {
   }
 }
 
-loadEnvLocal();
+if (require.main === module) loadEnvLocal();
 
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
 const BACKUP_INFURA_API_KEY = String(process.env.BACKUP_INFURA_API_KEY || '').trim();
@@ -517,6 +518,10 @@ function validateRpcMethodResult(method, params, result) {
   if (method === 'eth_getLogs') {
     if (!Array.isArray(result)) throw invalidRpcResponse('eth_getLogs result must be an array');
     const filter = params[0];
+    const hashBound = Object.prototype.hasOwnProperty.call(filter, 'blockHash');
+    if (hashBound && (!HASH_PATTERN.test(filter.blockHash) || filter.fromBlock != null || filter.toBlock != null)) {
+      throw invalidRpcResponse('Invalid block-hash transfer log filter');
+    }
     const seen = new Set();
     for (const log of result) {
       if (!log || !HASH_PATTERN.test(log.transactionHash) || !HASH_PATTERN.test(log.blockHash) ||
@@ -527,7 +532,8 @@ function validateRpcMethodResult(method, params, result) {
         throw invalidRpcResponse('Malformed ERC-20 transfer log');
       }
       const block = fromRpcHex(log.blockNumber);
-      if (block < fromRpcHex(filter.fromBlock) || block > fromRpcHex(filter.toBlock) ||
+      if ((hashBound ? log.blockHash.toLowerCase() !== filter.blockHash.toLowerCase()
+        : block < fromRpcHex(filter.fromBlock) || block > fromRpcHex(filter.toBlock)) ||
           (filter.address && log.address.toLowerCase() !== String(filter.address).toLowerCase()) ||
           (filter.topics || []).some((topic, index) => topic != null && log.topics[index].toLowerCase() !== topic.toLowerCase())) {
         throw invalidRpcResponse('Transfer log does not match the requested filter');
@@ -863,8 +869,9 @@ async function fetchPoolAssetTransfersPage(chain, usdcAddr, pairAddr, fromBlock,
   };
 }
 
-async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6, onProgress) {
+async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6, onProgress, dependencies = {}) {
   const seen = new Map();
+  const transfers = [];
   let totalRaw = 0n;
 
   for (const direction of ['outgoing', 'incoming']) {
@@ -896,6 +903,7 @@ async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, p
           continue;
         }
         seen.set(key, fingerprint);
+        transfers.push(transfer);
         totalRaw += getAssetTransferRawValue(transfer);
       }
 
@@ -914,6 +922,9 @@ async function sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, p
   // before this call and commits nothing, leaving the eth_getLogs fallback a
   // clean range to rescan (no partial double-count).
   assertRunBudget();
+  if (dependencies.verifyAssetTransfers) {
+    await dependencies.verifyAssetTransfers(transfers, usdcAddr, { participant: pairAddr });
+  }
   if (typeof onProgress === 'function') await onProgress(endBlock, totalRaw);
 
   return Number(totalRaw) / Math.pow(10, Number(decimals));
@@ -958,7 +969,7 @@ function getRpcLogChunkConfig(chain, env = process.env) {
   return { configuredMaxChunk, configuredMinChunk };
 }
 
-async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6, onProgress) {
+async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals = 6, onProgress, dependencies = {}) {
   const { configuredMaxChunk, configuredMinChunk } = getRpcLogChunkConfig(chain);
   const pairTopic = addrToTopic(pairAddr);
   const seen = new Map();
@@ -979,6 +990,7 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
       const outgoing = await fetchTransferLogsRpc(chain, usdcAddr, from, to, pairTopic, false);
       const incoming = await fetchTransferLogsRpc(chain, usdcAddr, from, to, pairTopic, true);
       const merged = outgoing.concat(incoming);
+      if (dependencies.verifyLogs) await dependencies.verifyLogs(merged, usdcAddr);
       for (const log of merged) {
         const k = logKey(log);
         const fingerprint = logFingerprint(log);
@@ -1007,13 +1019,19 @@ async function sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr,
         chunkSize = Math.min(growCeiling, chunkSize * 2);
       }
     } catch (error) {
-      if (error && ['POOL_STATE_PERSIST_FAILED', 'POOL_PROGRESS_FAILED', 'RPC_RUN_DEADLINE', 'RPC_INVALID_RESPONSE'].includes(error.code)) {
-        throw error;
-      }
-
       const inferredMaxChunk = inferMaxLogRangeFromError(error);
       const hasRangePressure = error.code === 'RPC_RANGE_LIMIT' ||
         (error.providerErrors || []).some((message) => /code=RPC_RANGE_(?:LIMIT|CEILING)\b/.test(message));
+      // A malformed response from one fallback must not hide a usable range
+      // ceiling learned from another provider. Local conflicting-event errors
+      // have no provider aggregate and still stop before committing the window.
+      const recoverableProviderRange = Array.isArray(error.providerErrors) &&
+        (inferredMaxChunk != null || hasRangePressure);
+      if (error && (['POOL_STATE_PERSIST_FAILED', 'POOL_PROGRESS_FAILED', 'RPC_RUN_DEADLINE'].includes(error.code) ||
+          (error.code === 'RPC_INVALID_RESPONSE' && !recoverableProviderRange))) {
+        throw error;
+      }
+
       if (inferredMaxChunk != null) {
         learnedMaxChunk = Math.min(learnedMaxChunk, inferredMaxChunk);
       }
@@ -1256,14 +1274,57 @@ function legacyTotalToRaw(value, decimals) {
   return BigInt(total.toFixed(decimals).replace('.', ''));
 }
 
-async function scanPoolRange(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals, onProgress) {
+// These are the immutable six-decimal USDC contracts already recorded in
+// lib/poolsConfig.ts. They allow the existing untagged anchors to migrate even
+// when an older pool record omitted its token precision.
+const LEGACY_USDC_DECIMALS = {
+  'polygon:0x2791bca1f2de4661ed88a30c99a7a9449aa84174': 6,
+  'base:0x833589fcd6edb6e08f4c7c32d4f71b54bda02913': 6,
+};
+
+function poolAnchorIdentity({ chain, pairAddr, usdcAddr, decimals }) {
+  if (!isValidAddress(pairAddr) || !isValidAddress(usdcAddr)) throw new Error('Invalid pool anchor addresses');
+  return {
+    chain: normalizeChain(chain), poolAddress: pairAddr.toLowerCase(),
+    tokenAddress: usdcAddr.toLowerCase(), decimals,
+  };
+}
+
+function validatePoolAnchorIdentity(anchor, identity, pool, lastBlock, addr) {
+  const mismatch = () => new Error('Pool anchor identity or token units changed; preserving totals and requiring operator recovery');
+  if (Object.prototype.hasOwnProperty.call(anchor, 'identity')) {
+    const saved = anchor.identity;
+    if (!saved || typeof saved !== 'object' ||
+        Object.keys(identity).some((key) => saved[key] !== identity[key])) throw mismatch();
+    return;
+  }
+
+  // Old anchors did not pin their units. Use only the persisted pool metadata,
+  // never a new environment override, to authorize adopting the current config.
+  if (!pool || normalizeChain(pool.chain) !== identity.chain ||
+      !isValidAddress(pool.usdc) || pool.usdc.toLowerCase() !== identity.tokenAddress ||
+      String(pool.address || addr).toLowerCase() !== identity.poolAddress) throw mismatch();
+  const recordedDecimals = pool.usdc_decimals ?? pool.decimals ??
+    LEGACY_USDC_DECIMALS[`${identity.chain}:${identity.tokenAddress}`];
+  if (recordedDecimals != null && Number(recordedDecimals) !== identity.decimals) throw mismatch();
+  if (lastBlock === anchor.lastBlock) {
+    // At this exact head the published value describes the same raw baseline.
+    // Compare the same Number conversion used for publication; converting the
+    // rounded display back to BigInt would reject valid large exact anchors.
+    if (Number(anchor.totalRaw) / Math.pow(10, identity.decimals) !== Number(pool.total_usd)) throw mismatch();
+  } else if (recordedDecimals == null) {
+    throw new Error('Legacy pool anchor token precision is unknown; operator recovery is required before replay');
+  }
+}
+
+async function scanPoolRange(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals, onProgress, dependencies = {}) {
   try {
-    await sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals, onProgress);
+    await sumTokenTransfersViaAlchemyAssetTransfers(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals, onProgress, dependencies);
     return 'alchemy-asset-transfers';
   } catch (error) {
     if (['POOL_STATE_PERSIST_FAILED', 'POOL_PROGRESS_FAILED', 'RPC_RUN_DEADLINE'].includes(error && error.code)) throw error;
     console.warn(`[pool-volume] ${chain}: Asset Transfers failed; falling back to eth_getLogs: ${sanitizeRpcMessage(error)}`);
-    await sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals, onProgress);
+    await sumTokenTransfersViaRpc(startBlock, endBlock, pairAddr, usdcAddr, chain, decimals, onProgress, dependencies);
     return 'rpc-logs-fallback';
   }
 }
@@ -1276,7 +1337,16 @@ async function refreshPoolWithAnchor(options, dependencies = {}) {
   const getBlock = dependencies.getBlock || getBlockByNumberRpc;
   const scan = dependencies.scan || scanPoolRange;
   const persist = dependencies.persist || persistPoolState;
+  const verifier = dependencies.verifier || createCanonicalTransferVerifier({
+    getBlockHeader: (number) => getBlock(chain, number),
+    getLogsByHash: (blockHash, tokenAddress) => rpcCallWithUrls(chain, 'eth_getLogs', [{
+      blockHash, address: tokenAddress, topics: [TRANSFER_TOPIC0],
+    }], getLogScanRpcUrlsForChain(chain)),
+    checkDeadline: assertRunBudget,
+    pinnedHeaders: [latest, finalized],
+  });
   if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) throw new Error('Invalid pool token decimals');
+  const identity = poolAnchorIdentity(options);
   const existing = checkpoint[addr] || checkpoint[legacyCheckpointKey];
   const lastBlock = existing && existing.lastBlock;
   if (!Number.isSafeInteger(lastBlock) || lastBlock < 0) {
@@ -1293,6 +1363,7 @@ async function refreshPoolWithAnchor(options, dependencies = {}) {
         !HASH_PATTERN.test(anchor.blockHash) || typeof anchor.totalRaw !== 'string' || !/^\d+$/.test(anchor.totalRaw)) {
       throw new Error('Invalid finalized pool anchor; operator recovery is required');
     }
+    validatePoolAnchorIdentity(anchor, identity, poolsMap[addr], lastBlock, addr);
   } else {
     // A legacy total is accepted as a baseline, never reconstructed by scanning
     // old blocks. Its checkpoint must already be finalized before migration.
@@ -1307,7 +1378,7 @@ async function refreshPoolWithAnchor(options, dependencies = {}) {
   if (anchorBlock.number !== anchor.lastBlock || anchorBlock.hash.toLowerCase() !== anchor.blockHash.toLowerCase()) {
     throw new Error('Finalized pool anchor hash mismatch; preserving totals and requiring operator recovery');
   }
-  anchor = { ...anchor, blockHash: anchor.blockHash.toLowerCase() };
+  anchor = { ...anchor, blockHash: anchor.blockHash.toLowerCase(), identity };
   let canonicalRaw = BigInt(anchor.totalRaw);
   const previousTotal = poolsMap[addr].total_usd;
   const sources = new Set();
@@ -1333,7 +1404,7 @@ async function refreshPoolWithAnchor(options, dependencies = {}) {
           throw new Error('Finalized block changed during pool scan; canonical promotion refused');
         }
         const nextRaw = canonicalRaw + deltaRaw;
-        const nextAnchor = { lastBlock: endBlock, blockHash: block.hash, totalRaw: String(nextRaw) };
+        const nextAnchor = { lastBlock: endBlock, blockHash: block.hash, totalRaw: String(nextRaw), identity };
         save(endBlock, nextRaw, block, nextAnchor, true);
         canonicalRaw = nextRaw;
         anchor = nextAnchor;
@@ -1341,13 +1412,13 @@ async function refreshPoolWithAnchor(options, dependencies = {}) {
         if (!['POOL_STATE_PERSIST_FAILED', 'RPC_RUN_DEADLINE'].includes(error.code)) error.code = 'POOL_PROGRESS_FAILED';
         throw error;
       }
-    }));
+    }, verifier));
   }
 
   let tentativeRaw = 0n;
   if (anchor.lastBlock < latest.number) {
     sources.add(await scan(anchor.lastBlock + 1, latest.number, pairAddr, usdcAddr, chain, decimals,
-      async (_endBlock, deltaRaw) => { tentativeRaw += deltaRaw; }));
+      async (_endBlock, deltaRaw) => { tentativeRaw += deltaRaw; }, verifier));
   }
   assertRunBudget();
   // Do not use a header cache here: a reorg during two-direction pagination

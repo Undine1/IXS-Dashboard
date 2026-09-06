@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import poolVolume from '../scripts/update_pool_volume_indexer.js';
+import { createRequire } from 'node:module';
+
+process.env.ALCHEMY_API_KEY = 'pool-unit-test-key';
+process.env.BACKUP_INFURA_API_KEY = '';
+process.env.BACKUP_CHAINSTACK_BASE_RPC_URL = '';
+const requireCjs = createRequire(import.meta.url);
+const poolVolume = requireCjs('../scripts/update_pool_volume_indexer.js');
 
 const {
   classifyRpcErrorMessage,

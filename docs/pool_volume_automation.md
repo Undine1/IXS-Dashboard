@@ -54,8 +54,10 @@ Operational notes
 - Check `pool_volume_alert.json` when a CI run fails to identify the failing pool/API call.
 
 Checkpoint integrity and RPC stability
-- Every response/page is validated before its volume and checkpoint are committed. Invalid or incomplete results never mean an empty successful range.
+- Every response/page is validated before its volume and checkpoint are committed. Malformed responses never mean an empty successful range.
 - A finalized baseline pairs the cumulative total with a verified block hash. Each run replaces the newer tail from that baseline rather than adding it twice; legacy cumulative totals are preserved during migration.
+- Reported log hashes must match canonical headers. Indexed transfers must match the exact token-event multiset returned by block-hash log reads for each reported block before volume changes. Self-transfers count once. Entirely omitted blocks still depend on provider completeness; see the detailed plan for the verification limits and extra RPC cost.
+- Raw finalized totals pin their chain, pool address, token address, and decimals. A conflicting configuration or ambiguous legacy token precision preserves the existing totals and requires recovery instead of silently rescaling history.
 - Exhausted transient provider failures temporarily prefer healthy alternatives, with recovery paths retained. Range-size errors shrink the requested window rather than disabling an otherwise usable provider.
 - Request deadlines include body consumption, and cooperative scan budgets leave time for saving progress. RPC diagnostics redact keyed URLs before writing logs/artifacts.
 - See [the detailed plan and operational settings](rpc_stability_plan.md), including the optional `RPC_ALCHEMY_BUDGET_CUPS` dashboard allocation.
