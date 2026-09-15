@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-09-15T10:28:44.501Z",
+    "generatedAt": "2026-09-15T11:48:55.718Z",
     "data": {
       "pools": [
         {
@@ -16,7 +16,7 @@
             "decimals0": 6,
             "decimals1": 18
           },
-          "value": 33699.819918
+          "value": 33747.036906
         },
         {
           "type": "Crypto",
@@ -89,7 +89,7 @@
     }
   },
   "burnStats": {
-    "generatedAt": "2026-09-15T10:28:44.501Z",
+    "generatedAt": "2026-09-15T11:48:55.718Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -111,7 +111,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-09-15T10:28:44.501Z",
+    "generatedAt": "2026-09-15T11:48:55.718Z",
     "data": {
       "name": "IXS Vault",
       "address": "0xc975a3EeF2e49F8eDdEf585340C43f15300fCB82",
