@@ -1,10 +1,10 @@
 {
   "0xd093a031df30f186976a1e2936b16d95ca7919d6": {
-    "lastTimestamp": 1789426711,
-    "lastBlock": 93814452,
+    "lastTimestamp": 1789431514,
+    "lastBlock": 93817654,
     "finalized": {
-      "lastBlock": 93814450,
-      "blockHash": "0x122cdff1859728139f6ac3b0cd16d8200378337c8f99e251f3cf7814ccd3be8e",
+      "lastBlock": 93817652,
+      "blockHash": "0x9fe3895cc6e4b571e0d89017dd0679741814b014553e5f94064d941d73b39ed0",
       "totalRaw": "3796792932499",
       "identity": {
         "chain": "polygon",
@@ -13,14 +13,14 @@
         "decimals": 6
       }
     },
-    "blockHash": "0x1342e5364b12195a605ad1a3d635df3faedba3794e281d4c5bec20e26373bb81"
+    "blockHash": "0xd391969abab446edd173835a8a24ae0ff42bda001d48193b78f54a593b91b7b9"
   },
   "0xd22a820dc52f1cacea7a5c86da16757f434f43c6": {
-    "lastTimestamp": 1789426711,
-    "lastBlock": 51318682,
+    "lastTimestamp": 1789431515,
+    "lastBlock": 51321084,
     "finalized": {
-      "lastBlock": 51317927,
-      "blockHash": "0xf2f1dbb989ef0c006f6de784c0b1060c2539c7dbb8f5cca4fccecf4a8e2b515d",
+      "lastBlock": 51320407,
+      "blockHash": "0x9cd4e7fef203bb8e13257ffe21b159c74299f10cd41157af96bf15847f0d594c",
       "totalRaw": "3106438403739",
       "identity": {
         "chain": "base",
@@ -29,6 +29,6 @@
         "decimals": 6
       }
     },
-    "blockHash": "0x6c1d94e5da12aba23b7463c121dbe3a9c72b927221b9d28ad2c7be0b6ad4e21c"
+    "blockHash": "0xfcd615390105d9579b3d5dd6bc79a23ba5af7343136d4542fde36e794720a2f9"
   }
 }
