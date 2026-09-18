@@ -19,7 +19,7 @@
       "rank": 3,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "5,211,750.09",
+      "totalIxs": "5,227,956.50",
       "label": "Uniswap V4"
     },
     {
@@ -54,7 +54,7 @@
       "rank": 8,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "2,340,997.13",
+      "totalIxs": "2,357,872.18",
       "label": "Uniswap V2"
     },
     {
@@ -229,7 +229,7 @@
       "rank": 33,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "713,114.26",
+      "totalIxs": "712,935.28",
       "label": "Contract"
     },
     {
@@ -3580,37 +3580,37 @@
     },
     {
       "rank": 512,
-      "holder": "0x1062726f45726917105eb4161fd86194f97ab188",
-      "chainsHolding": 1,
-      "totalIxs": "70,255.04",
-      "label": null
-    },
-    {
-      "rank": 513,
       "holder": "0x694479b55b6fd30b3a05d67cfc5b77eff6bfdc3a",
       "chainsHolding": 1,
       "totalIxs": "70,177.96",
       "label": null
     },
     {
-      "rank": 514,
+      "rank": 513,
       "holder": "0x956154585073a3caa7cc604ed1cabe914ca080de",
       "chainsHolding": 1,
       "totalIxs": "70,049.47",
       "label": null
     },
     {
-      "rank": 515,
+      "rank": 514,
       "holder": "0x337e6a02cf9d30dca7f314348e03336d10628b32",
       "chainsHolding": 1,
       "totalIxs": "70,000.00",
       "label": null
     },
     {
-      "rank": 516,
+      "rank": 515,
       "holder": "0x0b4ea183ec5dc35b0494928f8a716b2ebfe5bd6b",
       "chainsHolding": 1,
       "totalIxs": "69,769.81",
+      "label": null
+    },
+    {
+      "rank": 516,
+      "holder": "0x1062726f45726917105eb4161fd86194f97ab188",
+      "chainsHolding": 1,
+      "totalIxs": "69,586.40",
       "label": null
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12229,
-  "lastRefreshed": "2026-09-18T04:51:39.801Z",
+  "lastRefreshed": "2026-09-18T06:00:11.731Z",
   "source": "rpc-snapshot"
 }
