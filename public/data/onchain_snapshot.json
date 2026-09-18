@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-09-18T21:49:06.231Z",
+    "generatedAt": "2026-09-18T23:08:47.311Z",
     "data": {
       "pools": [
         {
@@ -16,7 +16,7 @@
             "decimals0": 6,
             "decimals1": 18
           },
-          "value": 33709.199918
+          "value": 33702.92895
         },
         {
           "type": "Crypto",
@@ -29,7 +29,7 @@
             "decimals0": 18,
             "decimals1": 6
           },
-          "value": 19047.169834
+          "value": 19265.349458
         },
         {
           "type": "RWA",
@@ -42,7 +42,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 21609.66908116508
+          "value": 22106.817956577543
         },
         {
           "type": "RWA",
@@ -55,7 +55,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 9252.585041508926
+          "value": 9465.448655050035
         },
         {
           "type": "RWA",
@@ -69,7 +69,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 5503.3232459282635
+          "value": 5629.931892847766
         },
         {
           "type": "RWA",
@@ -83,13 +83,13 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 1605.7217105222112
+          "value": 1642.6627085362566
         }
       ]
     }
   },
   "burnStats": {
-    "generatedAt": "2026-09-18T21:49:06.231Z",
+    "generatedAt": "2026-09-18T23:08:47.311Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -111,7 +111,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-09-18T21:49:06.231Z",
+    "generatedAt": "2026-09-18T23:08:47.311Z",
     "data": {
       "name": "IXS Vault",
       "address": "0xc975a3EeF2e49F8eDdEf585340C43f15300fCB82",
