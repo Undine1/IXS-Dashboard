@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-09-22T23:58:49.936Z",
+    "generatedAt": "2026-09-23T01:18:43.573Z",
     "data": {
       "pools": [
         {
@@ -16,7 +16,7 @@
             "decimals0": 6,
             "decimals1": 18
           },
-          "value": 37463.609086
+          "value": 37519.475438
         },
         {
           "type": "Crypto",
@@ -29,7 +29,7 @@
             "decimals0": 18,
             "decimals1": 6
           },
-          "value": 21611.881338
+          "value": 21474.044846
         },
         {
           "type": "RWA",
@@ -42,7 +42,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 27797.945910658837
+          "value": 27443.969870906876
         },
         {
           "type": "RWA",
@@ -55,7 +55,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 11902.211808593285
+          "value": 11750.650329416529
         },
         {
           "type": "RWA",
@@ -69,7 +69,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 7079.288504816723
+          "value": 6989.14160988965
         },
         {
           "type": "RWA",
@@ -83,13 +83,13 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 2065.5459872623132
+          "value": 2039.2435478357975
         }
       ]
     }
   },
   "burnStats": {
-    "generatedAt": "2026-09-22T23:58:49.936Z",
+    "generatedAt": "2026-09-23T01:18:43.573Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -111,13 +111,13 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-09-22T23:58:49.936Z",
+    "generatedAt": "2026-09-23T01:18:43.573Z",
     "data": {
       "name": "IXS Vault",
       "address": "0xc975a3EeF2e49F8eDdEf585340C43f15300fCB82",
       "network": "bsc",
-      "valueUsd": 655.9087717244657,
-      "navUpdatedAt": "2026-09-21T00:22:06.000Z"
+      "valueUsd": 655.8727047729288,
+      "navUpdatedAt": "2026-09-23T01:12:23.000Z"
     }
   }
 }
