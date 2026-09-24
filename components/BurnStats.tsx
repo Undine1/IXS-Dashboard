@@ -680,7 +680,9 @@ export default function BurnStats({
                               <ChainIcon network="blockchain" alt="" />
                               <div className="text-sm text-white">Verified by <a href={privateEntry.verifiedBy.href} target="_blank" rel="noopener noreferrer" className="hover:underline text-cyan-400">{privateEntry.verifiedBy.label}</a></div>
                             </div>
-                            <div className="text-sm font-mono font-bold text-white">{formatUsd(tvlPrivateVal, 0)}</div>
+                            <div className="text-sm font-mono font-bold text-white">
+                              {tvlPrivateVal === null ? formatUsd(null, 0) : `$${(tvlPrivateVal / 1_000_000).toFixed(2)}m`}
+                            </div>
                           </div>
                         </div>
 
