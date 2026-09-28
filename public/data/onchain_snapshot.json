@@ -115,14 +115,14 @@
     "data": {
       "vaults": [
         {
-          "name": "IX High Yield Bond — Permissionless",
+            "name": "IX High Yield Bond - Permissionless",
           "address": "0xaD01573b459805E3954398796203d830B57A8bD9",
           "network": "avalanche",
           "valueUsd": 402.614429,
           "navUpdatedAt": "2026-09-14T06:17:51.000Z"
         },
         {
-          "name": "IX High Yield Bond — Permissioned",
+            "name": "IX High Yield Bond - Permissioned",
           "address": "0x864E9C192a724773C2bB8C1e84572996074F0B41",
           "network": "avalanche",
           "valueUsd": 197.258337,

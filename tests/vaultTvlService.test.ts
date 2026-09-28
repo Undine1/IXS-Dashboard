@@ -36,6 +36,10 @@ test('Avalanche vaults are valued once each with a single USDC decimals read', (
   const result = decodeVaultTvlReads(validReads());
   assert.deepEqual(result.vaults.map(({ name, address, network }) => ({ name, address, network })),
     HYB_VAULTS.map(({ name, address }) => ({ name, address, network: 'avalanche' })));
+  assert.deepEqual(result.vaults.map((vault) => vault.name), [
+    'IX High Yield Bond - Permissionless',
+    'IX High Yield Bond - Permissioned',
+  ]);
   assert.deepEqual(result.vaults.map((vault) => vault.valueUsd), [402.614429, 197.258337]);
   assert.equal(result.totalValueUsd, 599.872766);
   assert.equal(result.vaults[0].navUpdatedAt, '2026-09-14T06:17:51.000Z');

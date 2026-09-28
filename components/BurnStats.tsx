@@ -109,7 +109,7 @@ interface CollapsiblePanelProps {
 }
 
 function ChainIcon({ network, alt }: ChainIconProps) {
-  const src = `/images/chains/${network}.png`;
+  const src = `/images/chains/${network}.${network === 'avalanche' ? 'svg' : 'png'}`;
 
   return (
     <Image
@@ -714,12 +714,10 @@ export default function BurnStats({
                               return (
                                 <div key={entry.address} className={insetDetailRowClass}>
                                   <div className={`flex items-center ${LAYOUT.itemGap}`}>
-                                    <ChainIcon network="blockchain" alt="" />
+                                    <ChainIcon network="avalanche" alt="" />
                                     <div>
                                       <a href={`https://snowtrace.io/address/${entry.address}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-white hover:underline">{entry.name}</a>
-                                      <div className="text-[11px] leading-4 text-slate-400">
-                                        Avalanche{navUpdatedAt ? ` · NAV updated ${navUpdatedAt} UTC` : ''}
-                                      </div>
+                                      {navUpdatedAt && <div className="text-[11px] leading-4 text-slate-400">NAV updated {navUpdatedAt} UTC</div>}
                                     </div>
                                   </div>
                                   <div className="text-sm font-mono font-bold text-white">{formatUsd(toFiniteNumberOrNull(entry.valueUsd), 0)}</div>

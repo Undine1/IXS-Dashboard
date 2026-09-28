@@ -9,8 +9,8 @@ import { getAvalancheRpcUrls } from './rpc';
 import { readSnapshotSection } from './onchainSnapshot';
 
 export const HYB_VAULTS = [
-  { name: 'IX High Yield Bond — Permissionless', address: '0xaD01573b459805E3954398796203d830B57A8bD9' },
-  { name: 'IX High Yield Bond — Permissioned', address: '0x864E9C192a724773C2bB8C1e84572996074F0B41' },
+  { name: 'IX High Yield Bond - Permissionless', address: '0xaD01573b459805E3954398796203d830B57A8bD9' },
+  { name: 'IX High Yield Bond - Permissioned', address: '0x864E9C192a724773C2bB8C1e84572996074F0B41' },
 ] as const;
 export const HYB_VAULT_ASSET_ADDRESS = '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E';
 export const HYB_VAULT_ASSET_DECIMALS = 6;
