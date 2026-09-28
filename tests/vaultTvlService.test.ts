@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   decodeVaultTvlReads,
-  IXS_VAULT_ASSET_ADDRESS,
-  IXS_VAULT_ADDRESS,
+  HYB_VAULT_ASSET_ADDRESS,
+  HYB_VAULTS,
+  isHealthyVaultTvlPayload,
 } from '../lib/vaultTvlService';
 import type { Multicall3Result } from '../lib/multicall3';
 
@@ -19,54 +20,54 @@ function ok(returnData: string): Multicall3Result {
   return { success: true, returnData };
 }
 
-test('vault TVL uses totalAssets and the contract NAV timestamp', () => {
-  const totalAssets = BigInt('3462012121490846858716');
-  const timestamp = BigInt(Math.floor(Date.parse('2026-08-25T05:59:48.000Z') / 1000));
-
-  const result = decodeVaultTvlReads([
-    ok(uintWord(totalAssets)),
-    ok(addressWord(IXS_VAULT_ASSET_ADDRESS)),
-    ok(uintWord(BigInt(18))),
-    ok(uintWord(timestamp)),
-  ]);
-
-  assert.equal(result.name, 'IXS Vault');
-  assert.equal(result.address, IXS_VAULT_ADDRESS);
-  assert.equal(result.network, 'bsc');
-  assert.equal(result.valueUsd, 3462.0121214908468);
-  assert.equal(result.navUpdatedAt, '2026-08-25T05:59:48.000Z');
-});
-
-test('vault TVL remains valid when its optional NAV timestamp read fails', () => {
-  const result = decodeVaultTvlReads([
-    ok(uintWord(BigInt(0))),
-    ok(addressWord(IXS_VAULT_ASSET_ADDRESS)),
-    ok(uintWord(BigInt(18))),
-    { success: false, returnData: '0x' },
-  ]);
-
-  assert.equal(result.valueUsd, 0);
-  assert.equal(result.navUpdatedAt, null);
-});
-
-test('vault TVL rejects an unexpected underlying asset or malformed totalAssets', () => {
-  const validTail = [
-    ok(addressWord(IXS_VAULT_ASSET_ADDRESS)),
-    ok(uintWord(BigInt(18))),
-    ok(uintWord(BigInt(1))),
+function validReads(): Multicall3Result[] {
+  return [
+    ok(uintWord(BigInt(402_614_429))),
+    ok(addressWord(HYB_VAULT_ASSET_ADDRESS)),
+    ok(uintWord(BigInt(Math.floor(Date.parse('2026-09-14T06:17:51.000Z') / 1000)))),
+    ok(uintWord(BigInt(197_258_337))),
+    ok(addressWord(HYB_VAULT_ASSET_ADDRESS)),
+    ok(uintWord(BigInt(Math.floor(Date.parse('2026-09-14T06:17:09.000Z') / 1000)))),
+    ok(uintWord(BigInt(6))),
   ];
+}
 
-  assert.throws(
-    () => decodeVaultTvlReads([ok('0x1234'), ...validTail]),
-    /Invalid totalAssets result/,
-  );
-  assert.throws(
-    () => decodeVaultTvlReads([
-      ok(uintWord(BigInt(1))),
-      ok(addressWord('0x0000000000000000000000000000000000000001')),
-      ok(uintWord(BigInt(18))),
-      ok(uintWord(BigInt(1))),
-    ]),
-    /Unexpected vault asset/,
-  );
+test('Avalanche vaults are valued once each with a single USDC decimals read', () => {
+  const result = decodeVaultTvlReads(validReads());
+  assert.deepEqual(result.vaults.map(({ name, address, network }) => ({ name, address, network })),
+    HYB_VAULTS.map(({ name, address }) => ({ name, address, network: 'avalanche' })));
+  assert.deepEqual(result.vaults.map((vault) => vault.valueUsd), [402.614429, 197.258337]);
+  assert.equal(result.totalValueUsd, 599.872766);
+  assert.equal(result.vaults[0].navUpdatedAt, '2026-09-14T06:17:51.000Z');
+  assert.ok(isHealthyVaultTvlPayload(result));
+});
+
+test('optional NAV timestamp failure does not discard accurate vault values', () => {
+  const reads = validReads();
+  reads[2] = { success: false, returnData: '0x' };
+  const result = decodeVaultTvlReads(reads);
+  assert.equal(result.vaults[0].navUpdatedAt, null);
+  assert.equal(result.totalValueUsd, 599.872766);
+});
+
+test('malformed or mismatched reads fail closed instead of publishing a partial sum', () => {
+  const malformed = validReads();
+  malformed[3] = ok('0x1234');
+  assert.throws(() => decodeVaultTvlReads(malformed), /Invalid .* totalAssets result/);
+
+  const wrongAsset = validReads();
+  wrongAsset[4] = ok(addressWord('0x0000000000000000000000000000000000000001'));
+  assert.throws(() => decodeVaultTvlReads(wrongAsset), /Unexpected .* asset/);
+
+  const wrongDecimals = validReads();
+  wrongDecimals[6] = ok(uintWord(BigInt(18)));
+  assert.throws(() => decodeVaultTvlReads(wrongDecimals), /Unexpected vault asset decimals/);
+});
+
+test('legacy BNB snapshots and duplicate Avalanche rows cannot enter the aggregate', () => {
+  const valid = decodeVaultTvlReads(validReads());
+  const legacy = { name: 'IXS Vault', address: '0xc975a3EeF2e49F8eDdEf585340C43f15300fCB82', network: 'bsc', valueUsd: 754 };
+  assert.equal(isHealthyVaultTvlPayload(legacy as never), false);
+  assert.equal(isHealthyVaultTvlPayload({ ...valid, vaults: [valid.vaults[0], valid.vaults[0]] }), false);
+  assert.equal(isHealthyVaultTvlPayload({ ...valid, totalValueUsd: valid.totalValueUsd! * 2 }), false);
 });

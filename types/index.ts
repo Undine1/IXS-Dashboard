@@ -32,9 +32,14 @@ export interface PoolsApiResponse {
 export interface VaultTvl {
   name: string;
   address: string;
-  network: 'bsc';
+  network: 'avalanche';
   valueUsd: number | null;
   navUpdatedAt: string | null;
+}
+
+export interface VaultTvlResponse {
+  vaults: VaultTvl[];
+  totalValueUsd: number | null;
 }
 
 export interface TvlPrivateEntry {

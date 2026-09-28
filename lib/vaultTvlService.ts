@@ -1,15 +1,19 @@
 // Relative imports keep this service usable from scripts/update_onchain_snapshot.ts.
-import type { VaultTvl } from '../types';
+import type { VaultTvl, VaultTvlResponse } from '../types';
 import {
   executeMulticall3WithRpcUrls,
+  type Multicall3Call,
   type Multicall3Result,
 } from './multicall3';
-import { getBscRpcUrls } from './rpc';
+import { getAvalancheRpcUrls } from './rpc';
 import { readSnapshotSection } from './onchainSnapshot';
 
-export const IXS_VAULT_ADDRESS = '0xc975a3EeF2e49F8eDdEf585340C43f15300fCB82';
-export const IXS_VAULT_ASSET_ADDRESS = '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d';
-export const IXS_VAULT_ASSET_DECIMALS = 18;
+export const HYB_VAULTS = [
+  { name: 'IX High Yield Bond — Permissionless', address: '0xaD01573b459805E3954398796203d830B57A8bD9' },
+  { name: 'IX High Yield Bond — Permissioned', address: '0x864E9C192a724773C2bB8C1e84572996074F0B41' },
+] as const;
+export const HYB_VAULT_ASSET_ADDRESS = '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E';
+export const HYB_VAULT_ASSET_DECIMALS = 6;
 
 const TOTAL_ASSETS_SELECTOR = '0x01e1d114';
 const ASSET_SELECTOR = '0x38d52e0f';
@@ -18,18 +22,21 @@ const PRICE_UPDATED_AT_SELECTOR = '0xb11c4eec';
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 export type VaultTvlServiceResult = {
-  payload: VaultTvl;
+  payload: VaultTvlResponse;
   healthy: boolean;
   fromCache: boolean;
 };
 
-function emptyPayload(): VaultTvl {
+function emptyPayload(): VaultTvlResponse {
   return {
-    name: 'IXS Vault',
-    address: IXS_VAULT_ADDRESS,
-    network: 'bsc',
-    valueUsd: null,
-    navUpdatedAt: null,
+    vaults: HYB_VAULTS.map(({ name, address }) => ({
+      name,
+      address,
+      network: 'avalanche',
+      valueUsd: null,
+      navUpdatedAt: null,
+    })),
+    totalValueUsd: null,
   };
 }
 
@@ -70,60 +77,73 @@ function decodeOptionalTimestamp(result: Multicall3Result | undefined): string |
   }
 }
 
-// Pure correctness boundary for tests. totalAssets is the vault's current
-// managed USDC balance; it is not reconstructed from deposits/withdrawals, so
-// NAV changes and redemptions cannot create accumulator drift or double counts.
-export function decodeVaultTvlReads(results: Multicall3Result[]): VaultTvl {
-  const totalAssets = decodeUint256(results[0], 'totalAssets');
-  const asset = decodeAddress(results[1], 'asset');
-  const decimals = decodeUint256(results[2], 'asset decimals');
-
-  if (asset !== IXS_VAULT_ASSET_ADDRESS.toLowerCase()) {
-    throw new Error(`Unexpected vault asset ${asset}`);
+// Each vault is read once at the same block. BNB routing vault balances are
+// excluded; totalAssets already reflects the canonical Avalanche vaults.
+export function decodeVaultTvlReads(results: Multicall3Result[]): VaultTvlResponse {
+  if (results.length !== HYB_VAULTS.length * 3 + 1) {
+    throw new Error('Unexpected vault read count');
   }
-  if (decimals !== BigInt(IXS_VAULT_ASSET_DECIMALS)) {
+  const decimals = decodeUint256(results[results.length - 1], 'asset decimals');
+  if (decimals !== BigInt(HYB_VAULT_ASSET_DECIMALS)) {
     throw new Error(`Unexpected vault asset decimals ${decimals.toString()}`);
   }
 
+  const vaults: VaultTvl[] = HYB_VAULTS.map(({ name, address }, index) => {
+    const offset = index * 3;
+    const totalAssets = decodeUint256(results[offset], `${name} totalAssets`);
+    const asset = decodeAddress(results[offset + 1], `${name} asset`);
+    if (asset !== HYB_VAULT_ASSET_ADDRESS.toLowerCase()) {
+      throw new Error(`Unexpected ${name} asset ${asset}`);
+    }
+    return {
+      name,
+      address,
+      network: 'avalanche',
+      // The dashboard values USDC at $1, consistent with its prior vault rule.
+      valueUsd: unitsToNumber(totalAssets, HYB_VAULT_ASSET_DECIMALS),
+      navUpdatedAt: decodeOptionalTimestamp(results[offset + 2]),
+    };
+  });
+
   return {
-    name: 'IXS Vault',
-    address: IXS_VAULT_ADDRESS,
-    network: 'bsc',
-    // This mirrors the dashboard's existing stablecoin-at-$1 valuation rule.
-    valueUsd: unitsToNumber(totalAssets, IXS_VAULT_ASSET_DECIMALS),
-    navUpdatedAt: decodeOptionalTimestamp(results[3]),
+    vaults,
+    totalValueUsd: vaults.reduce((sum, vault) => sum + (vault.valueUsd ?? 0), 0),
   };
 }
 
 export async function computeVaultTvl(): Promise<VaultTvlServiceResult> {
   try {
-    // Four guarded subreads in one physical eth_call, all from the same block.
-    const results = await executeMulticall3WithRpcUrls(getBscRpcUrls(), [
-      { target: IXS_VAULT_ADDRESS, allowFailure: true, callData: TOTAL_ASSETS_SELECTOR },
-      { target: IXS_VAULT_ADDRESS, allowFailure: true, callData: ASSET_SELECTOR },
-      { target: IXS_VAULT_ASSET_ADDRESS, allowFailure: true, callData: DECIMALS_SELECTOR },
-      { target: IXS_VAULT_ADDRESS, allowFailure: true, callData: PRICE_UPDATED_AT_SELECTOR },
+    // Seven guarded subreads in one physical eth_call, all at the same block.
+    const calls: Multicall3Call[] = HYB_VAULTS.flatMap(({ address }) => [
+      { target: address, allowFailure: true, callData: TOTAL_ASSETS_SELECTOR },
+      { target: address, allowFailure: true, callData: ASSET_SELECTOR },
+      { target: address, allowFailure: true, callData: PRICE_UPDATED_AT_SELECTOR },
     ]);
+    calls.push({ target: HYB_VAULT_ASSET_ADDRESS, allowFailure: true, callData: DECIMALS_SELECTOR });
+    const results = await executeMulticall3WithRpcUrls(getAvalancheRpcUrls(), calls);
     return { payload: decodeVaultTvlReads(results), healthy: true, fromCache: false };
   } catch (error) {
-    console.error('[vault TVL service] Unable to read IXS vault:', error);
+    console.error('[vault TVL service] Unable to read Avalanche HYB vaults:', error);
     return { payload: emptyPayload(), healthy: false, fromCache: false };
   }
 }
 
-let cachedPayload: VaultTvl | null = null;
+let cachedPayload: VaultTvlResponse | null = null;
 let cachedAtMs = 0;
 let vaultTvlInFlight: Promise<VaultTvlServiceResult> | null = null;
 
-function isHealthyPayload(payload: VaultTvl | null | undefined): payload is VaultTvl {
-  return Boolean(
-    payload &&
-      payload.network === 'bsc' &&
-      payload.address.toLowerCase() === IXS_VAULT_ADDRESS.toLowerCase() &&
-      typeof payload.valueUsd === 'number' &&
-      Number.isFinite(payload.valueUsd) &&
-      payload.valueUsd >= 0,
-  );
+export function isHealthyVaultTvlPayload(payload: VaultTvlResponse | null | undefined): payload is VaultTvlResponse {
+  if (!payload || !Array.isArray(payload.vaults) || payload.vaults.length !== HYB_VAULTS.length) return false;
+  if (typeof payload.totalValueUsd !== 'number' || !Number.isFinite(payload.totalValueUsd) || payload.totalValueUsd < 0) return false;
+
+  let total = 0;
+  for (const [index, expected] of HYB_VAULTS.entries()) {
+    const vault = payload.vaults[index];
+    if (!vault || vault.name !== expected.name || typeof vault.address !== 'string' || vault.address.toLowerCase() !== expected.address.toLowerCase()) return false;
+    if (vault.network !== 'avalanche' || typeof vault.valueUsd !== 'number' || !Number.isFinite(vault.valueUsd) || vault.valueUsd < 0) return false;
+    total += vault.valueUsd;
+  }
+  return Math.abs(total - payload.totalValueUsd) < 0.000001;
 }
 
 function computeVaultTvlSingleFlight(): Promise<VaultTvlServiceResult> {
@@ -140,7 +160,7 @@ export async function getVaultTvl(
 ): Promise<VaultTvlServiceResult> {
   if (!options.forceFresh) {
     const snapshot = readSnapshotSection('vaultTvl');
-    if (isHealthyPayload(snapshot?.data)) {
+    if (isHealthyVaultTvlPayload(snapshot?.data)) {
       return { payload: snapshot.data, healthy: true, fromCache: true };
     }
 

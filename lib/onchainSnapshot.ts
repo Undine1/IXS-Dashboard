@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import type { PoolsResponseBody } from './poolsService';
 import type { BurnStatsApiResponse } from './burnStatsService';
-import type { VaultTvl } from '../types';
+import type { VaultTvlResponse } from '../types';
 
 // Reader for the hourly on-chain snapshot written by
 // scripts/update_onchain_snapshot.ts in CI. Like the other committed data
@@ -17,7 +17,7 @@ export type OnchainSnapshotSection<T> = {
 export type OnchainSnapshot = {
   pools?: OnchainSnapshotSection<PoolsResponseBody>;
   burnStats?: OnchainSnapshotSection<BurnStatsApiResponse>;
-  vaultTvl?: OnchainSnapshotSection<VaultTvl>;
+  vaultTvl?: OnchainSnapshotSection<VaultTvlResponse>;
 };
 
 // If the pipeline stalls, sections older than this are ignored so the routes

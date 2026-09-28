@@ -103,7 +103,7 @@ export async function GET() {
       getVaultTvl(),
     ]);
 
-    const vaultTvl = Math.max(0, parseFiniteNumber(vaultResult.payload.valueUsd, 0));
+    const vaultTvl = Math.max(0, parseFiniteNumber(vaultResult.payload.totalValueUsd, 0));
     const tvl_usd = Number((computeTvlUsd(poolsResult.body) + readPrivateTvlValue() + vaultTvl).toFixed(2));
     const total_tokens_burned = computeTotalTokensBurned(burnResult.payload, parseTokenDecimals());
     const total_supply = getTotalSupply();

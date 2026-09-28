@@ -111,13 +111,25 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-09-28T00:48:36.411Z",
+    "generatedAt": "2026-09-28T01:12:56.269Z",
     "data": {
-      "name": "IXS Vault",
-      "address": "0xc975a3EeF2e49F8eDdEf585340C43f15300fCB82",
-      "network": "bsc",
-      "valueUsd": 754.9002743876986,
-      "navUpdatedAt": "2026-09-27T13:50:52.000Z"
+      "vaults": [
+        {
+          "name": "IX High Yield Bond — Permissionless",
+          "address": "0xaD01573b459805E3954398796203d830B57A8bD9",
+          "network": "avalanche",
+          "valueUsd": 402.614429,
+          "navUpdatedAt": "2026-09-14T06:17:51.000Z"
+        },
+        {
+          "name": "IX High Yield Bond — Permissioned",
+          "address": "0x864E9C192a724773C2bB8C1e84572996074F0B41",
+          "network": "avalanche",
+          "valueUsd": 197.258337,
+          "navUpdatedAt": "2026-09-14T06:17:09.000Z"
+        }
+      ],
+      "totalValueUsd": 599.872766
     }
   }
 }

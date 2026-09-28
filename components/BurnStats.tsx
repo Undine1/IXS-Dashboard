@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { Pool, TokenBurnStats, TvlPrivateEntry, TvlPublicDeal, VaultTvl } from '@/types';
+import { Pool, TokenBurnStats, TvlPrivateEntry, TvlPublicDeal, VaultTvlResponse } from '@/types';
 import { formatValue, formatAddress, formatUsd, formatNumber } from '@/lib/utils';
 import { PRIVATE_ENTRY as DEFAULT_PRIVATE_ENTRY, PUBLIC_DEALS as DEFAULT_PUBLIC_DEALS, TYPE_LABELS } from '@/lib/tvlConfig';
 import { getTotalSupply } from '@/lib/supply';
@@ -13,7 +13,7 @@ interface BurnStatsProps {
   stats: TokenBurnStats;
   tokenSymbol?: string;
   pools?: Pool[];
-  vault?: VaultTvl | null;
+  vault?: VaultTvlResponse | null;
   warnings?: string[];
 }
 
@@ -370,11 +370,10 @@ export default function BurnStats({
   const tvlPoolsVal = hasUnknownPoolValues
     ? null
     : poolValues.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-  const vaultTvlVal = toFiniteNumberOrNull(vault?.valueUsd);
+  const vaultTvlVal = toFiniteNumberOrNull(vault?.totalValueUsd);
   const totalTvl = tvlPrivateVal === null || tvlPoolsVal === null || vaultTvlVal === null
     ? null
     : tvlPrivateVal + tvlPoolsVal + vaultTvlVal; // Excluded launchpad from TVL
-  const navUpdatedAt = formatNavUpdatedAt(vault?.navUpdatedAt);
   // Platform Volume: sum of Crypto pools (treat pool.value as the pool's USD volume/liquidity)
   const cryptoPools = pools.filter((pool) => pool.type === 'Crypto');
   const poolsByType = pools.reduce<Record<string, Pool[]>>((acc, pool) => {
@@ -710,18 +709,23 @@ export default function BurnStats({
                             Vaults
                           </div>
                           <div className={insetListClass}>
-                            <div className={insetDetailRowClass}>
-                              <div className={`flex items-center ${LAYOUT.itemGap}`}>
-                                <ChainIcon network="blockchain" alt="BNB Chain" />
-                                <div>
-                                  <div className="text-sm font-medium text-white">{vault?.name || 'IXS Vault'}</div>
-                                  <div className="text-[11px] leading-4 text-slate-400">
-                                    BNB Chain{navUpdatedAt ? ` · NAV updated ${navUpdatedAt} UTC` : ''}
+                            {vault?.vaults?.length ? vault.vaults.map((entry) => {
+                              const navUpdatedAt = formatNavUpdatedAt(entry.navUpdatedAt);
+                              return (
+                                <div key={entry.address} className={insetDetailRowClass}>
+                                  <div className={`flex items-center ${LAYOUT.itemGap}`}>
+                                    <ChainIcon network="blockchain" alt="" />
+                                    <div>
+                                      <a href={`https://snowtrace.io/address/${entry.address}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-white hover:underline">{entry.name}</a>
+                                      <div className="text-[11px] leading-4 text-slate-400">
+                                        Avalanche{navUpdatedAt ? ` · NAV updated ${navUpdatedAt} UTC` : ''}
+                                      </div>
+                                    </div>
                                   </div>
+                                  <div className="text-sm font-mono font-bold text-white">{formatUsd(toFiniteNumberOrNull(entry.valueUsd), 0)}</div>
                                 </div>
-                              </div>
-                              <div className="text-sm font-mono font-bold text-white">{formatUsd(vaultTvlVal, 0)}</div>
-                            </div>
+                              );
+                            }) : <div className={insetDetailRowClass}>Vault data unavailable</div>}
                           </div>
                         </div>
                       </div>

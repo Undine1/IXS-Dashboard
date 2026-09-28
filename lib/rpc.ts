@@ -11,7 +11,7 @@ import type { ChainNetwork } from '@/types';
 const ALCHEMY_API_KEY = String(process.env.ALCHEMY_API_KEY || '').trim();
 const BACKUP_INFURA_API_KEY = String(process.env.BACKUP_INFURA_API_KEY || '').trim();
 const BACKUP_CHAINSTACK_BASE_RPC_URL = String(process.env.BACKUP_CHAINSTACK_BASE_RPC_URL || '').trim();
-const BSC_RPC_URL = String(process.env.BSC_RPC_URL || '').trim();
+const AVALANCHE_RPC_URL = String(process.env.AVALANCHE_RPC_URL || '').trim();
 
 const API_TIMEOUT_MS = 10000; // per request
 const MAX_RETRIES_PER_PROVIDER = 2; // attempts per provider = retries + 1
@@ -57,22 +57,15 @@ export function getRpcUrls(network: ChainNetwork): string[] {
   return urls;
 }
 
-// BSC is intentionally kept outside ChainNetwork: the shared pool/burn batch
-// only supports Ethereum, Polygon, and Base. The vault service is an isolated
-// BSC reader, so adding it cannot fan BSC into those existing code paths.
-export function getBscRpcUrls(): string[] {
-  const urls: string[] = [];
-  const addUrl = (url: string | null) => {
-    if (!url) return;
-    if (!urls.includes(url)) urls.push(url);
-  };
-
-  addUrl(BSC_RPC_URL || null);
-  addUrl(ALCHEMY_API_KEY ? `https://bnb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : null);
-  // Last-resort live fallback. Normal dashboard traffic is served from the
-  // hourly snapshot/CDN and does not reach this endpoint.
-  addUrl('https://bnb-mainnet.g.alchemy.com/public');
-  return urls;
+// Avalanche is only used by the HYB vault snapshot. Keep it outside the
+// shared pool/burn ChainNetwork to avoid widening those RPC batches.
+export function getAvalancheRpcUrls(): string[] {
+  const urls = [
+    AVALANCHE_RPC_URL,
+    ALCHEMY_API_KEY ? `https://avax-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : '',
+    'https://api.avax.network/ext/bc/C/rpc',
+  ];
+  return [...new Set(urls.filter(Boolean))];
 }
 
 // Posts a JSON-RPC payload, walking the provider list and retrying transient

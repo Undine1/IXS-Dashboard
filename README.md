@@ -38,10 +38,10 @@ A production-ready analytics dashboard that tracks IXS token burns, Total Value 
 ## Environment variables
 Create a `.env.local` in the project root.
 
-- `ALCHEMY_API_KEY` - primary shared RPC credential for Ethereum, Polygon, Base, and BNB Chain
+- `ALCHEMY_API_KEY` - primary shared RPC credential for Ethereum, Polygon, Base, and Avalanche
 - `BACKUP_INFURA_API_KEY` - optional Infura project key used as fallback
 - `BACKUP_CHAINSTACK_BASE_RPC_URL` - optional full HTTPS Chainstack Base RPC URL used as a third fallback for Base and by the once-daily workflow keepalive ping
-- `BSC_RPC_URL` - optional full BNB Chain RPC URL used ahead of the Alchemy BNB endpoint for the IXS vault snapshot
+- `AVALANCHE_RPC_URL` - optional full Avalanche C-Chain RPC URL used ahead of Alchemy; the official Avalanche public RPC is the final fallback
 - `RPC_LIVE_READ_TOKEN` - optional server-only token required in the `x-ixs-live-rpc-token` header when using the operational `?fresh=1` or `?debug=1` live-RPC bypasses
 - `MULTICALL3_ADDRESS` - optional override for the canonical Multicall3 deployment used to batch hourly snapshot reads
 - `HOLDER_RANKINGS_ASSET_TRANSFERS_PAGE_SIZE` - optional page size for Alchemy transfer pagination
@@ -91,6 +91,7 @@ The updaters write to `public/data/`. The holder updater also writes `data/holde
 ## APIs
 - `GET /api/pools` - returns pools with computed USD values, served from the hourly `public/data/onchain_snapshot.json`; falls back to live RPC reads when the snapshot is missing or older than 6 hours, or with `?fresh=1`/`?debug=1`
 - `GET /api/burnStats` - returns aggregated burn totals and per-address balances, same snapshot-first/live-fallback behavior as `/api/pools`
+- `GET /api/vaultTvl` - returns Permissionless and Permissioned IX High Yield Bond vault values from Avalanche, plus their sum; BNB routing vaults are excluded
 - `GET /api/holderRankings` - returns the latest file-backed holder snapshot from `public/data/holder_rankings.json`
 - `GET /api/syncStatus` - returns the newest timestamp embedded in the deployment-baked holder, pool-volume, or on-chain snapshots
 - `GET /metrics` - public CORS-open aggregate (TVL, burned, supply) consumed by external sites; composed from the same snapshot-backed services, response shape is stable

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import BurnStats from '@/components/BurnStats';
 import { fetchTokenBurnStatsFromAPI } from '@/lib/clientBurnService';
-import { Pool, PoolsApiResponse, TokenBurnStats, VaultTvl } from '@/types';
+import { Pool, PoolsApiResponse, TokenBurnStats, VaultTvlResponse } from '@/types';
 
 interface SyncStatusResponse {
   ok?: boolean;
@@ -16,7 +16,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [pools, setPools] = useState<Pool[]>([]);
-  const [vaultTvl, setVaultTvl] = useState<VaultTvl | null>(null);
+  const [vaultTvl, setVaultTvl] = useState<VaultTvlResponse | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [lastSnapshotSyncAt, setLastSnapshotSyncAt] = useState<string | null>(null);
   // The loading screen only gates the very first load; hourly background
@@ -108,8 +108,8 @@ export default function Dashboard() {
             setLoadingProgress((previous) => Math.max(previous, 92));
             return null;
           });
-        const vaultPromise: Promise<VaultTvl | null> = fetch('/api/vaultTvl')
-          .then(async (r) => (r.ok ? ((await r.json()) as VaultTvl) : null))
+        const vaultPromise: Promise<VaultTvlResponse | null> = fetch('/api/vaultTvl')
+          .then(async (r) => (r.ok ? ((await r.json()) as VaultTvlResponse) : null))
           .catch(() => null);
 
         const [burnsResult, poolsResult, syncStatusResult, vaultResult] = await Promise.all([

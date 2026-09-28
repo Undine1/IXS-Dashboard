@@ -119,7 +119,7 @@ async function main(): Promise<void> {
     failures.push('burnStats section unhealthy: missing or null balances');
   }
   if (!vaultResult.healthy) {
-    failures.push('vaultTvl section unhealthy: BSC vault read or contract guards failed');
+    failures.push('vaultTvl section unhealthy: Avalanche HYB vault reads or contract guards failed');
   }
   if (failures.length > 0) {
     for (const failure of failures) {
