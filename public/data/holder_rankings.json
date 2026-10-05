@@ -12,7 +12,7 @@
       "rank": 2,
       "holder": "0x5a58505a96d1dbf8df91cb21b54419fc36e93fde",
       "chainsHolding": 1,
-      "totalIxs": "7,597,650.94",
+      "totalIxs": "7,597,308.91",
       "label": "Wormhole Bridge"
     },
     {
@@ -40,7 +40,7 @@
       "rank": 6,
       "holder": "0x3ee18b2214aff97000d974cf647e7c347e8fa585",
       "chainsHolding": 1,
-      "totalIxs": "3,399,810.28",
+      "totalIxs": "3,398,887.22",
       "label": "Wormhole Bridge"
     },
     {
@@ -61,14 +61,14 @@
       "rank": 9,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "2,192,497.13",
+      "totalIxs": "2,203,828.33",
       "label": "Uniswap V4"
     },
     {
       "rank": 10,
       "holder": "0x53de80cf153f3e8d388a80d33b1553ed254c6aa8",
       "chainsHolding": 1,
-      "totalIxs": "1,631,828.94",
+      "totalIxs": "1,625,000.00",
       "label": null
     },
     {
@@ -82,7 +82,7 @@
       "rank": 12,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,545,692.92",
+      "totalIxs": "1,550,787.02",
       "label": "Uniswap V2"
     },
     {
@@ -264,7 +264,7 @@
       "rank": 38,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "661,103.87",
+      "totalIxs": "661,748.79",
       "label": "Contract"
     },
     {
@@ -299,7 +299,7 @@
       "rank": 43,
       "holder": "0xcf99708556f3d9c3d7f441582737733f197f0601",
       "chainsHolding": 3,
-      "totalIxs": "600,641.18",
+      "totalIxs": "600,643.20",
       "label": null
     },
     {
@@ -425,7 +425,7 @@
       "rank": 61,
       "holder": "0xce90767d34d7090e809bbec8f5213b1c0865eb0a",
       "chainsHolding": 1,
-      "totalIxs": "483,814.14",
+      "totalIxs": "487,087.70",
       "label": null
     },
     {
@@ -1109,30 +1109,30 @@
     },
     {
       "rank": 159,
-      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
-      "chainsHolding": 1,
-      "totalIxs": "231,875.83",
-      "label": null
-    },
-    {
-      "rank": 160,
       "holder": "0x342b9e9658e746dbb4ff3db729f8df2ccec14fa2",
       "chainsHolding": 1,
       "totalIxs": "230,397.36",
       "label": null
     },
     {
-      "rank": 161,
+      "rank": 160,
       "holder": "0xb7482938a7b635cca9c8bf355878e3991b351dfd",
       "chainsHolding": 2,
       "totalIxs": "228,759.42",
       "label": null
     },
     {
-      "rank": 162,
+      "rank": 161,
       "holder": "0x355ad0ac50c732e424b452f7b04f2cbd6907ad37",
       "chainsHolding": 1,
       "totalIxs": "227,998.88",
+      "label": null
+    },
+    {
+      "rank": 162,
+      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
+      "chainsHolding": 1,
+      "totalIxs": "226,334.41",
       "label": null
     },
     {
@@ -1209,7 +1209,7 @@
       "rank": 173,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "214,142.23",
+      "totalIxs": "215,282.46",
       "label": "IXS/USDC Base"
     },
     {
@@ -3762,24 +3762,24 @@
     },
     {
       "rank": 538,
+      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
+      "chainsHolding": 1,
+      "totalIxs": "69,299.56",
+      "label": "Contract"
+    },
+    {
+      "rank": 539,
       "holder": "0x78f403c49c301e1ffac3a5b9c68c61fc3d480f0d",
       "chainsHolding": 1,
       "totalIxs": "69,057.97",
       "label": null
     },
     {
-      "rank": 539,
+      "rank": 540,
       "holder": "0x3b709f73c29a37f8a657a8e9438f14a1a528733c",
       "chainsHolding": 1,
       "totalIxs": "69,049.50",
       "label": null
-    },
-    {
-      "rank": 540,
-      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
-      "chainsHolding": 1,
-      "totalIxs": "68,957.53",
-      "label": "Contract"
     },
     {
       "rank": 541,
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12368,
-  "lastRefreshed": "2026-10-05T07:38:04.817Z",
+  "lastRefreshed": "2026-10-05T08:58:09.723Z",
   "source": "rpc-snapshot"
 }
