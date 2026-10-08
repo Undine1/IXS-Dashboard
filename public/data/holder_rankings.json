@@ -5,14 +5,14 @@
       "rank": 1,
       "holder": "0x21dd761cac8461a68344f40d2f12e172a18a297f",
       "chainsHolding": 1,
-      "totalIxs": "16,296,118.81",
+      "totalIxs": "16,296,118.31",
       "label": "Nexera Bridge"
     },
     {
       "rank": 2,
       "holder": "0x5a58505a96d1dbf8df91cb21b54419fc36e93fde",
       "chainsHolding": 1,
-      "totalIxs": "7,605,031.86",
+      "totalIxs": "7,605,031.85",
       "label": "Wormhole Bridge"
     },
     {
@@ -61,7 +61,7 @@
       "rank": 9,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "1,885,922.52",
+      "totalIxs": "1,890,692.57",
       "label": "Uniswap V4"
     },
     {
@@ -89,7 +89,7 @@
       "rank": 13,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,430,804.32",
+      "totalIxs": "1,435,165.92",
       "label": "Uniswap V2"
     },
     {
@@ -257,7 +257,7 @@
       "rank": 37,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "655,474.30",
+      "totalIxs": "655,691.70",
       "label": "Contract"
     },
     {
@@ -292,7 +292,7 @@
       "rank": 42,
       "holder": "0xcf99708556f3d9c3d7f441582737733f197f0601",
       "chainsHolding": 3,
-      "totalIxs": "600,711.13",
+      "totalIxs": "600,712.16",
       "label": null
     },
     {
@@ -453,7 +453,7 @@
       "rank": 65,
       "holder": "0xce90767d34d7090e809bbec8f5213b1c0865eb0a",
       "chainsHolding": 1,
-      "totalIxs": "473,606.00",
+      "totalIxs": "473,157.85",
       "label": null
     },
     {
@@ -1307,7 +1307,7 @@
       "rank": 187,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "205,608.19",
+      "totalIxs": "205,658.97",
       "label": "IXS/USDC Base"
     },
     {
@@ -1907,23 +1907,23 @@
     },
     {
       "rank": 273,
-      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
-      "chainsHolding": 1,
-      "totalIxs": "149,121.33",
-      "label": null
-    },
-    {
-      "rank": 274,
       "holder": "0xde21042774a2e9fdb376cecc23d3edcfdb8115ef",
       "chainsHolding": 1,
       "totalIxs": "148,989.00",
       "label": null
     },
     {
-      "rank": 275,
+      "rank": 274,
       "holder": "0xdbb664bd716205debced97ef6ec5bee26fee4072",
       "chainsHolding": 2,
       "totalIxs": "148,948.90",
+      "label": null
+    },
+    {
+      "rank": 275,
+      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
+      "chainsHolding": 1,
+      "totalIxs": "148,132.17",
       "label": null
     },
     {
@@ -3883,7 +3883,7 @@
       "rank": 555,
       "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
       "chainsHolding": 1,
-      "totalIxs": "63,992.59",
+      "totalIxs": "63,991.86",
       "label": "Contract"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12414,
-  "lastRefreshed": "2026-10-08T01:18:08.917Z",
+  "lastRefreshed": "2026-10-08T02:38:18.625Z",
   "source": "rpc-snapshot"
 }
