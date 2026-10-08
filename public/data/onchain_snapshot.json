@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-10-08T08:48:40.685Z",
+    "generatedAt": "2026-10-08T10:08:31.395Z",
     "data": {
       "pools": [
         {
@@ -16,7 +16,7 @@
             "decimals0": 6,
             "decimals1": 18
           },
-          "value": 54928.415942
+          "value": 54922.012674
         },
         {
           "type": "Crypto",
@@ -29,7 +29,7 @@
             "decimals0": 18,
             "decimals1": 6
           },
-          "value": 24295.391344
+          "value": 24244.557676
         },
         {
           "type": "RWA",
@@ -42,7 +42,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 60123.965660919115
+          "value": 59872.25509266495
         },
         {
           "type": "RWA",
@@ -55,7 +55,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 25743.203342030247
+          "value": 25635.42874215689
         },
         {
           "type": "RWA",
@@ -69,7 +69,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 15311.739231931331
+          "value": 15247.636231727301
         },
         {
           "type": "RWA",
@@ -83,13 +83,13 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 11.887183619460023
+          "value": 11.83741761166422
         }
       ]
     }
   },
   "burnStats": {
-    "generatedAt": "2026-10-08T08:48:40.685Z",
+    "generatedAt": "2026-10-08T10:08:31.395Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -111,15 +111,15 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-10-08T08:48:40.685Z",
+    "generatedAt": "2026-10-08T10:08:31.395Z",
     "data": {
       "vaults": [
         {
           "name": "IX High Yield Bond - Permissionless",
           "address": "0xaD01573b459805E3954398796203d830B57A8bD9",
           "network": "avalanche",
-          "valueUsd": 823.449583,
-          "navUpdatedAt": "2026-09-29T01:23:38.000Z"
+          "valueUsd": 504.54066,
+          "navUpdatedAt": "2026-10-08T09:55:23.000Z"
         },
         {
           "name": "IX High Yield Bond - Permissioned",
@@ -129,7 +129,7 @@
           "navUpdatedAt": "2026-10-01T02:51:20.000Z"
         }
       ],
-      "totalValueUsd": 1366.3355809999998
+      "totalValueUsd": 1047.4266579999999
     }
   }
 }
