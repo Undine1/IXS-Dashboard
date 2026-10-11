@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-10-11T10:17:51.759Z",
+    "generatedAt": "2026-10-11T11:38:15.371Z",
     "data": {
       "pools": [
         {
@@ -16,7 +16,7 @@
             "decimals0": 6,
             "decimals1": 18
           },
-          "value": 52275.362162
+          "value": 51873.566376
         },
         {
           "type": "Crypto",
@@ -89,7 +89,7 @@
     }
   },
   "burnStats": {
-    "generatedAt": "2026-10-11T10:17:51.759Z",
+    "generatedAt": "2026-10-11T11:38:15.371Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -111,7 +111,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-10-11T10:17:51.759Z",
+    "generatedAt": "2026-10-11T11:38:15.371Z",
     "data": {
       "vaults": [
         {
