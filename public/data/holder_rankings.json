@@ -5,7 +5,7 @@
       "rank": 1,
       "holder": "0x21dd761cac8461a68344f40d2f12e172a18a297f",
       "chainsHolding": 1,
-      "totalIxs": "16,296,118.31",
+      "totalIxs": "16,289,218.33",
       "label": "Nexera Bridge"
     },
     {
@@ -54,7 +54,7 @@
       "rank": 8,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "2,457,223.66",
+      "totalIxs": "2,462,711.55",
       "label": "Uniswap V4"
     },
     {
@@ -82,7 +82,7 @@
       "rank": 12,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,546,638.10",
+      "totalIxs": "1,547,101.59",
       "label": "Uniswap V2"
     },
     {
@@ -250,7 +250,7 @@
       "rank": 36,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "661,389.71",
+      "totalIxs": "661,904.45",
       "label": "Contract"
     },
     {
@@ -3335,23 +3335,23 @@
     },
     {
       "rank": 477,
-      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
-      "chainsHolding": 1,
-      "totalIxs": "82,152.99",
-      "label": null
-    },
-    {
-      "rank": 478,
       "holder": "0xfc9b0281a30f2f719a6943dfc03bb0200def77bc",
       "chainsHolding": 1,
       "totalIxs": "82,081.61",
       "label": null
     },
     {
-      "rank": 479,
+      "rank": 478,
       "holder": "0x071d693190e16110a5854e4cef93f70d4ea594f2",
       "chainsHolding": 1,
       "totalIxs": "81,802.97",
+      "label": null
+    },
+    {
+      "rank": 479,
+      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
+      "chainsHolding": 1,
+      "totalIxs": "81,219.22",
       "label": null
     },
     {
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12420,
-  "lastRefreshed": "2026-10-11T18:09:17.473Z",
+  "totalRowCount": 12421,
+  "lastRefreshed": "2026-10-11T19:28:05.335Z",
   "source": "rpc-snapshot"
 }
