@@ -1,26 +1,26 @@
 {
   "pools": {
     "0xd093a031df30f186976a1e2936b16d95ca7919d6": {
-      "total_usd": 3819094.519182,
-      "lastUpdated": "2026-10-12T11:18:22.226Z",
+      "total_usd": 3819189.879402,
+      "lastUpdated": "2026-10-12T12:38:46.983Z",
       "chain": "polygon",
       "usdc": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
     },
     "0xd22a820dc52f1cacea7a5c86da16757f434f43c6": {
       "total_usd": 3246257.177327,
-      "lastUpdated": "2026-10-12T11:18:23.675Z",
+      "lastUpdated": "2026-10-12T12:38:48.210Z",
       "chain": "base",
       "usdc": "0x833589fCd6eDb6E08f4c7C32D4f71b54bdA02913"
     }
   },
   "checkpoints": {
     "0xd093a031df30f186976a1e2936b16d95ca7919d6": {
-      "lastTimestamp": 1791803901,
-      "lastBlock": 95399074,
+      "lastTimestamp": 1791808725,
+      "lastBlock": 95402290,
       "finalized": {
-        "lastBlock": 95399071,
-        "blockHash": "0xe0c686cce9b7ffdbe6e296729dd6dd82927a5c811973a14bf829727ad04a400d",
-        "totalRaw": "3819094519182",
+        "lastBlock": 95402288,
+        "blockHash": "0x0e488f8930791582bd86db8fdde9135d6fee1a6e50601d91752b3a05ec07da79",
+        "totalRaw": "3819189879402",
         "identity": {
           "chain": "polygon",
           "poolAddress": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
@@ -28,14 +28,14 @@
           "decimals": 6
         }
       },
-      "blockHash": "0x35657d79e36994bac758472db35579df02a8a3a3110c764fda66c91f17aa6427"
+      "blockHash": "0x928025a8f952c43cd5f70a8652a41ba48ef399cd807ecb073abd35045e5597ce"
     },
     "0xd22a820dc52f1cacea7a5c86da16757f434f43c6": {
-      "lastTimestamp": 1791803901,
-      "lastBlock": 52507277,
+      "lastTimestamp": 1791808727,
+      "lastBlock": 52509690,
       "finalized": {
-        "lastBlock": 52506602,
-        "blockHash": "0x006d7c0a5dc1abfe3bc9e503cc397b7da8b1f519ad22589d3a5f1388fd57002f",
+        "lastBlock": 52509083,
+        "blockHash": "0xcad0589bc580bed5206baac99a1956553a7859ed306320a0b38ba7d32b9c0b06",
         "totalRaw": "3246257177327",
         "identity": {
           "chain": "base",
@@ -44,8 +44,8 @@
           "decimals": 6
         }
       },
-      "blockHash": "0x9b4051ac82dd849c27a72fc767aa5b2b08f99a1e0cb7be651f267d15eccb7ebb"
+      "blockHash": "0xcfdda58f7549252965ceaf6957ed749752d01ec9249492d049524d6c1047e5cf"
     }
   },
-  "lastUpdated": "2026-10-12T11:18:23.675Z"
+  "lastUpdated": "2026-10-12T12:38:48.210Z"
 }
