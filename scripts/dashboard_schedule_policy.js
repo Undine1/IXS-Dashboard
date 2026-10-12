@@ -15,12 +15,34 @@ const REQUIRED_VOLUME_POOLS = [
 ];
 const SNAPSHOT_FILES = ['holder_rankings.json', 'pool_volume.json', 'onchain_snapshot.json'];
 
+/** @typedef {{ status: number, requestId?: string, remaining?: number, resetAt?: number, retryAfterSeconds?: number }} GitHubDiagnostics */
+
 class SchedulerError extends Error {
-  /** @param {string} code */
-  constructor(code) {
+  /** @param {string} code @param {GitHubDiagnostics} [github] */
+  constructor(code, github) {
     super(code);
     this.code = code;
+    this.github = github;
   }
+}
+
+/** Only allowlisted header fields may reach logs; never an error body or URL.
+ * @param {Response} response @returns {GitHubDiagnostics}
+ */
+function githubDiagnostics(response) {
+  /** @type {GitHubDiagnostics} */
+  const details = { status: response.status };
+  const requestId = response.headers.get('x-github-request-id');
+  if (requestId && /^[a-fA-F0-9:]{1,128}$/.test(requestId)) details.requestId = requestId;
+  for (const [header, field] of /** @type {const} */ ([
+    ['x-ratelimit-remaining', 'remaining'],
+    ['x-ratelimit-reset', 'resetAt'],
+    ['retry-after', 'retryAfterSeconds'],
+  ])) {
+    const value = response.headers.get(header);
+    if (value !== null && /^\d{1,16}$/.test(value) && Number.isSafeInteger(Number(value))) details[field] = Number(value);
+  }
+  return details;
 }
 
 /** @param {unknown} value @returns {Record<string, unknown>} */
@@ -122,8 +144,9 @@ function createGitHubClient({ token, fetchImpl = fetch, now = Date.now }) {
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
       if (!response.ok) {
+        const details = githubDiagnostics(response);
         await response.body?.cancel();
-        throw new SchedulerError(`github-http-${response.status}`);
+        throw new SchedulerError(`github-http-${response.status}`, details);
       }
       if (body !== undefined) {
         // Current API returns 200; older versions returned 204. The receipt is
@@ -248,8 +271,13 @@ async function readGitHubDocuments(client) {
   const ref = record(await client.request(`/repos/${REPOSITORY}/git/ref/heads/${BRANCH}`));
   const sha = record(ref.object).sha;
   if (typeof sha !== 'string' || !/^[a-f0-9]{40}$/.test(sha)) throw new SchedulerError('github-ref-invalid');
-  const [holder, volume, snapshot] = await Promise.all(SNAPSHOT_FILES.map((file) =>
-    client.request(`/repos/${REPOSITORY}/contents/public/data/${file}?ref=${sha}`, { raw: true })));
+  // GitHub recommends serial requests to reduce secondary throttling. Stop at
+  // the first failure, rather than leaving two more authenticated GETs in flight.
+  const documents = [];
+  for (const file of SNAPSHOT_FILES) {
+    documents.push(await client.request(`/repos/${REPOSITORY}/contents/public/data/${file}?ref=${sha}`, { raw: true }));
+  }
+  const [holder, volume, snapshot] = documents;
   return { holder, volume, snapshot };
 }
 

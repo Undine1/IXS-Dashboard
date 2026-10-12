@@ -28,7 +28,11 @@ export async function runWatchdog(
     });
     return { action: 'dispatch', reason: decision.reason, stale: decision.stale, requests: client.requestCount() };
   } catch (error) {
-    return { action: 'error', reason: error instanceof SchedulerError ? error.code : 'watchdog-failed', requests: client.requestCount() };
+    return {
+      action: 'error', reason: error instanceof SchedulerError ? error.code : 'watchdog-failed',
+      requests: client.requestCount(),
+      ...(error instanceof SchedulerError && error.github ? { github: error.github } : {}),
+    };
   }
 }
 

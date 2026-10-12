@@ -125,7 +125,7 @@ for (const status of [301, 302, 303, 307, 308]) {
 test('a redirected workflow dispatch is an error, not success or a second POST', async () => {
   const github = fakeGitHub({ dispatchStatus: 302 });
   const result = await runWatchdog(env, github);
-  assert.deepEqual(result, { action: 'error', reason: 'github-http-302', requests: 12 });
+  assert.deepEqual(result, { action: 'error', reason: 'github-http-302', requests: 12, github: { status: 302 } });
   assert.equal(github.calls.filter(({ init }) => init?.method === 'POST').length, 1);
   assert.ok(github.calls.every(({ url }) => new URL(url).origin === 'https://api.github.com'));
 });
@@ -139,6 +139,68 @@ test('GitHub 401/403/429/503 and malformed metadata never dispatch or retry', as
   }
   const result = await runWatchdog(env, { clock: () => now, fetchImpl: async () => Response.json({ unexpected: true }) });
   assert.equal(result.reason, 'github-runs-invalid');
+});
+
+test('snapshot reads are serial and still use one immutable revision', async () => {
+  const github = fakeGitHub();
+  let inFlight = 0;
+  let peak = 0;
+  const result = await runWatchdog(env, { clock: github.clock, fetchImpl: async (input, init) => {
+    inFlight++;
+    peak = Math.max(peak, inFlight);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      return await github.fetchImpl(input, init);
+    } finally { inFlight--; }
+  } });
+  assert.equal(result.action, 'dispatch');
+  assert.equal(result.requests, 12);
+  assert.equal(peak, 1);
+});
+
+for (const status of [403, 429]) {
+  test(`HTTP ${status} on the first snapshot stops subsequent downloads and dispatch`, async () => {
+    const github = fakeGitHub();
+    const calls: string[] = [];
+    const result = await runWatchdog(env, { clock: github.clock, fetchImpl: async (input, init) => {
+      calls.push(String(input));
+      if (String(input).includes('holder_rankings.json')) return new Response('private response', { status });
+      return github.fetchImpl(input, init);
+    } });
+    assert.deepEqual(result, { action: 'error', reason: `github-http-${status}`, requests: 4, github: { status } });
+    assert.equal(calls.length, 4);
+    assert.ok(calls.every((url) => !/pool_volume|onchain_snapshot|dispatches/.test(url)));
+  });
+}
+
+test('HTTP errors retain allowlisted GitHub rate-limit diagnostics without private response details', async () => {
+  let cancelled = false;
+  const result = await runWatchdog(env, { clock: () => now, fetchImpl: async () => new Response(new ReadableStream({
+    start(controller) { controller.enqueue(new TextEncoder().encode(`${env.GITHUB_TOKEN} https://private.invalid`)); },
+    cancel() { cancelled = true; },
+  }), { status: 403, headers: {
+    'x-github-request-id': '92CE:120587:11D79C:15002B:6ACCE725',
+    'x-ratelimit-remaining': '0',
+    'x-ratelimit-reset': '1791814500',
+    'retry-after': '120',
+    'x-private-header': env.GITHUB_TOKEN,
+  } }) });
+  assert.deepEqual(result, {
+    action: 'error', reason: 'github-http-403', requests: 1,
+    github: { status: 403, requestId: '92CE:120587:11D79C:15002B:6ACCE725', remaining: 0, resetAt: 1791814500, retryAfterSeconds: 120 },
+  });
+  assert.equal(cancelled, true);
+  assert.ok(!JSON.stringify(result).includes(env.GITHUB_TOKEN));
+});
+
+test('malformed rate-limit headers are omitted from diagnostics', async () => {
+  const result = await runWatchdog(env, { clock: () => now, fetchImpl: async () => new Response(null, { status: 429, headers: {
+    'x-github-request-id': `secret-${env.GITHUB_TOKEN}`,
+    'x-ratelimit-remaining': '-1',
+    'x-ratelimit-reset': '9007199254740992',
+    'retry-after': 'https://private.invalid',
+  } }) });
+  assert.deepEqual(result, { action: 'error', reason: 'github-http-429', requests: 1, github: { status: 429 } });
 });
 
 test('failed refresh stays retryable even before the 70-minute freshness threshold', async () => {

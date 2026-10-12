@@ -13,7 +13,7 @@ The Worker ships **disabled** (`ENABLED="false"`). Committing it does not activa
 
 - Cloudflare runs at UTC minutes 7, 17, 27, 37, 47 and 57: **144 small checks/day**. It has no blockchain credentials, public HTTP trigger, database, KV, or Durable Object.
 - A normal recent-success check makes **two GitHub GETs** (recent runs and the actual job's steps), then stops. An active recent run takes one GET. Source files are downloaded only outside the short cooldown.
-- A typical dispatch decision takes **12 GitHub requests**, including exactly one POST. The hard per-invocation budget is 18 requests, 45 seconds total, 8 seconds per request, and 512 KiB per response. This is metadata/network work, not blockchain CU usage. Failed HTTP calls are not retried inside an invocation.
+- A typical dispatch decision takes **12 GitHub requests**, including exactly one POST. The hard per-invocation budget is 18 requests, 45 seconds total, 8 seconds per request, and 512 KiB per response. This is metadata/network work, not blockchain CU usage. Requests are sequential, including the three pinned snapshot reads; the first failed snapshot stops further downloads and dispatch. Failed HTTP calls are not retried inside an invocation.
 - Native cron remains hourly at :23. Its guard considers all source timestamps, with a 55-minute minimum between successful attempts to allow ordinary hourly jitter. The watchdog waits until a required source is at least 70 minutes old. Healthy data therefore normally stays within roughly 70–80 minutes **plus GitHub queue, updater, and deployment time** when the native schedule misses a slot; this is a target, not an SLA.
 - Failed attempts wait **60 minutes after completion** before another automatic attempt. A recent partial checkpoint does not erase a known failure. Manual `force=true` is an explicit operator override; it is ignored when `watchdog=true`.
 - Guard-only successes do not move the attempt clock. A late cron or two racing watchdog dispatches acquire the same existing lock and check the newly committed data before doing work. Skips do not install dependencies, call RPC, upload artifacts, commit, or trigger another Vercel build.
@@ -77,7 +77,7 @@ npm run typecheck:scheduler
 npx --no-install tsc --noEmit
 npm run build
 wrangler types workers/scheduler/worker-configuration.d.ts --config workers/scheduler/wrangler.jsonc --strict-vars false --check
-wrangler deploy --dry-run --config workers/scheduler/wrangler.jsonc --outdir workers/scheduler/dist
+wrangler deploy --dry-run --config workers/scheduler/wrangler.jsonc --outdir dist
 ```
 
 `worker-configuration.d.ts` is generated with the installed Wrangler; do not edit it. The Worker has a separate TypeScript environment so its runtime types cannot leak into Next.js.
@@ -90,4 +90,30 @@ Recent attempt history is bounded to 20 created runs and at most six job inspect
 
 An ambiguous dispatch timeout is never immediately retried: GitHub may already have accepted it. The next tick checks again; the in-job guard handles duplicate queued invocations. Workflow failures remain visible through the existing Actions status/alerts; the Worker adds structured error logs, **not a new email/Discord/Telegram notification channel**. Token expiry or two-hour staleness should be investigated in those views. No automatic human notification has been configured.
 
+HTTP errors now include safe GitHub diagnostics in Worker logs and Actions warnings/errors: status, a validated `x-github-request-id`, and valid integer `x-ratelimit-remaining`, `x-ratelimit-reset` (UTC epoch seconds), and `retry-after` (seconds), when supplied. No raw response bodies, arbitrary headers, redirect destinations, or credentials are logged. Logging these headers does not introduce automatic retries or shared persistent backoff. The existing ten-minute watchdog cadence and native outage fallback remain unchanged.
+
 Regression coverage includes partial failures, delayed cron races, skipped attempts, cancelled pre-run jobs, out-of-order executions, old active reruns, invalid dates, one-SHA reads, response/request limits, rejected/ambiguous dispatches, no public dispatch route, and daily keepalive deduplication.
+
+## GitHub secondary-limit audit — 2026-10-12
+
+Vercel deployment `dpl_4FfQ2TFXNfEcdM8ceCayAaHr6Sj2`, for commit `e7827d9`, failed around 13:56 UTC with `git_info_fail`: GitHub returned HTTP 403 and explicitly reported a secondary rate limit. GitHub request ID: `92CE:120587:11D79C:15002B:6ACCE725`. The failure occurred during source retrieval, before the application build; Vercel returned no build events for this deployment.
+
+Evidence from this repository:
+
+- [Actions run 38258603142](https://github.com/Undine1/IXS-Dashboard/actions/runs/38258603142) succeeded. Its freshness guard admitted stale data, and its data push succeeded on attempt 1 at 13:51:46 UTC. No guard fallback or push retry occurred.
+- Recent refreshes around the incident were roughly 70–80 minutes apart. The next data commit, `cdf3f587`, deployed successfully to production around 15:10 UTC.
+- Cloudflare's active dashboard scheduler version was `28d72fc0-20b3-4d2f-83e3-f11aeff13163`, with `ENABLED=true` and the existing ten-minute cron. Its logs from 13:30–14:15 UTC show five checks: 2, 6, 12, 2, and 2 GitHub requests respectively, totaling **24 requests**. Only the 12-request check dispatched; the others skipped. There were no watchdog errors or retry bursts in that window.
+- The visitor-facing dashboard serves saved data and does not perform scheduler GitHub polling per visitor.
+
+These observations locate the failed request in Vercel's GitHub integration, but do not prove which internal secondary-limit threshold was exceeded or what other activity contributed. Neither Vercel's internal authenticated request history nor the failed request's rate-limit headers are exposed by the inspected deployment APIs. GitHub says secondary-limit status cannot be queried directly. Do not infer that blockchain RPC traffic, dashboard visitors, or the watchdog caused this specific failure.
+
+Two improvements were selected and implemented:
+
+1. Replace concurrent snapshot downloads with sequential reads, preserving the immutable SHA and all freshness checks. This follows [GitHub's recommendation to avoid concurrent REST requests](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#avoid-concurrent-requests) and avoids sending the remaining downloads after a failure. Normal request counts and refresh cadence remain unchanged.
+2. Preserve only validated diagnostic headers on HTTP errors so future scheduler-side incidents can be correlated and examined without disclosing credentials. Keep the one-POST rule, existing cooldowns, outage fallback, and accounting code unchanged.
+
+Regression tests cover serial reads, first-snapshot 403/429 short-circuiting, valid and malformed diagnostic headers, and existing dispatch/deduplication behavior. Production deployment includes the separately hosted Cloudflare scheduler; a Git push alone only deploys Vercel.
+
+Validation: 256 tests passed, along with ESLint, application and scheduler typechecks, and a Next production build. The bundled Worker passed 11 offline checks with native workerd fetch and mocked outbound services, including successful reads/dispatch, 403/429, rejected redirects, and the closed HTTP handler. The existing Wrangler 4.109.0 includes workerd 1.20260708.1, which supports compatibility dates only through 2026-07-15. The offline test used that supported date; the production Worker retains 2026-08-31. No package or tool was installed or updated.
+
+For another Vercel-only failure, investigate that deployment and retain its GitHub request ID. Retrying source retrieval belongs to Vercel's integration; adding data scans, repeated commits, or a second deployment trigger would increase work without resolving the failing fetch. Follow [GitHub's rate-limit response guidance](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#exceeding-the-rate-limit), including any supplied retry delay, when handling an observed throttle.

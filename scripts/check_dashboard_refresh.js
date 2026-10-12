@@ -28,7 +28,7 @@ async function checkDashboardRefresh(env, fetchImpl = fetch) {
     if (watchdog) throw error; // Extra invocations fail closed on uncertain history.
     // Keep GitHub's original hourly/manual refresh available during a metadata
     // API outage. The existing concurrency group still prevents parallel scans.
-    console.warn(`::warning::Refresh guard unavailable (${error instanceof SchedulerError ? error.code : 'preflight-error'}); using native schedule`);
+    console.warn(`::warning::Refresh guard unavailable (${error instanceof SchedulerError ? error.code : 'preflight-error'}); using native schedule${error instanceof SchedulerError && error.github ? ` ${JSON.stringify(error.github)}` : ''}`);
     return { refresh: true, reason: 'native-schedule-fallback', stale: [] };
   }
 }
@@ -39,7 +39,7 @@ if (require.main === module) {
     if (!process.env.GITHUB_OUTPUT) throw new Error('GITHUB_OUTPUT is required');
     fs.appendFileSync(process.env.GITHUB_OUTPUT, `refresh=${decision.refresh}\nreason=${decision.reason}\n`);
   }).catch((error) => {
-    console.error(`::error::Refresh guard failed (${error instanceof SchedulerError ? error.code : 'preflight-error'})`);
+    console.error(`::error::Refresh guard failed (${error instanceof SchedulerError ? error.code : 'preflight-error'})${error instanceof SchedulerError && error.github ? ` ${JSON.stringify(error.github)}` : ''}`);
     process.exitCode = 1;
   });
 }
