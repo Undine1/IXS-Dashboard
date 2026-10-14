@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-10-14T21:58:18.726Z",
+    "generatedAt": "2026-10-14T23:18:27.099Z",
     "data": {
       "pools": [
         {
@@ -16,7 +16,7 @@
             "decimals0": 6,
             "decimals1": 18
           },
-          "value": 48189.920784
+          "value": 48383.20751
         },
         {
           "type": "Crypto",
@@ -29,7 +29,7 @@
             "decimals0": 18,
             "decimals1": 6
           },
-          "value": 11228.614786
+          "value": 11349.926692
         },
         {
           "type": "RWA",
@@ -42,7 +42,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 44952.46071883833
+          "value": 45927.551338014804
         },
         {
           "type": "RWA",
@@ -55,7 +55,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 19247.239005092466
+          "value": 19664.742338587355
         },
         {
           "type": "RWA",
@@ -69,7 +69,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 11448.019916754889
+          "value": 11696.345740313087
         },
         {
           "type": "RWA",
@@ -83,13 +83,13 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 8.887606611397072
+          "value": 9.080392983825227
         }
       ]
     }
   },
   "burnStats": {
-    "generatedAt": "2026-10-14T21:58:18.726Z",
+    "generatedAt": "2026-10-14T23:18:27.099Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -111,7 +111,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-10-14T21:58:18.726Z",
+    "generatedAt": "2026-10-14T23:18:27.099Z",
     "data": {
       "vaults": [
         {
