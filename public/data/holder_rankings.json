@@ -68,7 +68,7 @@
       "rank": 10,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,659,763.21",
+      "totalIxs": "1,660,678.82",
       "label": "Uniswap V2"
     },
     {
@@ -159,7 +159,7 @@
       "rank": 23,
       "holder": "0x9642b23ed1e01df1092b92641051881a322f5d4e",
       "chainsHolding": 1,
-      "totalIxs": "897,324.54",
+      "totalIxs": "898,823.60",
       "label": "MEXC 16"
     },
     {
@@ -390,7 +390,7 @@
       "rank": 56,
       "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
       "chainsHolding": 1,
-      "totalIxs": "509,919.79",
+      "totalIxs": "509,004.18",
       "label": null
     },
     {
@@ -2411,44 +2411,44 @@
     },
     {
       "rank": 345,
-      "holder": "0x50ef5ed097913c223827636890cfb9ed492f5955",
-      "chainsHolding": 1,
-      "totalIxs": "121,208.41",
-      "label": null
-    },
-    {
-      "rank": 346,
       "holder": "0xc85de96355fcb5f37996cb1d270514870eec086f",
       "chainsHolding": 1,
       "totalIxs": "120,427.74",
       "label": null
     },
     {
-      "rank": 347,
+      "rank": 346,
       "holder": "0x5c1639f439e45a6ba5387852abf5e5a2b5f7a5a6",
       "chainsHolding": 2,
       "totalIxs": "120,281.31",
       "label": null
     },
     {
-      "rank": 348,
+      "rank": 347,
       "holder": "0x707dfe0d0e27477c7abcfaecfce5aacc26fd0b57",
       "chainsHolding": 1,
       "totalIxs": "120,000.00",
       "label": null
     },
     {
-      "rank": 349,
+      "rank": 348,
       "holder": "0xd03c18949edb594c59228177c8a82a3fc0747ae3",
       "chainsHolding": 1,
       "totalIxs": "119,999.00",
       "label": null
     },
     {
-      "rank": 350,
+      "rank": 349,
       "holder": "0xf410ca750a5db9bba0e3d03459f8e7b4f2415775",
       "chainsHolding": 1,
       "totalIxs": "119,980.00",
+      "label": null
+    },
+    {
+      "rank": 350,
+      "holder": "0x50ef5ed097913c223827636890cfb9ed492f5955",
+      "chainsHolding": 1,
+      "totalIxs": "119,709.36",
       "label": null
     },
     {
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12414,
-  "lastRefreshed": "2026-10-15T20:22:56.006Z",
+  "totalRowCount": 12413,
+  "lastRefreshed": "2026-10-15T21:37:53.431Z",
   "source": "rpc-snapshot"
 }
