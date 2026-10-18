@@ -47,7 +47,7 @@
       "rank": 7,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "2,849,508.95",
+      "totalIxs": "2,850,521.23",
       "label": "Uniswap V4"
     },
     {
@@ -75,7 +75,7 @@
       "rank": 11,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,621,916.57",
+      "totalIxs": "1,622,086.50",
       "label": "Uniswap V2"
     },
     {
@@ -243,7 +243,7 @@
       "rank": 35,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "666,720.05",
+      "totalIxs": "667,268.02",
       "label": "Contract"
     },
     {
@@ -451,17 +451,17 @@
     },
     {
       "rank": 65,
-      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
-      "chainsHolding": 1,
-      "totalIxs": "479,161.48",
-      "label": null
-    },
-    {
-      "rank": 66,
       "holder": "0x29065a4c1f2f20d1e263930088890d6f49fe715a",
       "chainsHolding": 1,
       "totalIxs": "478,150.00",
       "label": "Poloniex 10"
+    },
+    {
+      "rank": 66,
+      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
+      "chainsHolding": 1,
+      "totalIxs": "477,979.28",
+      "label": null
     },
     {
       "rank": 67,
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 12417,
-  "lastRefreshed": "2026-10-18T05:57:40.981Z",
+  "totalRowCount": 12418,
+  "lastRefreshed": "2026-10-18T07:17:47.450Z",
   "source": "rpc-snapshot"
 }
