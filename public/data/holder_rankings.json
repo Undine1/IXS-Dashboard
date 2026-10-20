@@ -68,7 +68,7 @@
       "rank": 10,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "1,746,595.50",
+      "totalIxs": "1,749,349.84",
       "label": "Uniswap V2"
     },
     {
@@ -227,24 +227,24 @@
     },
     {
       "rank": 33,
-      "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
-      "chainsHolding": 1,
-      "totalIxs": "676,743.17",
-      "label": "Contract"
-    },
-    {
-      "rank": 34,
       "holder": "0x987185b440ce529d698950508e0aba2730ffac49",
       "chainsHolding": 2,
       "totalIxs": "675,038.29",
       "label": null
     },
     {
-      "rank": 35,
+      "rank": 34,
       "holder": "0x877bb16f265e7d2771a217da50f94cd5d2aca46e",
       "chainsHolding": 2,
       "totalIxs": "675,000.00",
       "label": null
+    },
+    {
+      "rank": 35,
+      "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
+      "chainsHolding": 1,
+      "totalIxs": "674,215.31",
+      "label": "Contract"
     },
     {
       "rank": 36,
@@ -341,7 +341,7 @@
       "rank": 49,
       "holder": "0xce90767d34d7090e809bbec8f5213b1c0865eb0a",
       "chainsHolding": 1,
-      "totalIxs": "542,829.21",
+      "totalIxs": "542,943.60",
       "label": null
     },
     {
@@ -474,7 +474,7 @@
       "rank": 68,
       "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
       "chainsHolding": 1,
-      "totalIxs": "439,183.68",
+      "totalIxs": "437,756.53",
       "label": null
     },
     {
@@ -997,17 +997,17 @@
     },
     {
       "rank": 143,
+      "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
+      "chainsHolding": 1,
+      "totalIxs": "256,566.83",
+      "label": "IXS/USDC Base"
+    },
+    {
+      "rank": 144,
       "holder": "0x550129cd7f7bb0e6db429f8ac0b70a073669e198",
       "chainsHolding": 1,
       "totalIxs": "256,566.78",
       "label": null
-    },
-    {
-      "rank": 144,
-      "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
-      "chainsHolding": 1,
-      "totalIxs": "255,840.03",
-      "label": "IXS/USDC Base"
     },
     {
       "rank": 145,
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 12419,
-  "lastRefreshed": "2026-10-20T03:38:30.662Z",
+  "lastRefreshed": "2026-10-20T04:58:24.545Z",
   "source": "rpc-snapshot"
 }
