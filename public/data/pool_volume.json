@@ -2,24 +2,24 @@
   "pools": {
     "0xd093a031df30f186976a1e2936b16d95ca7919d6": {
       "total_usd": 3830053.673138,
-      "lastUpdated": "2026-10-25T03:08:02.018Z",
+      "lastUpdated": "2026-10-25T04:28:01.820Z",
       "chain": "polygon",
       "usdc": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
     },
     "0xd22a820dc52f1cacea7a5c86da16757f434f43c6": {
-      "total_usd": 3295572.14601,
-      "lastUpdated": "2026-10-25T03:08:06.744Z",
+      "total_usd": 3295678.300145,
+      "lastUpdated": "2026-10-25T04:28:03.810Z",
       "chain": "base",
       "usdc": "0x833589fCd6eDb6E08f4c7C32D4f71b54bdA02913"
     }
   },
   "checkpoints": {
     "0xd093a031df30f186976a1e2936b16d95ca7919d6": {
-      "lastTimestamp": 1792897680,
-      "lastBlock": 96128206,
+      "lastTimestamp": 1792902480,
+      "lastBlock": 96131406,
       "finalized": {
-        "lastBlock": 96128203,
-        "blockHash": "0x6c2666fc0e9a3a39ad1f6c34324713dd9b5a24d978d7736a93024a287d463445",
+        "lastBlock": 96131404,
+        "blockHash": "0x18179140df516e9c353a6462fc41f822815e836b1242eae8e02d0a47ba3ebd79",
         "totalRaw": "3830053673138",
         "identity": {
           "chain": "polygon",
@@ -28,15 +28,15 @@
           "decimals": 6
         }
       },
-      "blockHash": "0x30578bc74e2efdcf625a38210b1f4f8a656169ea067fb615e8f070afc42265de"
+      "blockHash": "0x41544da45769e1e187a3a220ca49b1dd84dbb084f106568543831b3e7d4deeae"
     },
     "0xd22a820dc52f1cacea7a5c86da16757f434f43c6": {
-      "lastTimestamp": 1792897681,
-      "lastBlock": 53054167,
+      "lastTimestamp": 1792902481,
+      "lastBlock": 53056567,
       "finalized": {
-        "lastBlock": 53053421,
-        "blockHash": "0xcc77f0d123e6862bec74855a20e39ca35dd87aa72f1d7a62f64cc408e0a15b70",
-        "totalRaw": "3295572146010",
+        "lastBlock": 53055906,
+        "blockHash": "0xbc2074fb178687f7230d3feae9aebeeb1a4c62317e7301445532382f142f668d",
+        "totalRaw": "3295678300145",
         "identity": {
           "chain": "base",
           "poolAddress": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
@@ -44,8 +44,8 @@
           "decimals": 6
         }
       },
-      "blockHash": "0x26a9926a4c48fb9aa9aa7c1112eedd07a08efa68a67a3844ffaccbc604e40216"
+      "blockHash": "0x11474593baad3fba5fedb4d94c6e4a37d8ef4d4d1f6103c1bdc585579351863f"
     }
   },
-  "lastUpdated": "2026-10-25T03:08:06.744Z"
+  "lastUpdated": "2026-10-25T04:28:03.810Z"
 }
