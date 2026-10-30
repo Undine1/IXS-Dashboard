@@ -159,7 +159,7 @@ test('daily keepalive is not multiplied by workflow_dispatch and failures still 
 });
 
 test('workflow guard precedes dependencies/RPC and preserves live-tip non-cancelling concurrency', () => {
-  const workflow = readFileSync('.github/workflows/update-dashboard-data.yml', 'utf8');
+  const workflow = readFileSync('.github/workflows/update-dashboard-data.yml', 'utf8').replace(/\r\n/g, '\n');
   assert.ok(workflow.indexOf('ref: ${{ github.ref_name }}') < workflow.indexOf('id: freshness'));
   assert.ok(workflow.indexOf('id: freshness') < workflow.indexOf('name: Setup Node.js'));
   assert.ok(workflow.includes(`name: ${ATTEMPT_STEP}`));

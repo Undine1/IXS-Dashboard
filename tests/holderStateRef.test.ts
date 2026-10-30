@@ -192,7 +192,7 @@ test('bootstrap uses a missing-ref lease and cannot replace a concurrently creat
 });
 
 test('workflow reserves persistence time and gates holders without blocking independent products', () => {
-  const workflow = readFileSync('.github/workflows/update-dashboard-data.yml', 'utf8');
+  const workflow = readFileSync('.github/workflows/update-dashboard-data.yml', 'utf8').replace(/\r\n/g, '\n');
   const jobTimeout = Number(workflow.match(/^    timeout-minutes: (\d+)$/m)?.[1]);
   const stepTimeouts = [...workflow.matchAll(/^        timeout-minutes: (\d+)$/gm)].map((match) => Number(match[1]));
   assert.ok(stepTimeouts.reduce((total, value) => total + value, 0) < jobTimeout);

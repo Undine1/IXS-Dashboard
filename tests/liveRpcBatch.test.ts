@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { robinhoodAggregateResponse, robinhoodVolumePayload } from './fixtures/robinhood';
+import { robinhoodAggregateResponse } from './fixtures/robinhood';
+import { ethereumAggregateResponse } from './fixtures/ethereum';
 
 const word = (value: number | bigint) => BigInt(value).toString(16).padStart(64, '0');
 
@@ -60,12 +61,15 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
   let phase: 'pools' | 'burns' | 'pool-fallback' | 'pool-subcall-fallback' | 'pool-migration' = 'pools';
 
   globalThis.fetch = (async (url: string | URL, options?: RequestInit) => {
-    if (String(url).includes('dexscreener')) return Response.json(robinhoodVolumePayload());
     if (String(url).includes('robinhood')) {
       const payload = JSON.parse(String(options?.body));
       return Response.json({ result: payload.method === 'eth_blockNumber' ? '0x123456' : robinhoodAggregateResponse() });
     }
     const network = new URL(String(url)).host.split('.')[0];
+    if (network === 'eth-mainnet' && phase !== 'burns') {
+      const payload = JSON.parse(String(options?.body));
+      return Response.json({ result: payload.method === 'eth_blockNumber' ? '0x123456' : ethereumAggregateResponse() });
+    }
     const body = JSON.parse(String(options?.body || '{}')) as {
       params: Array<{ data: string }>;
     };
@@ -110,7 +114,7 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
 
     const pools = await computePoolsBody();
     assert.equal(pools.healthy, true);
-    assert.equal(pools.body.pools.length, 7);
+    assert.equal(pools.body.pools.length, 8);
     assert.ok(pools.body.pools.every((pool) => typeof pool.value === 'number'));
     const batchedPoolValues = pools.body.pools.map((pool) => pool.value);
     assert.deepEqual(

@@ -376,10 +376,10 @@ export default function BurnStats({
   const totalTvl = tvlPrivateVal === null || tvlPoolsVal === null || vaultTvlVal === null
     ? null
     : tvlPrivateVal + tvlPoolsVal + vaultTvlVal; // Excluded launchpad from TVL
-  // Liquidity is never volume. Legacy lifetime volume and Robinhood's rolling
-  // 24-hour volume remain separate; neither series is converted or accumulated.
-  const cryptoPools = pools.filter((pool) => pool.type === 'Crypto');
-  const robinhoodPool = cryptoPools.find((pool) => pool.network === 'robinhood');
+  // Only list pools covered by the cumulative volume indexer. TVL-only pools
+  // must not create empty rows or contribute liquidity to the volume total.
+  const cryptoPools = pools.filter((pool) => pool.type === 'Crypto' &&
+    poolVolumeMap && pool.address.toLowerCase() in poolVolumeMap);
   const poolsByType = pools.reduce<Record<string, Pool[]>>((acc, pool) => {
     const key = pool.type || 'Other';
     if (!acc[key]) acc[key] = [];
@@ -425,7 +425,7 @@ export default function BurnStats({
       <div className="rounded-xl border border-slate-700 bg-slate-800/70 px-5 py-4 text-sm text-slate-300">
         <a href={ROBINHOOD.migrationUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-cyan-400 hover:underline">IXS migration to Robinhood Chain</a>
         <p className="mt-1">Crypto liquidity migration: December 21, 2026. RWA pools remain on Polygon. 1 legacy IXS converts to 10 new IXS.</p>
-        <p className="mt-1 text-xs text-slate-400">Supply, burns and holder rankings below cover legacy IXS. Liquidity includes both legacy pools and the new Robinhood Chain pool.</p>
+        <p className="mt-1 text-xs text-slate-400">Supply and burns below cover legacy IXS. Liquidity includes both legacy pools and the new Robinhood Chain pool.</p>
       </div>
       {/* --- Top Metrics Grid --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
@@ -466,7 +466,7 @@ export default function BurnStats({
               }`}
             >
               <CardRail gradientClass="from-indigo-400 via-violet-300 to-sky-300" roundedClass="rounded-t-2xl" />
-              <p className="text-sm font-semibold text-teal-400 text-center">Legacy Volume - Lifetime</p>
+              <p className="text-sm font-semibold text-teal-400 text-center">Platform Volume</p>
                 <div className="flex-1 flex items-center justify-center">
                   <span className="text-3xl font-bold text-white">
                     {poolVolumeTotal === null ? (
@@ -476,10 +476,6 @@ export default function BurnStats({
                     )}
                   </span>
                 </div>
-
-              <p className="mt-2 text-center text-xs text-slate-400">
-                Robinhood Chain - 24h: <span className="font-mono text-white">{formatUsd(toFiniteNumberOrNull(robinhoodPool?.volume24hUsd), 0)}</span>
-              </p>
 
               <span className={`absolute left-1/2 -translate-x-1/2 bottom-2 transition-transform duration-300 ${showPlatformVolume ? 'rotate-180' : ''}`} aria-hidden>
                 <svg className="w-5 h-5 text-gray-300" viewBox="0 0 20 20" fill="currentColor"><path d="M5.23 7.21a.75.75 0 011.06-.02L10 10.88l3.71-3.69a.75.75 0 111.06 1.06l-4.24 4.22a.75.75 0 01-1.06 0L5.25 8.25a.75.75 0 01-.02-1.04z"/></svg>
@@ -495,16 +491,13 @@ export default function BurnStats({
                       ) : (
                         cryptoPools.map((p, i) => {
                           const addr = (p.address || '').toLowerCase();
-                          const perPoolVal = p.network === 'robinhood' ? p.volume24hUsd : poolVolumeMap ? (addr in poolVolumeMap ? poolVolumeMap[addr] : null) : null;
+                          const perPoolVal = poolVolumeMap ? (addr in poolVolumeMap ? poolVolumeMap[addr] : null) : null;
                           const display = typeof perPoolVal === 'number' ? formatUsd(perPoolVal, 0) : 'N/A';
                           return (
-                            <div key={`${p.network}-${p.name}-${i}`} className={insetDetailRowClass}>
+                            <div key={`${p.network}-${p.name}-${i}`} className={insetRowClass}>
                               <div className={`flex items-center ${LAYOUT.itemGap}`}>
                                 <ChainIcon network={p.network} alt={p.network === 'robinhood' ? 'Robinhood Chain' : p.network} />
-                                <div className="text-sm font-medium text-white">
-                                  {p.name}
-                                  <div className="text-[11px] text-slate-400">{p.network === 'robinhood' ? '24h volume' : 'Lifetime volume'}</div>
-                                </div>
+                                <div className="text-sm font-medium text-white">{p.name}</div>
                               </div>
                               <div className="text-sm font-mono font-bold text-white">{display}</div>
                             </div>
@@ -513,7 +506,6 @@ export default function BurnStats({
                       )}
                     </div>
                   </div>
-                  {robinhoodPool && <p className="mt-2 text-xs text-slate-400">Robinhood Chain 24h volume from <a href={robinhoodPool.volumeSource || robinhoodPool.explorerUrl} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">DEX Screener</a>. Kept separate from lifetime totals.</p>}
                 </div>
               </div>
             </CollapsiblePanel>
@@ -712,13 +704,13 @@ export default function BurnStats({
                                 <div key={`${p.network}-${p.name}-${i}`} className={insetRowClass}>
                                   <div className={`flex items-center ${LAYOUT.itemGap}`}>
                                     <ChainIcon network={p.network} alt={p.network === 'robinhood' ? 'Robinhood Chain' : p.network} />
-                                    <div className="text-sm font-medium text-white">{p.explorerUrl ? <a href={p.explorerUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{p.name}</a> : p.name}</div>
+                                    <div className="text-sm font-medium text-white" title={p.protocol === 'uniswap-v2+v4' ? 'Combined Uniswap v2 and v4 liquidity' : undefined}>{p.explorerUrl ? <a href={p.explorerUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{p.name}</a> : p.name}</div>
                                   </div>
                                   <div className="text-sm font-mono font-bold text-white">{formatUsd(toFiniteNumberOrNull(p.value), 0)}</div>
                                 </div>
                               ))}
                             </div>
-                            {type === 'Crypto' && robinhoodPool && <p className="text-xs text-slate-400">Robinhood Chain: Uniswap v4 liquidity principal, excluding uncollected fees. {robinhoodPool.observedAt && <>Updated {formatNavUpdatedAt(robinhoodPool.observedAt)} UTC.</>}</p>}
+                            {type === 'Crypto' && items.some((pool) => pool.protocol?.includes('v4')) && <p className="text-xs text-slate-400">Uniswap v4 values exclude uncollected fees.</p>}
                             {items.some((pool) => pool.priceBasis === 'migration-1-to-10') && <p className="text-xs text-slate-400">IXS valued at the 1:10 migration conversion because the legacy pool price is unavailable.</p>}
                           </div>
                         ))}
@@ -764,7 +756,7 @@ export default function BurnStats({
                   }`}
                 >
                   <CardRail gradientClass="from-red-600 via-red-500 to-orange-400" roundedClass="rounded-t-2xl" />
-                  <p className="text-sm font-semibold text-teal-400 text-center">Legacy Holder Rankings</p>
+                  <p className="text-sm font-semibold text-teal-400 text-center">Holder Rankings</p>
                   <div className="flex-1 flex items-center justify-center">
                     <div className="flex flex-col items-center gap-1 text-center">
                       <span className="text-3xl font-bold text-white">

@@ -24,13 +24,12 @@ export interface Pool {
   value?: number | null;
   priceSource?: boolean;
   tokenContract?: string;
-  protocol?: 'uniswap-v4';
+  protocol?: 'uniswap-v4' | 'uniswap-v2+v4';
+  underlyingPools?: { address: string; protocol: 'uniswap-v2' | 'uniswap-v4'; value: number }[];
   poolManager?: string;
   explorerUrl?: string;
   valuation?: 'liquidity-principal';
   observedAt?: string;
-  volume24hUsd?: number | null;
-  volumeSource?: string;
   tokenPriceUsd?: number;
   priceBasis?: 'migration-1-to-10';
 }

@@ -8,6 +8,8 @@ import { POOLS, type PoolConfig } from './poolsConfig';
 import { readSnapshotSection } from './onchainSnapshot';
 import { computeRobinhoodPool } from './robinhoodPoolService';
 import { ROBINHOOD, ROBINHOOD_POOL } from './robinhoodConfig';
+import { computeEthereumIxsPool, isEthereumIxsPoolHealthy } from './ethereumPoolsService';
+import { ETHEREUM_IXS_POOL } from './ethereumPoolsConfig';
 import {
   createMulticall3ReadGroups,
   prefetchMulticall3Reads,
@@ -76,14 +78,16 @@ export type PoolsServiceResult = {
 
 export function isCurrentPoolsSnapshot(body: PoolsResponseBody | undefined): boolean {
   if (!body || !Array.isArray(body.pools) || body.warnings?.length) return false;
-  const expected = [ROBINHOOD_POOL, ...POOLS];
+  const expected = [ROBINHOOD_POOL, ETHEREUM_IXS_POOL, ...POOLS];
   if (body.pools.length !== expected.length) return false;
   return expected.every((config) => {
     const matches = body.pools.filter((pool) => pool?.network === config.network &&
       typeof pool.address === 'string' && pool.address.toLowerCase() === config.address.toLowerCase());
     return matches.length === 1 && typeof matches[0].value === 'number' &&
       Number.isFinite(matches[0].value) && matches[0].value >= 0 &&
-      matches[0].protocol === config.protocol && (config.network !== 'robinhood' ||
+      matches[0].protocol === config.protocol &&
+      (config.protocol !== 'uniswap-v2+v4' || isEthereumIxsPoolHealthy(matches[0])) &&
+      (config.network !== 'robinhood' ||
         (matches[0].poolManager === ROBINHOOD.poolManager && matches[0].tokenContract === ROBINHOOD.token &&
          matches[0].valuation === 'liquidity-principal'));
   });
@@ -358,8 +362,16 @@ export async function computePoolsBody(
     // Separate v4 adapter: no V2 reserves or shared PoolManager balances.
     robinhoodPool = await computeRobinhoodPool();
   } catch {
-    robinhoodPool = { ...ROBINHOOD_POOL, value: null, volume24hUsd: null };
+    robinhoodPool = { ...ROBINHOOD_POOL, value: null };
     warnings.push('IXS-ETH (Robinhood Chain): liquidity temporarily unavailable');
+  }
+  let ethereumPool: PoolWithValue;
+  try {
+    // Both Ethereum markets share one block-pinned batch and one display row.
+    ethereumPool = await computeEthereumIxsPool();
+  } catch {
+    ethereumPool = { ...ETHEREUM_IXS_POOL, value: null };
+    warnings.push('IXS/ETH (Ethereum): combined liquidity temporarily unavailable');
   }
   const migrationPriced = new Set<number>();
   const migrationPriceNetworks = new Set<ChainNetwork>();
@@ -423,7 +435,7 @@ export async function computePoolsBody(
     }
   });
 
-  poolsData.unshift(robinhoodPool);
+  poolsData.unshift(robinhoodPool, ethereumPool);
 
   const body: PoolsResponseBody = { pools: poolsData };
   if (warnings.length > 0) body.warnings = warnings;

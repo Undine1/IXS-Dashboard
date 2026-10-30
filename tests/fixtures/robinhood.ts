@@ -14,15 +14,13 @@ export function robinhoodResults(timestamp = Math.floor(Date.now() / 1000)) {
   ].map((returnData) => ({ success: true, returnData }));
 }
 
-export function robinhoodVolumePayload(value: unknown = 250) {
-  return { pairs: [{ chainId: 'robinhood', dexId: 'uniswap', pairAddress: ROBINHOOD.poolId,
-    baseToken: { address: ROBINHOOD.token }, quoteToken: { address: `0x${'0'.repeat(40)}` },
-    volume: { h24: value } }] };
+export function robinhoodAggregateResponse() {
+  return aggregateResponse(robinhoodResults());
 }
 
-export function robinhoodAggregateResponse() {
-  const tuples = robinhoodResults().map(({ returnData }) =>
-    `${abiWords(1, 64, (returnData.length - 2) / 2).slice(2)}${returnData.slice(2)}`);
+export function aggregateResponse(results: { success: boolean; returnData: string }[]) {
+  const tuples = results.map(({ returnData, success }) =>
+    `${abiWords(success ? 1 : 0, 64, (returnData.length - 2) / 2).slice(2)}${returnData.slice(2)}`);
   let offset = tuples.length * 32;
   const offsets = tuples.map((tuple) => { const current = offset; offset += tuple.length / 2; return current; });
   return `${abiWords(32, tuples.length, ...offsets)}${tuples.join('')}`;
