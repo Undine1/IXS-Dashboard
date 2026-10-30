@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import BurnStats from '@/components/BurnStats';
-import SiteTabs from '@/components/SiteTabs';
 import { fetchTokenBurnStatsFromAPI } from '@/lib/clientBurnService';
 import { Pool, PoolsApiResponse, TokenBurnStats, VaultTvlResponse } from '@/types';
 
@@ -203,8 +202,6 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-
-        <SiteTabs active="statistics" />
 
         {loading ? (
           <div className="ixs-dashboard-loading py-8 md:py-10">
