@@ -1,0 +1,56 @@
+[
+  {
+    "label": "token",
+    "address": "0xdcd7face6a1d0bdd0665ea1b0842fc9ce797862b",
+    "name": "owner()",
+    "result": "0x00000000000000000000000026c70c2fc15e70c4dea21fafbdf014e8a8069979"
+  },
+  {
+    "label": "token",
+    "address": "0xdcd7face6a1d0bdd0665ea1b0842fc9ce797862b",
+    "name": "pendingOwner()",
+    "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "label": "migration",
+    "address": "0x358201f49bb186771d79299802fea636ea1b2a27",
+    "name": "owner()",
+    "result": "0x0000000000000000000000006b27cf95414bd327395c87f302e85d6361799208"
+  },
+  {
+    "label": "migration",
+    "address": "0x358201f49bb186771d79299802fea636ea1b2a27",
+    "name": "pendingOwner()",
+    "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "label": "vault",
+    "address": "0x23a65cdee846b83cee2bdc2debfea17f8c444370",
+    "name": "owner()",
+    "result": "0x000000000000000000000000857ff825254755a6fbe22125029a6754e8c9cedd"
+  },
+  {
+    "label": "vault",
+    "address": "0x23a65cdee846b83cee2bdc2debfea17f8c444370",
+    "name": "depositors()",
+    "result": "0x00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000001000000000000000000000000857ff825254755a6fbe22125029a6754e8c9cedd"
+  },
+  {
+    "label": "vault",
+    "address": "0x23a65cdee846b83cee2bdc2debfea17f8c444370",
+    "name": "module()",
+    "result": "0x000000000000000000000000cf1274cb411798fe925246eb987bd16c3af068b8"
+  },
+  {
+    "label": "vault",
+    "address": "0x23a65cdee846b83cee2bdc2debfea17f8c444370",
+    "name": "manager()",
+    "result": "0x0000000000000000000000002e6e879648293e939aa68ba4c6c129a1be733bda"
+  },
+  {
+    "block": "0x60ea43d",
+    "number": 101622845,
+    "timestamp": 1793352462,
+    "asOf": "2026-10-30T09:27:42.000Z"
+  }
+]
