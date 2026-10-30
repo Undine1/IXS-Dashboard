@@ -424,7 +424,7 @@ export default function BurnStats({
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="rounded-xl border border-slate-700 bg-slate-800/70 px-5 py-4 text-sm text-slate-300">
         <a href={ROBINHOOD.migrationUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-cyan-400 hover:underline">IXS migration to Robinhood Chain</a>
-        <p className="mt-1">Crypto liquidity migration: December 21, 2026. RWA pools remain on Polygon. 1 legacy IXS converts to 10 new IXS.</p>
+        <p className="mt-1">Crypto liquidity migration: December 21, 2026.</p>
         <p className="mt-1 text-xs text-slate-400">Supply and burns below cover legacy IXS. Liquidity includes both legacy pools and the new Robinhood Chain pool.</p>
       </div>
       {/* --- Top Metrics Grid --- */}
