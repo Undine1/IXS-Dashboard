@@ -1,16 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { robinhoodAggregateResponse, robinhoodVolumePayload } from './fixtures/robinhood';
 
 const word = (value: number | bigint) => BigInt(value).toString(16).padStart(64, '0');
 
 function encodeAggregateResults(
   count: number,
-  returnData: string,
+  returnData: string | string[],
   failedIndexes = new Set<number>(),
 ): string {
   const tuples = Array.from({ length: count }, (_, index) => {
     const success = !failedIndexes.has(index);
-    const bytes = success ? returnData.replace(/^0x/, '') : '';
+    const bytes = success ? (Array.isArray(returnData) ? returnData[index] : returnData).replace(/^0x/, '') : '';
     const padded = bytes.padEnd(Math.ceil(bytes.length / 64) * 64, '0');
     return `${word(success ? 1 : 0)}${word(64)}${word(bytes.length / 2)}${padded}`;
   });
@@ -56,9 +57,14 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
   const reserves = `0x${word(1_000_000)}${word(1_000_000_000_000_000_000n)}${word(0)}`;
   const balance = `0x${word(42)}`;
   const requests: string[] = [];
-  let phase: 'pools' | 'burns' | 'pool-fallback' | 'pool-subcall-fallback' = 'pools';
+  let phase: 'pools' | 'burns' | 'pool-fallback' | 'pool-subcall-fallback' | 'pool-migration' = 'pools';
 
   globalThis.fetch = (async (url: string | URL, options?: RequestInit) => {
+    if (String(url).includes('dexscreener')) return Response.json(robinhoodVolumePayload());
+    if (String(url).includes('robinhood')) {
+      const payload = JSON.parse(String(options?.body));
+      return Response.json({ result: payload.method === 'eth_blockNumber' ? '0x123456' : robinhoodAggregateResponse() });
+    }
     const network = new URL(String(url)).host.split('.')[0];
     const body = JSON.parse(String(options?.body || '{}')) as {
       params: Array<{ data: string }>;
@@ -83,7 +89,8 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
     const result = isBatch
       ? encodeAggregateResults(
           aggregateCallCount(data),
-          phase === 'burns' ? balance : reserves,
+          phase === 'burns' ? balance : phase === 'pool-migration' && network === 'polygon-mainnet'
+            ? [`0x${word(0)}${word(0)}${word(0)}`, ...Array(4).fill(reserves)] : reserves,
           failedIndexes,
         )
       : reserves;
@@ -103,7 +110,7 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
 
     const pools = await computePoolsBody();
     assert.equal(pools.healthy, true);
-    assert.equal(pools.body.pools.length, 6);
+    assert.equal(pools.body.pools.length, 7);
     assert.ok(pools.body.pools.every((pool) => typeof pool.value === 'number'));
     const batchedPoolValues = pools.body.pools.map((pool) => pool.value);
     assert.deepEqual(
@@ -161,6 +168,17 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
         'pool-subcall-fallback:polygon-mainnet:0x0902f1ac',
       ],
     );
+    phase = 'pool-migration';
+    const migrated = await computePoolsBody();
+    assert.equal(migrated.healthy, true);
+    assert.equal(migrated.body.pools.find((pool) => pool.name === 'WIXS-USDC')?.value, 0);
+    const rwaPools = migrated.body.pools.filter((pool) => pool.type === 'RWA');
+    assert.equal(rwaPools.length, 4);
+    for (const pool of rwaPools) {
+      assert.equal(pool.priceBasis, 'migration-1-to-10');
+      assert.ok(Math.abs((pool.value ?? 0) - 4e-10) < 1e-20, 'RWA valuation uses 10 new IXS per legacy IXS');
+    }
+    assert.equal(migrated.body.pools.find((pool) => pool.network === 'robinhood')?.value, 14_000);
   } finally {
     globalThis.fetch = originalFetch;
     for (const key of envKeys) {

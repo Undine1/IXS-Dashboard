@@ -1,8 +1,8 @@
 /**
  * Hourly snapshot of the on-demand chain reads: pool reserve valuations (TVL),
- * burn-address balances, and the BSC IXS vault. Reads are grouped into one
+ * burn-address balances, and the Avalanche HYB vaults. Legacy reads are grouped into one
  * Multicall3 eth_call per configured chain, with individual RPC fallback if a
- * whole batch fails.
+ * whole batch fails. Robinhood v4 uses its own pool-specific, block-pinned batch.
  * Running this in CI lets the Vercel routes serve
  * a deployment-baked file instead of fanning out RPC calls per request — the
  * live RPC path in lib/poolsService + lib/burnStatsService remains only as a

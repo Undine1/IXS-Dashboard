@@ -1,11 +1,13 @@
 // Relative imports (not the @/ alias) so scripts/update_onchain_snapshot.ts
 // can run this module under tsx in CI.
-import type { ChainNetwork } from '../types';
+import type { ChainNetwork, Pool, PoolNetwork } from '../types';
 import { getRpcUrls, hasAnyRpcConfigured, rpcCall, sleep } from './rpc';
 import { bigintToDecimalNumber, normalizeAddressFromHex, parseHexInt } from './poolMath';
 import { poolReserveReadKey, type PrefetchedOnchainReads } from './onchainReadKeys';
 import { POOLS, type PoolConfig } from './poolsConfig';
 import { readSnapshotSection } from './onchainSnapshot';
+import { computeRobinhoodPool } from './robinhoodPoolService';
+import { ROBINHOOD, ROBINHOOD_POOL } from './robinhoodConfig';
 import {
   createMulticall3ReadGroups,
   prefetchMulticall3Reads,
@@ -38,7 +40,7 @@ export type PoolDebug = {
   error?: string;
 };
 
-export type PoolWithValue = PoolConfig & {
+export type PoolWithValue = Pool & {
   value: number | null;
   debug?: PoolDebug;
 };
@@ -57,7 +59,7 @@ export type PoolsResponseBody = {
     pools: Array<{
       name: string;
       address: string;
-      network: ChainNetwork;
+      network: PoolNetwork;
       debug: PoolDebug;
       derivedIxsPrice: number | null;
     }>;
@@ -71,6 +73,21 @@ export type PoolsServiceResult = {
   healthy: boolean;
   fromCache: boolean;
 };
+
+export function isCurrentPoolsSnapshot(body: PoolsResponseBody | undefined): boolean {
+  if (!body || !Array.isArray(body.pools) || body.warnings?.length) return false;
+  const expected = [ROBINHOOD_POOL, ...POOLS];
+  if (body.pools.length !== expected.length) return false;
+  return expected.every((config) => {
+    const matches = body.pools.filter((pool) => pool?.network === config.network &&
+      typeof pool.address === 'string' && pool.address.toLowerCase() === config.address.toLowerCase());
+    return matches.length === 1 && typeof matches[0].value === 'number' &&
+      Number.isFinite(matches[0].value) && matches[0].value >= 0 &&
+      matches[0].protocol === config.protocol && (config.network !== 'robinhood' ||
+        (matches[0].poolManager === ROBINHOOD.poolManager && matches[0].tokenContract === ROBINHOOD.token &&
+         matches[0].valuation === 'liquidity-principal'));
+  });
+}
 
 const STABLE_TOKENS_BY_NETWORK: Record<ChainNetwork, string[]> = {
   ethereum: [
@@ -300,7 +317,7 @@ export async function getPoolsBody(
     // The hourly pipeline snapshots this data; only sections that fetched
     // healthily are stored, so a stored section can be served as-is.
     const snapshot = readSnapshotSection('pools');
-    if (snapshot && Array.isArray(snapshot.data?.pools) && snapshot.data.pools.length > 0) {
+    if (snapshot && isCurrentPoolsSnapshot(snapshot.data)) {
       return { body: snapshot.data, healthy: true, fromCache: true };
     }
 
@@ -336,6 +353,16 @@ export async function computePoolsBody(
   const prices: Prices = {};
   const warnings: string[] = [];
   const resultsByIndex = new Array<FetchPoolResult>(POOLS.length);
+  let robinhoodPool: PoolWithValue;
+  try {
+    // Separate v4 adapter: no V2 reserves or shared PoolManager balances.
+    robinhoodPool = await computeRobinhoodPool();
+  } catch {
+    robinhoodPool = { ...ROBINHOOD_POOL, value: null, volume24hUsd: null };
+    warnings.push('IXS-ETH (Robinhood Chain): liquidity temporarily unavailable');
+  }
+  const migrationPriced = new Set<number>();
+  const migrationPriceNetworks = new Set<ChainNetwork>();
 
   // Process price-source/stable-paired pools first so derived IXS prices exist
   // before dependent pools are valued; emit results in POOLS order so the
@@ -351,6 +378,18 @@ export async function computePoolsBody(
     }
     processedAny = true;
 
+    // RWA pools remain on Polygon after crypto liquidity migrates. Only use
+    // the documented redemption ratio when their legacy price source is empty
+    // or unavailable; this converts a PRICE, never balances, supply or volume.
+    const nativePrice = robinhoodPool.tokenPriceUsd;
+    if (pool.type === 'RWA' && !prices[pool.network]?.ixs &&
+        typeof nativePrice === 'number' && nativePrice > 0 && Number.isFinite(nativePrice)) {
+      prices[pool.network] = { ixs: { usd: nativePrice * ROBINHOOD.tokensPerLegacyIxs } };
+      migrationPriceNetworks.add(pool.network);
+    }
+    if (pool.type === 'RWA' && migrationPriceNetworks.has(pool.network)) {
+      migrationPriced.add(index);
+    }
     const result = await fetchPoolValue(pool, prices, prefetchedReads);
     if (result.derivedIxsPrice && result.derivedIxsPrice > 0) {
       const current = prices[pool.network] || {};
@@ -365,12 +404,13 @@ export async function computePoolsBody(
 
   POOLS.forEach((pool, index) => {
     const result = resultsByIndex[index];
+    const displayPool: PoolConfig = migrationPriced.has(index) ? { ...pool, priceBasis: 'migration-1-to-10' } : pool;
     if (result.debug.error) {
       warnings.push(`${pool.name} (${pool.network}): ${result.debug.error}`);
     }
 
     if (debugMode) {
-      poolsData.push({ ...pool, value: result.usdValue, debug: result.debug });
+      poolsData.push({ ...displayPool, value: result.usdValue, debug: result.debug });
       poolsDebug.push({
         name: pool.name,
         address: pool.address,
@@ -379,9 +419,11 @@ export async function computePoolsBody(
         derivedIxsPrice: result.derivedIxsPrice,
       });
     } else {
-      poolsData.push({ ...pool, value: result.usdValue });
+      poolsData.push({ ...displayPool, value: result.usdValue });
     }
   });
+
+  poolsData.unshift(robinhoodPool);
 
   const body: PoolsResponseBody = { pools: poolsData };
   if (warnings.length > 0) body.warnings = warnings;

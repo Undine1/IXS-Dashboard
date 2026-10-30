@@ -68,6 +68,15 @@ export function getAvalancheRpcUrls(): string[] {
   return [...new Set(urls.filter(Boolean))];
 }
 
+export function getRobinhoodRpcUrls(): string[] {
+  return [...new Set([
+    String(process.env.ROBINHOOD_RPC_URL || '').trim(),
+    ALCHEMY_API_KEY ? `https://robinhood-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : '',
+    // Bounded fallback only; normal traffic is served from the hourly snapshot.
+    'https://rpc.mainnet.chain.robinhood.com',
+  ].filter(Boolean))];
+}
+
 // Posts a JSON-RPC payload, walking the provider list and retrying transient
 // failures (timeouts, 429s) with exponential backoff. Non-transient errors
 // (4xx/5xx, reverts) fail over to the next provider immediately. Returns the

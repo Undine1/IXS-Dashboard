@@ -1,8 +1,24 @@
 {
   "pools": {
-    "generatedAt": "2026-10-30T06:28:03.870Z",
+    "generatedAt": "2026-10-30T06:35:13.632Z",
     "data": {
       "pools": [
+        {
+          "type": "Crypto",
+          "name": "IXS-ETH",
+          "network": "robinhood",
+          "address": "0x252827c9712732983d1d720e87ff5f2d875fae840ff128c0331cce0baa6a4bf8",
+          "tokenContract": "0xdcd7face6a1d0bdd0665ea1b0842fc9ce797862b",
+          "poolManager": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+          "protocol": "uniswap-v4",
+          "explorerUrl": "https://dexscreener.com/robinhood/0x252827c9712732983d1d720e87ff5f2d875fae840ff128c0331cce0baa6a4bf8",
+          "valuation": "liquidity-principal",
+          "value": 333778.4970799615,
+          "tokenPriceUsd": 0.004078032411150418,
+          "observedAt": "2026-10-30T06:35:11.000Z",
+          "volume24hUsd": 80844.71,
+          "volumeSource": "https://dexscreener.com/robinhood/0x252827c9712732983d1d720e87ff5f2d875fae840ff128c0331cce0baa6a4bf8"
+        },
         {
           "type": "Crypto",
           "name": "IXS-USDC",
@@ -89,7 +105,7 @@
     }
   },
   "burnStats": {
-    "generatedAt": "2026-10-30T06:28:03.870Z",
+    "generatedAt": "2026-10-30T06:35:13.632Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -111,7 +127,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-10-30T06:28:03.870Z",
+    "generatedAt": "2026-10-30T06:35:13.632Z",
     "data": {
       "vaults": [
         {

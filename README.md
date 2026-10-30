@@ -62,8 +62,18 @@ Create a `.env.local` in the project root.
 - `RPC_RUN_BUDGET_MS` - cooperative scan deadline; CI supplies separate pool and holder budgets with time reserved for persistence
 - `RPC_MIN_INTERVAL_MS` - optional legacy fixed pacing override for every pool/holder RPC provider; `0` disables pacing unless an explicit Alchemy allocation is set
 - `NEXT_PUBLIC_TOTAL_SUPPLY` (or `TOTAL_SUPPLY`) - optional override of the 180M IXS max supply; read by both the dashboard and `/metrics` via `lib/supply.ts` so they cannot drift
+- `ROBINHOOD_RPC_URL` - optional dedicated Robinhood Chain mainnet RPC. Otherwise the existing Alchemy key is used, with a bounded official public-RPC fallback.
 
 The pool-volume, holder-ranking, and on-chain snapshot updaters auto-load `.env.local` when environment variables are not already exported.
+
+### Robinhood Chain liquidity and migration
+
+- Native IXS: `0xDcD7FaCE6A1d0bDD0665Ea1B0842fc9CE797862b` on chain 4663. The verified v4 pool ID and PoolManager are in `lib/robinhoodConfig.ts`; this bytes32 pool ID is not a contract address. The hourly on-chain snapshot includes this pool alongside the six legacy pools.
+- TVL uses Uniswap's ReservesLens over the pool's full liquidity curve and the Chainlink ETH/USD feed, pinned to one L2 block. It counts liquidity principal only, excluding uncollected fees and hook custody. It never uses the singleton PoolManager's token/ETH balances or doubles one side of a concentrated-liquidity pool. Normal refresh cost is two RPC requests plus one DEX Screener request. Wrong-chain, stalled-head, stale-oracle and unsupported-hook responses fail closed; failed pool refreshes retain the previous snapshot with its original timestamp.
+- The native pool's rolling 24-hour USD trading volume is identity-checked against DEX Screener and displayed separately. It is never accumulated or added to the legacy lifetime `pool_volume.json` series. A volume-provider failure displays N/A without discarding a valid liquidity read.
+- December 21, 2026 concerns the **crypto** liquidity migration only. Legacy pools remain tracked at actual balances, including any residual third-party liquidity; historical volume is retained. IXAPE, TAU, MSTO and CKGP remain on Polygon. If the Polygon crypto pool can no longer supply an IXS price, RWA valuation uses the new IXS price multiplied by the documented 10:1 conversion and labels that price basis.
+- Supply, burns, holder rankings and the existing supply/burn fields in `/metrics` remain in **legacy IXS units**. `/metrics` TVL includes the new pool once. Do not add native IXS balances, the bridged legacy token, migration custody or the 2.5B native cap to legacy 180M-unit statistics. Native holder/supply/burn accounting is a separate migration project, not inferred from pool custody.
+- Sources: [IXS migration](https://robinhood.ixs.finance/), [Robinhood network](https://docs.robinhood.com/chain/add-network-to-wallet/), [Uniswap deployments](https://developers.uniswap.org/docs/protocols/v4/deployments), [ReservesLens accounting](https://github.com/Uniswap/v4-periphery/blob/main/src/interfaces/IReservesLens.sol), [Chainlink feed metadata](https://reference-data-directory.vercel.app/feeds-robinhood-mainnet.json), [DEX Screener API](https://docs.dexscreener.com/api/reference). The unmodified chain icon comes from the [official Robinhood Chain brand assets](https://docs.robinhood.com/chain/brand-guidelines/).
 
 ## Running locally
 1. Install dependencies

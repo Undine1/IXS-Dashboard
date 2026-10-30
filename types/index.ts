@@ -12,15 +12,27 @@ export interface TokenBurnStats {
 }
 
 export type ChainNetwork = 'ethereum' | 'polygon' | 'base';
+// Legacy IXS accounting remains in its original denomination. Pool networks
+// are separate because native Robinhood IXS uses a 1:10 redenomination.
+export type PoolNetwork = ChainNetwork | 'robinhood';
 
 export interface Pool {
   type: string;
   name: string;
   address: string;
-  network: ChainNetwork;
+  network: PoolNetwork;
   value?: number | null;
   priceSource?: boolean;
   tokenContract?: string;
+  protocol?: 'uniswap-v4';
+  poolManager?: string;
+  explorerUrl?: string;
+  valuation?: 'liquidity-principal';
+  observedAt?: string;
+  volume24hUsd?: number | null;
+  volumeSource?: string;
+  tokenPriceUsd?: number;
+  priceBasis?: 'migration-1-to-10';
 }
 
 export interface PoolsApiResponse {

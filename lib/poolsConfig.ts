@@ -1,4 +1,4 @@
-import type { Pool } from '@/types';
+import type { ChainNetwork, Pool } from '@/types';
 
 export type PoolMeta = {
   token0: string;
@@ -7,7 +7,9 @@ export type PoolMeta = {
   decimals1: number;
 };
 
-export type PoolConfig = Omit<Pool, 'value'> & {
+// V2 pairs only: never send getReserves/token0/token1 to a v4 pool ID.
+export type PoolConfig = Omit<Pool, 'value' | 'network'> & {
+  network: ChainNetwork;
   priceSource?: boolean;
   tokenContract?: string;
   // Immutable pair metadata. When present, the pools route skips the
