@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-10-30T18:18:10.926Z",
+    "generatedAt": "2026-10-30T19:28:08.334Z",
     "data": {
       "pools": [
         {
@@ -13,9 +13,9 @@
           "protocol": "uniswap-v4",
           "explorerUrl": "https://dexscreener.com/robinhood/0x252827c9712732983d1d720e87ff5f2d875fae840ff128c0331cce0baa6a4bf8",
           "valuation": "liquidity-principal",
-          "value": 340193.25631926314,
-          "tokenPriceUsd": 0.004205457650737101,
-          "observedAt": "2026-10-30T18:18:09.000Z"
+          "value": 339700.8309120844,
+          "tokenPriceUsd": 0.0042142475786724,
+          "observedAt": "2026-10-30T19:28:06.000Z"
         },
         {
           "type": "Crypto",
@@ -26,18 +26,18 @@
           "poolManager": "0x000000000004444c5dc75cb358380d2e3de08a90",
           "protocol": "uniswap-v2+v4",
           "explorerUrl": "https://dexscreener.com/ethereum/0x73d7c860998ca3c01ce8c808f5577d94d545d1b4",
-          "value": 543297.6336870624,
-          "observedAt": "2026-10-30T18:17:59.000Z",
+          "value": 539835.7912898944,
+          "observedAt": "2026-10-30T19:27:59.000Z",
           "underlyingPools": [
             {
               "address": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
               "protocol": "uniswap-v2",
-              "value": 203485.84846871023
+              "value": 202248.39324068202
             },
             {
               "address": "0xd54a5e98dc3d0a90a058d4e46b2db9e7d92dbf50598833035e1f27eac4f23a4f",
               "protocol": "uniswap-v4",
-              "value": 339811.7852183522
+              "value": 337587.3980492124
             }
           ]
         },
@@ -54,7 +54,7 @@
             "decimals0": 6,
             "decimals1": 18
           },
-          "value": 30904.002142000005
+          "value": 30872.579862
         },
         {
           "type": "Crypto",
@@ -127,7 +127,7 @@
     }
   },
   "burnStats": {
-    "generatedAt": "2026-10-30T18:18:10.926Z",
+    "generatedAt": "2026-10-30T19:28:08.334Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -149,7 +149,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-10-30T18:18:10.926Z",
+    "generatedAt": "2026-10-30T19:28:08.334Z",
     "data": {
       "vaults": [
         {
