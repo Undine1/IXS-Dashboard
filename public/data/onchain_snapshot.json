@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-10-30T06:35:13.632Z",
+    "generatedAt": "2026-10-30T07:48:09.789Z",
     "data": {
       "pools": [
         {
@@ -13,10 +13,10 @@
           "protocol": "uniswap-v4",
           "explorerUrl": "https://dexscreener.com/robinhood/0x252827c9712732983d1d720e87ff5f2d875fae840ff128c0331cce0baa6a4bf8",
           "valuation": "liquidity-principal",
-          "value": 333778.4970799615,
-          "tokenPriceUsd": 0.004078032411150418,
-          "observedAt": "2026-10-30T06:35:11.000Z",
-          "volume24hUsd": 80844.71,
+          "value": 336407.9947850215,
+          "tokenPriceUsd": 0.004149489622944015,
+          "observedAt": "2026-10-30T07:48:08.000Z",
+          "volume24hUsd": 85426.89,
           "volumeSource": "https://dexscreener.com/robinhood/0x252827c9712732983d1d720e87ff5f2d875fae840ff128c0331cce0baa6a4bf8"
         },
         {
@@ -32,7 +32,7 @@
             "decimals0": 6,
             "decimals1": 18
           },
-          "value": 30839.165684
+          "value": 30807.976672
         },
         {
           "type": "Crypto",
@@ -105,7 +105,7 @@
     }
   },
   "burnStats": {
-    "generatedAt": "2026-10-30T06:35:13.632Z",
+    "generatedAt": "2026-10-30T07:48:09.789Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -127,7 +127,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-10-30T06:35:13.632Z",
+    "generatedAt": "2026-10-30T07:48:09.789Z",
     "data": {
       "vaults": [
         {
