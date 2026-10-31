@@ -2,24 +2,24 @@
   "pools": {
     "0xd093a031df30f186976a1e2936b16d95ca7919d6": {
       "total_usd": 3831618.498961,
-      "lastUpdated": "2026-10-31T21:17:46.791Z",
+      "lastUpdated": "2026-10-31T22:34:01.001Z",
       "chain": "polygon",
       "usdc": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
     },
     "0xd22a820dc52f1cacea7a5c86da16757f434f43c6": {
       "total_usd": 3352360.156297,
-      "lastUpdated": "2026-10-31T21:17:48.450Z",
+      "lastUpdated": "2026-10-31T22:34:02.258Z",
       "chain": "base",
       "usdc": "0x833589fCd6eDb6E08f4c7C32D4f71b54bdA02913"
     }
   },
   "checkpoints": {
     "0xd093a031df30f186976a1e2936b16d95ca7919d6": {
-      "lastTimestamp": 1793481466,
-      "lastBlock": 96517340,
+      "lastTimestamp": 1793486040,
+      "lastBlock": 96520389,
       "finalized": {
-        "lastBlock": 96517338,
-        "blockHash": "0x381e665a3a6fa3697bf847bab388698a58ee04266bfa782aca6e651556937f10",
+        "lastBlock": 96520387,
+        "blockHash": "0xd088a5ee599af3ab136ce8c65c9d3d5975bb4d1d471c68c81d670641566a1d2c",
         "totalRaw": "3831618498961",
         "identity": {
           "chain": "polygon",
@@ -28,14 +28,14 @@
           "decimals": 6
         }
       },
-      "blockHash": "0x610361a809b5b2e8d82ca744bb1639d095cf606bcf2d6600f1c72db27d940a33"
+      "blockHash": "0xbdee922c32c1bb926f0eae45aa7dea4b1c74c01145b12b8e3008aa6428f98135"
     },
     "0xd22a820dc52f1cacea7a5c86da16757f434f43c6": {
-      "lastTimestamp": 1793481465,
-      "lastBlock": 53346059,
+      "lastTimestamp": 1793486039,
+      "lastBlock": 53348346,
       "finalized": {
-        "lastBlock": 53345435,
-        "blockHash": "0x60e6969b2c266eec92d9173cf48841b61131165f0874e50d64f8295869ee3a40",
+        "lastBlock": 53347186,
+        "blockHash": "0x5f3a197c818b2c8954d3e273c59aa68ff08cbded5c4f00f48025e06d134b98c7",
         "totalRaw": "3352360156297",
         "identity": {
           "chain": "base",
@@ -44,8 +44,8 @@
           "decimals": 6
         }
       },
-      "blockHash": "0x90076deadba4279c9b9342f8b6ecb0e4d74c4ccc7f975ecaf75924bf750a3ce3"
+      "blockHash": "0xcd62ea5cd7940070268690802e9fb537ae55f96ab97e2478e6f6b704d12a221d"
     }
   },
-  "lastUpdated": "2026-10-31T21:17:48.450Z"
+  "lastUpdated": "2026-10-31T22:34:02.258Z"
 }
