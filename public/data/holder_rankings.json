@@ -5,7 +5,7 @@
       "rank": 1,
       "holder": "0x85001cc4867c5e1c22da4b79bb8852b9e2a06da0",
       "chainsHolding": 1,
-      "totalIxs": "52,366,290.21",
+      "totalIxs": "52,416,290.21",
       "label": "Migration Contract"
     },
     {
@@ -136,16 +136,16 @@
     },
     {
       "rank": 20,
-      "holder": "0xe809e3701830afe33e0fa84ca3cbfab8baddb77d",
-      "chainsHolding": 2,
-      "totalIxs": "811,845.79",
+      "holder": "0xf1443dfac1f31fddb766f8f366160cdd4a80bee4",
+      "chainsHolding": 1,
+      "totalIxs": "763,201.49",
       "label": null
     },
     {
       "rank": 21,
-      "holder": "0xf1443dfac1f31fddb766f8f366160cdd4a80bee4",
-      "chainsHolding": 1,
-      "totalIxs": "763,201.49",
+      "holder": "0xe809e3701830afe33e0fa84ca3cbfab8baddb77d",
+      "chainsHolding": 2,
+      "totalIxs": "761,845.79",
       "label": null
     },
     {
@@ -166,7 +166,7 @@
       "rank": 24,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "718,540.93",
+      "totalIxs": "718,689.20",
       "label": "Contract"
     },
     {
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 11976,
-  "lastRefreshed": "2026-11-01T14:37:55.382Z",
+  "totalRowCount": 11975,
+  "lastRefreshed": "2026-11-01T15:57:57.444Z",
   "source": "rpc-snapshot"
 }
