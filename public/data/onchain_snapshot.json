@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-11-01T17:17:58.490Z",
+    "generatedAt": "2026-11-01T18:38:08.159Z",
     "data": {
       "pools": [
         {
@@ -15,7 +15,7 @@
           "valuation": "liquidity-principal",
           "value": 346567.6360970981,
           "tokenPriceUsd": 0.004307815796064805,
-          "observedAt": "2026-11-01T17:17:56.000Z"
+          "observedAt": "2026-11-01T18:38:05.000Z"
         },
         {
           "type": "Crypto",
@@ -26,18 +26,18 @@
           "poolManager": "0x000000000004444c5dc75cb358380d2e3de08a90",
           "protocol": "uniswap-v2+v4",
           "explorerUrl": "https://dexscreener.com/ethereum/0x73d7c860998ca3c01ce8c808f5577d94d545d1b4",
-          "value": 555937.6560949977,
-          "observedAt": "2026-11-01T17:17:47.000Z",
+          "value": 554827.1641515454,
+          "observedAt": "2026-11-01T18:37:59.000Z",
           "underlyingPools": [
             {
               "address": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
               "protocol": "uniswap-v2",
-              "value": 208707.0651223725
+              "value": 208290.17032883046
             },
             {
               "address": "0xd54a5e98dc3d0a90a058d4e46b2db9e7d92dbf50598833035e1f27eac4f23a4f",
               "protocol": "uniswap-v4",
-              "value": 347230.5909726252
+              "value": 346536.99382271495
             }
           ]
         },
@@ -54,7 +54,7 @@
             "decimals0": 6,
             "decimals1": 18
           },
-          "value": 31736.74508
+          "value": 31695.076602
         },
         {
           "type": "Crypto",
@@ -127,7 +127,7 @@
     }
   },
   "burnStats": {
-    "generatedAt": "2026-11-01T17:17:58.490Z",
+    "generatedAt": "2026-11-01T18:38:08.159Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -149,7 +149,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-11-01T17:17:58.490Z",
+    "generatedAt": "2026-11-01T18:38:08.159Z",
     "data": {
       "vaults": [
         {
