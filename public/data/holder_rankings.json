@@ -5,7 +5,7 @@
       "rank": 1,
       "holder": "0x85001cc4867c5e1c22da4b79bb8852b9e2a06da0",
       "chainsHolding": 1,
-      "totalIxs": "53,460,085.04",
+      "totalIxs": "53,471,785.76",
       "label": "Migration Contract"
     },
     {
@@ -33,7 +33,7 @@
       "rank": 5,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "4,856,405.25",
+      "totalIxs": "4,846,108.57",
       "label": "Uniswap V4"
     },
     {
@@ -61,7 +61,7 @@
       "rank": 9,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "2,446,592.05",
+      "totalIxs": "2,443,579.06",
       "label": "Uniswap V2"
     },
     {
@@ -166,7 +166,7 @@
       "rank": 24,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "722,174.15",
+      "totalIxs": "721,052.86",
       "label": "Contract"
     },
     {
@@ -404,7 +404,7 @@
       "rank": 58,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "370,135.89",
+      "totalIxs": "370,602.79",
       "label": "IXS/USDC Base"
     },
     {
@@ -661,24 +661,24 @@
     },
     {
       "rank": 95,
+      "holder": "0x91762331b1dc921a254fde2d98fb163d290c90ea",
+      "chainsHolding": 1,
+      "totalIxs": "227,237.08",
+      "label": null
+    },
+    {
+      "rank": 96,
       "holder": "0x8c0676a336b9e2a7b8622737a0bf33f11451622a",
       "chainsHolding": 1,
       "totalIxs": "225,481.25",
       "label": null
     },
     {
-      "rank": 96,
+      "rank": 97,
       "holder": "0xfe3d92cf0292a4e44402d1e6a10ae8b575fa61dc",
       "chainsHolding": 1,
       "totalIxs": "223,556.20",
       "label": "Contract"
-    },
-    {
-      "rank": 97,
-      "holder": "0x91762331b1dc921a254fde2d98fb163d290c90ea",
-      "chainsHolding": 1,
-      "totalIxs": "223,288.08",
-      "label": null
     },
     {
       "rank": 98,
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 11963,
-  "lastRefreshed": "2026-11-02T03:58:07.113Z",
+  "totalRowCount": 11962,
+  "lastRefreshed": "2026-11-02T05:17:55.886Z",
   "source": "rpc-snapshot"
 }
