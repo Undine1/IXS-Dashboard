@@ -5,7 +5,7 @@
       "rank": 1,
       "holder": "0x85001cc4867c5e1c22da4b79bb8852b9e2a06da0",
       "chainsHolding": 1,
-      "totalIxs": "54,716,613.09",
+      "totalIxs": "54,812,222.96",
       "label": "Migration Contract"
     },
     {
@@ -26,7 +26,7 @@
       "rank": 4,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "5,212,037.55",
+      "totalIxs": "5,196,325.75",
       "label": "Uniswap V4"
     },
     {
@@ -61,7 +61,7 @@
       "rank": 9,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "2,567,494.17",
+      "totalIxs": "2,562,559.40",
       "label": "Uniswap V2"
     },
     {
@@ -103,7 +103,7 @@
       "rank": 15,
       "holder": "0x3ee18b2214aff97000d974cf647e7c347e8fa585",
       "chainsHolding": 1,
-      "totalIxs": "1,168,723.35",
+      "totalIxs": "1,104,663.35",
       "label": "Wormhole Bridge"
     },
     {
@@ -166,7 +166,7 @@
       "rank": 24,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "734,487.61",
+      "totalIxs": "734,795.11",
       "label": "Contract"
     },
     {
@@ -397,7 +397,7 @@
       "rank": 57,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "388,395.92",
+      "totalIxs": "389,101.22",
       "label": "IXS/USDC Base"
     },
     {
@@ -509,7 +509,7 @@
       "rank": 73,
       "holder": "0x11f81bf5ad3f7e373adcacfc59940b1eb4e6f3da",
       "chainsHolding": 2,
-      "totalIxs": "303,285.92",
+      "totalIxs": "303,185.92",
       "label": null
     },
     {
@@ -1468,7 +1468,7 @@
       "rank": 210,
       "holder": "0x84acaeb992794dbad01d1041a9a5b7fd4ddc5bb3",
       "chainsHolding": 1,
-      "totalIxs": "110,422.25",
+      "totalIxs": "110,419.26",
       "label": null
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 11929,
-  "lastRefreshed": "2026-11-03T19:48:01.488Z",
+  "lastRefreshed": "2026-11-03T21:08:07.665Z",
   "source": "rpc-snapshot"
 }
