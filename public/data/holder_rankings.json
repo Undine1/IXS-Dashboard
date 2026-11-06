@@ -5,14 +5,14 @@
       "rank": 1,
       "holder": "0x85001cc4867c5e1c22da4b79bb8852b9e2a06da0",
       "chainsHolding": 1,
-      "totalIxs": "57,874,018.74",
+      "totalIxs": "57,882,095.82",
       "label": "Migration Contract"
     },
     {
       "rank": 2,
       "holder": "0x21dd761cac8461a68344f40d2f12e172a18a297f",
       "chainsHolding": 1,
-      "totalIxs": "12,131,663.15",
+      "totalIxs": "12,127,293.17",
       "label": "Nexera Bridge"
     },
     {
@@ -61,7 +61,7 @@
       "rank": 9,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "2,589,932.43",
+      "totalIxs": "2,585,310.93",
       "label": "Uniswap V2"
     },
     {
@@ -75,7 +75,7 @@
       "rank": 11,
       "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
       "chainsHolding": 1,
-      "totalIxs": "1,913,539.43",
+      "totalIxs": "1,910,082.66",
       "label": null
     },
     {
@@ -1293,7 +1293,7 @@
       "rank": 185,
       "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
       "chainsHolding": 1,
-      "totalIxs": "118,739.54",
+      "totalIxs": "118,739.57",
       "label": "Contract"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 11892,
-  "lastRefreshed": "2026-11-06T10:37:57.239Z",
+  "lastRefreshed": "2026-11-06T11:57:56.189Z",
   "source": "rpc-snapshot"
 }
