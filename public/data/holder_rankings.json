@@ -26,7 +26,7 @@
       "rank": 4,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "5,197,338.99",
+      "totalIxs": "5,212,504.96",
       "label": "Uniswap V4"
     },
     {
@@ -61,7 +61,7 @@
       "rank": 9,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "2,589,800.00",
+      "totalIxs": "2,582,729.06",
       "label": "Uniswap V2"
     },
     {
@@ -75,7 +75,7 @@
       "rank": 11,
       "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
       "chainsHolding": 1,
-      "totalIxs": "1,818,153.21",
+      "totalIxs": "1,814,105.39",
       "label": null
     },
     {
@@ -339,17 +339,17 @@
     },
     {
       "rank": 49,
+      "holder": "0x11f81bf5ad3f7e373adcacfc59940b1eb4e6f3da",
+      "chainsHolding": 2,
+      "totalIxs": "417,304.78",
+      "label": null
+    },
+    {
+      "rank": 50,
       "holder": "0xad644f3cc768bc6dcef97096790e2210d5191cec",
       "chainsHolding": 1,
       "totalIxs": "413,294.49",
       "label": "Contract"
-    },
-    {
-      "rank": 50,
-      "holder": "0x11f81bf5ad3f7e373adcacfc59940b1eb4e6f3da",
-      "chainsHolding": 2,
-      "totalIxs": "405,244.21",
-      "label": null
     },
     {
       "rank": 51,
@@ -598,17 +598,17 @@
     },
     {
       "rank": 86,
-      "holder": "0x91762331b1dc921a254fde2d98fb163d290c90ea",
-      "chainsHolding": 1,
-      "totalIxs": "248,910.50",
-      "label": null
-    },
-    {
-      "rank": 87,
       "holder": "0xec1e6e048c6875e9f4a51a5ec74b63da05d1f803",
       "chainsHolding": 1,
       "totalIxs": "247,354.97",
       "label": "Contract"
+    },
+    {
+      "rank": 87,
+      "holder": "0x91762331b1dc921a254fde2d98fb163d290c90ea",
+      "chainsHolding": 1,
+      "totalIxs": "233,910.50",
+      "label": null
     },
     {
       "rank": 88,
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 11879,
-  "lastRefreshed": "2026-11-07T16:53:38.115Z",
+  "lastRefreshed": "2026-11-07T18:07:55.746Z",
   "source": "rpc-snapshot"
 }
