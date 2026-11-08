@@ -5,7 +5,7 @@
       "rank": 1,
       "holder": "0x85001cc4867c5e1c22da4b79bb8852b9e2a06da0",
       "chainsHolding": 1,
-      "totalIxs": "59,456,839.20",
+      "totalIxs": "59,478,540.47",
       "label": "Migration Contract"
     },
     {
@@ -26,7 +26,7 @@
       "rank": 4,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "5,228,110.42",
+      "totalIxs": "5,235,464.73",
       "label": "Uniswap V4"
     },
     {
@@ -61,7 +61,7 @@
       "rank": 9,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "2,597,399.45",
+      "totalIxs": "2,598,733.55",
       "label": "Uniswap V2"
     },
     {
@@ -82,7 +82,7 @@
       "rank": 12,
       "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
       "chainsHolding": 1,
-      "totalIxs": "1,765,248.19",
+      "totalIxs": "1,760,078.10",
       "label": null
     },
     {
@@ -138,7 +138,7 @@
       "rank": 20,
       "holder": "0x3ee18b2214aff97000d974cf647e7c347e8fa585",
       "chainsHolding": 1,
-      "totalIxs": "1,013,806.22",
+      "totalIxs": "993,148.57",
       "label": "Wormhole Bridge"
     },
     {
@@ -173,7 +173,7 @@
       "rank": 25,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "733,241.52",
+      "totalIxs": "733,238.87",
       "label": "Contract"
     },
     {
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 11873,
-  "lastRefreshed": "2026-11-08T08:38:04.181Z",
+  "totalRowCount": 11874,
+  "lastRefreshed": "2026-11-08T09:58:08.816Z",
   "source": "rpc-snapshot"
 }

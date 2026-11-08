@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-11-08T08:38:07.695Z",
+    "generatedAt": "2026-11-08T09:58:11.800Z",
     "data": {
       "pools": [
         {
@@ -13,9 +13,9 @@
           "protocol": "uniswap-v4",
           "explorerUrl": "https://dexscreener.com/robinhood/0x252827c9712732983d1d720e87ff5f2d875fae840ff128c0331cce0baa6a4bf8",
           "valuation": "liquidity-principal",
-          "value": 314554.80465498276,
-          "tokenPriceUsd": 0.0036864461947461887,
-          "observedAt": "2026-11-08T08:38:06.000Z"
+          "value": 314653.96251076495,
+          "tokenPriceUsd": 0.0036884109270956603,
+          "observedAt": "2026-11-08T09:58:10.000Z"
         },
         {
           "type": "Crypto",
@@ -26,18 +26,18 @@
           "poolManager": "0x000000000004444c5dc75cb358380d2e3de08a90",
           "protocol": "uniswap-v2+v4",
           "explorerUrl": "https://dexscreener.com/ethereum/0x73d7c860998ca3c01ce8c808f5577d94d545d1b4",
-          "value": 507413.75802026404,
-          "observedAt": "2026-11-08T08:37:59.000Z",
+          "value": 506640.59789237264,
+          "observedAt": "2026-11-08T09:57:59.000Z",
           "underlyingPools": [
             {
               "address": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
               "protocol": "uniswap-v2",
-              "value": 191631.4902907784
+              "value": 191366.10013906102
             },
             {
               "address": "0xd54a5e98dc3d0a90a058d4e46b2db9e7d92dbf50598833035e1f27eac4f23a4f",
               "protocol": "uniswap-v4",
-              "value": 315782.26772948564
+              "value": 315274.49775331165
             }
           ]
         },
@@ -127,7 +127,7 @@
     }
   },
   "burnStats": {
-    "generatedAt": "2026-11-08T08:38:07.695Z",
+    "generatedAt": "2026-11-08T09:58:11.800Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -149,7 +149,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-11-08T08:38:07.695Z",
+    "generatedAt": "2026-11-08T09:58:11.800Z",
     "data": {
       "vaults": [
         {
