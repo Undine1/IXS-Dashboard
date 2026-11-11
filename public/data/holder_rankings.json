@@ -12,7 +12,7 @@
       "rank": 2,
       "holder": "0x21dd761cac8461a68344f40d2f12e172a18a297f",
       "chainsHolding": 1,
-      "totalIxs": "12,101,925.57",
+      "totalIxs": "12,083,227.04",
       "label": "Nexera Bridge"
     },
     {
@@ -26,7 +26,7 @@
       "rank": 4,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "5,427,403.41",
+      "totalIxs": "5,428,699.92",
       "label": "Uniswap V4"
     },
     {
@@ -47,7 +47,7 @@
       "rank": 7,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "2,661,209.70",
+      "totalIxs": "2,663,746.91",
       "label": "Uniswap V2"
     },
     {
@@ -96,7 +96,7 @@
       "rank": 14,
       "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
       "chainsHolding": 1,
-      "totalIxs": "1,558,703.39",
+      "totalIxs": "1,554,869.67",
       "label": null
     },
     {
@@ -173,7 +173,7 @@
       "rank": 25,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "739,515.71",
+      "totalIxs": "739,808.05",
       "label": "Contract"
     },
     {
@@ -320,7 +320,7 @@
       "rank": 46,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "428,772.16",
+      "totalIxs": "428,479.82",
       "label": "IXS/USDC Base"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 11846,
-  "lastRefreshed": "2026-11-11T01:28:04.739Z",
+  "lastRefreshed": "2026-11-11T02:47:58.453Z",
   "source": "rpc-snapshot"
 }
