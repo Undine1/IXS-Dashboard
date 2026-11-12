@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-11-12T11:48:07.680Z",
+    "generatedAt": "2026-11-12T12:53:08.774Z",
     "data": {
       "pools": [
         {
@@ -13,9 +13,9 @@
           "protocol": "uniswap-v4",
           "explorerUrl": "https://dexscreener.com/robinhood/0x252827c9712732983d1d720e87ff5f2d875fae840ff128c0331cce0baa6a4bf8",
           "valuation": "liquidity-principal",
-          "value": 271805.5144317043,
-          "tokenPriceUsd": 0.0030779882860815944,
-          "observedAt": "2026-11-12T11:48:05.000Z"
+          "value": 270100.67326043313,
+          "tokenPriceUsd": 0.003056329625939261,
+          "observedAt": "2026-11-12T12:53:06.000Z"
         },
         {
           "type": "Crypto",
@@ -26,18 +26,18 @@
           "poolManager": "0x000000000004444c5dc75cb358380d2e3de08a90",
           "protocol": "uniswap-v2+v4",
           "explorerUrl": "https://dexscreener.com/ethereum/0x73d7c860998ca3c01ce8c808f5577d94d545d1b4",
-          "value": 434298.1978836589,
-          "observedAt": "2026-11-12T11:47:59.000Z",
+          "value": 424706.5887124373,
+          "observedAt": "2026-11-12T12:52:59.000Z",
           "underlyingPools": [
             {
               "address": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
               "protocol": "uniswap-v2",
-              "value": 165508.93147883491
+              "value": 162683.27617582414
             },
             {
               "address": "0xd54a5e98dc3d0a90a058d4e46b2db9e7d92dbf50598833035e1f27eac4f23a4f",
               "protocol": "uniswap-v4",
-              "value": 268789.266404824
+              "value": 262023.31253661317
             }
           ]
         },
@@ -54,7 +54,7 @@
             "decimals0": 6,
             "decimals1": 18
           },
-          "value": 26639.419766
+          "value": 25809.098074
         },
         {
           "type": "Crypto",
@@ -67,7 +67,7 @@
             "decimals0": 18,
             "decimals1": 6
           },
-          "value": 804.536972
+          "value": 752.997592
         },
         {
           "type": "RWA",
@@ -80,7 +80,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 13916.938026459964
+          "value": 12188.637125861364
         },
         {
           "type": "RWA",
@@ -93,7 +93,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 5958.79798638211
+          "value": 5218.793546700851
         },
         {
           "type": "RWA",
@@ -107,7 +107,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 3544.219407779605
+          "value": 3104.0739114974276
         },
         {
           "type": "RWA",
@@ -121,13 +121,13 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 2.751535031374479
+          "value": 2.409830522544188
         }
       ]
     }
   },
   "burnStats": {
-    "generatedAt": "2026-11-12T11:48:07.680Z",
+    "generatedAt": "2026-11-12T12:53:08.774Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -149,7 +149,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-11-12T11:48:07.680Z",
+    "generatedAt": "2026-11-12T12:53:08.774Z",
     "data": {
       "vaults": [
         {
