@@ -19,14 +19,14 @@
       "rank": 3,
       "holder": "0x5a58505a96d1dbf8df91cb21b54419fc36e93fde",
       "chainsHolding": 1,
-      "totalIxs": "6,347,551.02",
+      "totalIxs": "6,348,097.81",
       "label": "Wormhole Bridge"
     },
     {
       "rank": 4,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "5,573,790.73",
+      "totalIxs": "5,580,007.13",
       "label": "Uniswap V4"
     },
     {
@@ -47,7 +47,7 @@
       "rank": 7,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "2,718,535.23",
+      "totalIxs": "2,722,913.72",
       "label": "Uniswap V2"
     },
     {
@@ -131,7 +131,7 @@
       "rank": 19,
       "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
       "chainsHolding": 1,
-      "totalIxs": "989,689.89",
+      "totalIxs": "980,129.53",
       "label": null
     },
     {
@@ -166,7 +166,7 @@
       "rank": 24,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "738,356.90",
+      "totalIxs": "738,150.64",
       "label": "Contract"
     },
     {
@@ -292,7 +292,7 @@
       "rank": 42,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "458,514.94",
+      "totalIxs": "459,267.98",
       "label": "IXS/USDC Base"
     },
     {
@@ -1144,17 +1144,17 @@
     },
     {
       "rank": 164,
-      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
-      "chainsHolding": 1,
-      "totalIxs": "127,738.70",
-      "label": "Contract"
-    },
-    {
-      "rank": 165,
       "holder": "0x3000d7c1c81dd174c11acab9a92d141438056e1e",
       "chainsHolding": 1,
       "totalIxs": "127,661.51",
       "label": null
+    },
+    {
+      "rank": 165,
+      "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
+      "chainsHolding": 1,
+      "totalIxs": "127,191.91",
+      "label": "Contract"
     },
     {
       "rank": 166,
@@ -4202,7 +4202,7 @@
       "label": null
     }
   ],
-  "totalRowCount": 11808,
-  "lastRefreshed": "2026-11-14T15:37:57.904Z",
+  "totalRowCount": 11806,
+  "lastRefreshed": "2026-11-14T16:57:58.860Z",
   "source": "rpc-snapshot"
 }
