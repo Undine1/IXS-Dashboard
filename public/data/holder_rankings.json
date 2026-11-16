@@ -5,7 +5,7 @@
       "rank": 1,
       "holder": "0x85001cc4867c5e1c22da4b79bb8852b9e2a06da0",
       "chainsHolding": 1,
-      "totalIxs": "67,847,815.36",
+      "totalIxs": "67,864,195.49",
       "label": "Migration Contract"
     },
     {
@@ -26,7 +26,7 @@
       "rank": 4,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "5,972,969.94",
+      "totalIxs": "5,975,330.43",
       "label": "Uniswap V4"
     },
     {
@@ -47,7 +47,7 @@
       "rank": 7,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "2,879,828.61",
+      "totalIxs": "2,879,126.10",
       "label": "Uniswap V2"
     },
     {
@@ -68,7 +68,7 @@
       "rank": 10,
       "holder": "0x9642b23ed1e01df1092b92641051881a322f5d4e",
       "chainsHolding": 1,
-      "totalIxs": "2,003,827.72",
+      "totalIxs": "1,999,832.61",
       "label": "MEXC 16"
     },
     {
@@ -178,37 +178,37 @@
     },
     {
       "rank": 26,
-      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
-      "chainsHolding": 1,
-      "totalIxs": "607,214.47",
-      "label": null
-    },
-    {
-      "rank": 27,
       "holder": "0xbdd64da092026112957bd7f12f43c57fe4dcdfe2",
       "chainsHolding": 3,
       "totalIxs": "605,122.34",
       "label": null
     },
     {
-      "rank": 28,
+      "rank": 27,
       "holder": "0x00784b13082709d392ea04a0525560305988d4c8",
       "chainsHolding": 1,
       "totalIxs": "597,470.18",
       "label": null
     },
     {
-      "rank": 29,
+      "rank": 28,
       "holder": "0xb76de6d63ba3f52cf85f00d33470a5e45d4c4992",
       "chainsHolding": 1,
       "totalIxs": "595,590.86",
       "label": null
     },
     {
-      "rank": 30,
+      "rank": 29,
       "holder": "0x4a26612dbcdc6efd351c2d86125e4ca2919c3bd0",
       "chainsHolding": 1,
       "totalIxs": "594,864.98",
+      "label": null
+    },
+    {
+      "rank": 30,
+      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
+      "chainsHolding": 1,
+      "totalIxs": "589,176.37",
       "label": null
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 11786,
-  "lastRefreshed": "2026-11-16T19:38:03.490Z",
+  "lastRefreshed": "2026-11-16T20:57:57.679Z",
   "source": "rpc-snapshot"
 }
