@@ -5,7 +5,7 @@
       "rank": 1,
       "holder": "0x85001cc4867c5e1c22da4b79bb8852b9e2a06da0",
       "chainsHolding": 1,
-      "totalIxs": "67,864,195.49",
+      "totalIxs": "67,874,099.80",
       "label": "Migration Contract"
     },
     {
@@ -47,7 +47,7 @@
       "rank": 7,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "2,879,126.10",
+      "totalIxs": "2,897,036.24",
       "label": "Uniswap V2"
     },
     {
@@ -68,7 +68,7 @@
       "rank": 10,
       "holder": "0x9642b23ed1e01df1092b92641051881a322f5d4e",
       "chainsHolding": 1,
-      "totalIxs": "1,999,832.61",
+      "totalIxs": "1,999,747.61",
       "label": "MEXC 16"
     },
     {
@@ -138,7 +138,7 @@
       "rank": 20,
       "holder": "0xcf99708556f3d9c3d7f441582737733f197f0601",
       "chainsHolding": 3,
-      "totalIxs": "760,801.65",
+      "totalIxs": "760,804.42",
       "label": null
     },
     {
@@ -152,7 +152,7 @@
       "rank": 22,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "754,825.51",
+      "totalIxs": "755,163.41",
       "label": "Contract"
     },
     {
@@ -208,7 +208,7 @@
       "rank": 30,
       "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
       "chainsHolding": 1,
-      "totalIxs": "589,176.37",
+      "totalIxs": "574,980.68",
       "label": null
     },
     {
@@ -264,7 +264,7 @@
       "rank": 38,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "490,406.29",
+      "totalIxs": "489,934.39",
       "label": "IXS/USDC Base"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 11786,
-  "lastRefreshed": "2026-11-16T20:57:57.679Z",
+  "lastRefreshed": "2026-11-16T22:17:59.361Z",
   "source": "rpc-snapshot"
 }
