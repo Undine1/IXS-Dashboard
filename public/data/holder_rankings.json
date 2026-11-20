@@ -19,7 +19,7 @@
       "rank": 3,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "6,491,244.25",
+      "totalIxs": "6,498,312.86",
       "label": "Uniswap V4"
     },
     {
@@ -47,7 +47,7 @@
       "rank": 7,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "3,133,694.80",
+      "totalIxs": "3,146,570.47",
       "label": "Uniswap V2"
     },
     {
@@ -124,7 +124,7 @@
       "rank": 18,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "768,583.93",
+      "totalIxs": "765,155.16",
       "label": "Contract"
     },
     {
@@ -215,7 +215,7 @@
       "rank": 31,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "540,942.97",
+      "totalIxs": "544,373.67",
       "label": "IXS/USDC Base"
     },
     {
@@ -416,30 +416,30 @@
     },
     {
       "rank": 60,
-      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
-      "chainsHolding": 1,
-      "totalIxs": "318,127.73",
-      "label": null
-    },
-    {
-      "rank": 61,
       "holder": "0x23e730e46284c706a511b026d514b04f111d0cb9",
       "chainsHolding": 1,
       "totalIxs": "307,541.65",
       "label": null
     },
     {
-      "rank": 62,
+      "rank": 61,
       "holder": "0x91bd0252c665254f3ec2d8f8cf85576f2292f290",
       "chainsHolding": 1,
       "totalIxs": "303,957.42",
       "label": null
     },
     {
-      "rank": 63,
+      "rank": 62,
       "holder": "0x66ff579fa3a7696ec411a43d0c32c5395513c497",
       "chainsHolding": 1,
       "totalIxs": "300,000.89",
+      "label": null
+    },
+    {
+      "rank": 63,
+      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
+      "chainsHolding": 1,
+      "totalIxs": "293,753.24",
       "label": null
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 11783,
-  "lastRefreshed": "2026-11-20T00:48:10.593Z",
+  "lastRefreshed": "2026-11-20T01:57:59.848Z",
   "source": "rpc-snapshot"
 }
