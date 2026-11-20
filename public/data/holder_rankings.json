@@ -5,7 +5,7 @@
       "rank": 1,
       "holder": "0x85001cc4867c5e1c22da4b79bb8852b9e2a06da0",
       "chainsHolding": 1,
-      "totalIxs": "70,304,329.49",
+      "totalIxs": "70,357,564.39",
       "label": "Migration Contract"
     },
     {
@@ -19,7 +19,7 @@
       "rank": 3,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "6,526,725.42",
+      "totalIxs": "6,523,993.86",
       "label": "Uniswap V4"
     },
     {
@@ -96,7 +96,7 @@
       "rank": 14,
       "holder": "0x3ee18b2214aff97000d974cf647e7c347e8fa585",
       "chainsHolding": 1,
-      "totalIxs": "1,344,872.69",
+      "totalIxs": "1,291,637.79",
       "label": "Wormhole Bridge"
     },
     {
@@ -591,37 +591,37 @@
     },
     {
       "rank": 85,
+      "holder": "0x7118c959e28279d477fb5c34d8557a50dbdadd31",
+      "chainsHolding": 2,
+      "totalIxs": "208,527.25",
+      "label": null
+    },
+    {
+      "rank": 86,
       "holder": "0xe6bfb4958d00d3134d386efe8f4add47a1a7a039",
       "chainsHolding": 1,
       "totalIxs": "207,341.36",
       "label": null
     },
     {
-      "rank": 86,
+      "rank": 87,
       "holder": "0x2f75663e1dc2764fd76619e76f7dabd22e5efa63",
       "chainsHolding": 1,
       "totalIxs": "207,306.53",
       "label": null
     },
     {
-      "rank": 87,
+      "rank": 88,
       "holder": "0x8545e024b5f612d3307254b54b547ed27b36d5ea",
       "chainsHolding": 1,
       "totalIxs": "206,779.71",
       "label": null
     },
     {
-      "rank": 88,
+      "rank": 89,
       "holder": "0x7d5eb84eeb253f255b9418cbdafb8f0c450fb589",
       "chainsHolding": 1,
       "totalIxs": "206,119.36",
-      "label": null
-    },
-    {
-      "rank": 89,
-      "holder": "0x7118c959e28279d477fb5c34d8557a50dbdadd31",
-      "chainsHolding": 2,
-      "totalIxs": "205,795.70",
       "label": null
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 11778,
-  "lastRefreshed": "2026-11-20T21:58:07.818Z",
+  "lastRefreshed": "2026-11-20T23:17:53.223Z",
   "source": "rpc-snapshot"
 }
