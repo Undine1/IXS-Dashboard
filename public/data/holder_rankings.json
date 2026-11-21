@@ -5,7 +5,7 @@
       "rank": 1,
       "holder": "0x85001cc4867c5e1c22da4b79bb8852b9e2a06da0",
       "chainsHolding": 1,
-      "totalIxs": "70,751,569.59",
+      "totalIxs": "70,774,521.67",
       "label": "Migration Contract"
     },
     {
@@ -19,14 +19,14 @@
       "rank": 3,
       "holder": "0x000000000004444c5dc75cb358380d2e3de08a90",
       "chainsHolding": 1,
-      "totalIxs": "6,674,558.62",
+      "totalIxs": "6,659,643.42",
       "label": "Uniswap V4"
     },
     {
       "rank": 4,
       "holder": "0x5a58505a96d1dbf8df91cb21b54419fc36e93fde",
       "chainsHolding": 1,
-      "totalIxs": "5,052,197.90",
+      "totalIxs": "5,050,166.07",
       "label": "Wormhole Bridge"
     },
     {
@@ -47,7 +47,7 @@
       "rank": 7,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "3,227,533.68",
+      "totalIxs": "3,224,205.15",
       "label": "Uniswap V2"
     },
     {
@@ -124,7 +124,7 @@
       "rank": 18,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
-      "totalIxs": "777,802.88",
+      "totalIxs": "776,193.33",
       "label": "Contract"
     },
     {
@@ -194,7 +194,7 @@
       "rank": 28,
       "holder": "0xd22a820dc52f1cacea7a5c86da16757f434f43c6",
       "chainsHolding": 1,
-      "totalIxs": "584,038.03",
+      "totalIxs": "582,828.82",
       "label": "IXS/USDC Base"
     },
     {
@@ -341,7 +341,7 @@
       "rank": 49,
       "holder": "0xcf99708556f3d9c3d7f441582737733f197f0601",
       "chainsHolding": 3,
-      "totalIxs": "386,144.48",
+      "totalIxs": "386,146.96",
       "label": null
     },
     {
@@ -859,7 +859,7 @@
       "rank": 123,
       "holder": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
       "chainsHolding": 1,
-      "totalIxs": "156,503.64",
+      "totalIxs": "155,010.83",
       "label": "Contract"
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 11775,
-  "lastRefreshed": "2026-11-21T08:20:32.167Z",
+  "lastRefreshed": "2026-11-21T09:48:04.211Z",
   "source": "rpc-snapshot"
 }
