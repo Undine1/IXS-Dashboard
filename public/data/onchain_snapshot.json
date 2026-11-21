@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-11-21T20:07:54.813Z",
+    "generatedAt": "2026-11-21T21:27:56.949Z",
     "data": {
       "pools": [
         {
@@ -13,9 +13,9 @@
           "protocol": "uniswap-v4",
           "explorerUrl": "https://dexscreener.com/robinhood/0x252827c9712732983d1d720e87ff5f2d875fae840ff128c0331cce0baa6a4bf8",
           "valuation": "liquidity-principal",
-          "value": 192894.27418573786,
-          "tokenPriceUsd": 0.0019591141654553067,
-          "observedAt": "2026-11-21T20:07:53.000Z"
+          "value": 192469.39699247706,
+          "tokenPriceUsd": 0.0019520661976605322,
+          "observedAt": "2026-11-21T21:27:55.000Z"
         },
         {
           "type": "Crypto",
@@ -26,18 +26,18 @@
           "poolManager": "0x000000000004444c5dc75cb358380d2e3de08a90",
           "protocol": "uniswap-v2+v4",
           "explorerUrl": "https://dexscreener.com/ethereum/0x73d7c860998ca3c01ce8c808f5577d94d545d1b4",
-          "value": 308190.9488908573,
-          "observedAt": "2026-11-21T20:07:47.000Z",
+          "value": 308607.23961432785,
+          "observedAt": "2026-11-21T21:27:47.000Z",
           "underlyingPools": [
             {
               "address": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
               "protocol": "uniswap-v2",
-              "value": 120596.98150224113
+              "value": 120791.78523543572
             },
             {
               "address": "0xd54a5e98dc3d0a90a058d4e46b2db9e7d92dbf50598833035e1f27eac4f23a4f",
               "protocol": "uniswap-v4",
-              "value": 187593.96738861612
+              "value": 187815.45437889211
             }
           ]
         },
@@ -127,7 +127,7 @@
     }
   },
   "burnStats": {
-    "generatedAt": "2026-11-21T20:07:54.813Z",
+    "generatedAt": "2026-11-21T21:27:56.949Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -149,7 +149,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-11-21T20:07:54.813Z",
+    "generatedAt": "2026-11-21T21:27:56.949Z",
     "data": {
       "vaults": [
         {
