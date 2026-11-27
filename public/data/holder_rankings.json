@@ -47,7 +47,7 @@
       "rank": 7,
       "holder": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
       "chainsHolding": 1,
-      "totalIxs": "2,964,303.50",
+      "totalIxs": "2,967,980.06",
       "label": "Uniswap V2"
     },
     {
@@ -68,7 +68,7 @@
       "rank": 10,
       "holder": "0x0c1db94fa797aeefa1c946e0f1d3c00a89d1f7bd",
       "chainsHolding": 1,
-      "totalIxs": "1,809,058.09",
+      "totalIxs": "2,000,000.09",
       "label": null
     },
     {
@@ -122,37 +122,37 @@
     },
     {
       "rank": 18,
-      "holder": "0xcc97b3a17100947361152350d5cb3df371ad670f",
-      "chainsHolding": 2,
-      "totalIxs": "910,666.81",
-      "label": null
-    },
-    {
-      "rank": 19,
       "holder": "0xf1443dfac1f31fddb766f8f366160cdd4a80bee4",
       "chainsHolding": 1,
       "totalIxs": "763,201.49",
       "label": null
     },
     {
-      "rank": 20,
+      "rank": 19,
       "holder": "0x57764498faa7db02ad4b8a77fd821d9871932253",
       "chainsHolding": 1,
       "totalIxs": "756,009.10",
       "label": null
     },
     {
-      "rank": 21,
+      "rank": 20,
       "holder": "0x0bcaebeeee604443feb6d5314a726626a858ebd3",
       "chainsHolding": 1,
       "totalIxs": "755,956.53",
       "label": "Contract"
     },
     {
-      "rank": 22,
+      "rank": 21,
       "holder": "0xe8bf33f06fbd766c75ba6f4217c8e6d1d077c0f8",
       "chainsHolding": 1,
       "totalIxs": "742,142.10",
+      "label": null
+    },
+    {
+      "rank": 22,
+      "holder": "0xcc97b3a17100947361152350d5cb3df371ad670f",
+      "chainsHolding": 2,
+      "totalIxs": "719,724.81",
       "label": null
     },
     {
@@ -1844,79 +1844,79 @@
     },
     {
       "rank": 264,
-      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
-      "chainsHolding": 1,
-      "totalIxs": "65,596.25",
-      "label": null
-    },
-    {
-      "rank": 265,
       "holder": "0xdb6476671ffd6a2130a0cca2729fd49c73816464",
       "chainsHolding": 1,
       "totalIxs": "65,384.31",
       "label": "Contract"
     },
     {
-      "rank": 266,
+      "rank": 265,
       "holder": "0x0171d947ee6ce0f487490bd4f8d89878ff2d88ba",
       "chainsHolding": 1,
       "totalIxs": "65,336.06",
       "label": null
     },
     {
-      "rank": 267,
+      "rank": 266,
       "holder": "0x225f810273cb346d41bbc0f455042468682c826a",
       "chainsHolding": 1,
       "totalIxs": "65,001.48",
       "label": null
     },
     {
-      "rank": 268,
+      "rank": 267,
       "holder": "0xbb1f075e9ec945f1fc828d3583e91d9205df3055",
       "chainsHolding": 1,
       "totalIxs": "64,577.74",
       "label": null
     },
     {
-      "rank": 269,
+      "rank": 268,
       "holder": "0xabd166d99a8b05aebfcb6397db5081e2978a6cec",
       "chainsHolding": 1,
       "totalIxs": "64,394.84",
       "label": null
     },
     {
-      "rank": 270,
+      "rank": 269,
       "holder": "0x4af61d30f81842525d17dbff71146e3c740aca57",
       "chainsHolding": 1,
       "totalIxs": "64,102.35",
       "label": null
     },
     {
-      "rank": 271,
+      "rank": 270,
       "holder": "0x2ee1367f51b4381fea82dbf2729c2226de578084",
       "chainsHolding": 1,
       "totalIxs": "63,660.38",
       "label": null
     },
     {
-      "rank": 272,
+      "rank": 271,
       "holder": "0x9908178969852995e09544e2e152f4d58eeb1754",
       "chainsHolding": 1,
       "totalIxs": "62,589.89",
       "label": null
     },
     {
-      "rank": 273,
+      "rank": 272,
       "holder": "0x46891da2185aa8691b1cca637cd32a54a998d690",
       "chainsHolding": 1,
       "totalIxs": "62,387.24",
       "label": null
     },
     {
-      "rank": 274,
+      "rank": 273,
       "holder": "0xa2d18c5ca7170c55aed88793f1b06386d1e20a2d",
       "chainsHolding": 1,
       "totalIxs": "62,320.35",
+      "label": null
+    },
+    {
+      "rank": 274,
+      "holder": "0xd53e31924d0cfda200769ba80ae6b383dfec92bb",
+      "chainsHolding": 1,
+      "totalIxs": "61,919.68",
       "label": null
     },
     {
@@ -4203,6 +4203,6 @@
     }
   ],
   "totalRowCount": 11750,
-  "lastRefreshed": "2026-11-27T03:18:01.125Z",
+  "lastRefreshed": "2026-11-27T04:37:54.148Z",
   "source": "rpc-snapshot"
 }
