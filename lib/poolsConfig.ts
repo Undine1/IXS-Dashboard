@@ -11,6 +11,8 @@ export type PoolMeta = {
 export type PoolConfig = Omit<Pool, 'value' | 'network'> & {
   network: ChainNetwork;
   priceSource?: boolean;
+  // Pricing reads and volume tracking can continue without counting this pool in TVL.
+  includeInTvl?: boolean;
   tokenContract?: string;
   // Immutable pair metadata. When present, the pools route skips the
   // token0/token1/decimals eth_calls (constant for a V2 pair) and only reads
@@ -46,6 +48,7 @@ export const POOLS: PoolConfig[] = [
     name: 'WIXS-USDC',
     address: '0xd093a031df30f186976a1e2936b16d95ca7919d6',
     network: 'polygon',
+    includeInTvl: false,
     meta: {
       token0: '0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8',
       token1: '0x2791bca1f2de4661ed88a30c99a7a9449aa84174',
@@ -104,3 +107,5 @@ export const POOLS: PoolConfig[] = [
     },
   },
 ];
+
+export const TVL_POOLS = POOLS.filter((pool) => pool.includeInTvl !== false);

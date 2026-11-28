@@ -57,19 +57,6 @@
           "value": 22554.907102
         },
         {
-          "type": "Crypto",
-          "name": "WIXS-USDC",
-          "address": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
-          "network": "polygon",
-          "meta": {
-            "token0": "0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8",
-            "token1": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
-            "decimals0": 18,
-            "decimals1": 6
-          },
-          "value": 671.403546
-        },
-        {
           "type": "RWA",
           "name": "IXAPE",
           "address": "0xfe3d92cf0292a4e44402d1e6a10ae8b575fa61dc",

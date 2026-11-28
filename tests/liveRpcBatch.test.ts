@@ -112,9 +112,16 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
       import('../lib/burnStatsService'),
     ]);
 
-    const pools = await computePoolsBody();
+    const pools = await computePoolsBody({ debug: true });
     assert.equal(pools.healthy, true);
-    assert.equal(pools.body.pools.length, 8);
+    assert.equal(pools.body.pools.length, 7);
+    assert.equal(pools.body.pools.some((pool) => pool.name === 'WIXS-USDC'), false);
+    const polygonPrice = pools.body.debug?.pools.find((pool) => pool.name === 'WIXS-USDC')?.derivedIxsPrice;
+    assert.ok(typeof polygonPrice === 'number' && polygonPrice > 0);
+    for (const pool of pools.body.pools.filter((pool) => pool.type === 'RWA')) {
+      assert.equal(pool.debug?.price0, polygonPrice, 'excluded TVL pool still supplies the Polygon price');
+      assert.equal(pool.priceBasis, undefined, 'existing pricing is preserved');
+    }
     assert.ok(pools.body.pools.every((pool) => typeof pool.value === 'number'));
     const batchedPoolValues = pools.body.pools.map((pool) => pool.value);
     assert.deepEqual(
@@ -175,7 +182,7 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
     phase = 'pool-migration';
     const migrated = await computePoolsBody();
     assert.equal(migrated.healthy, true);
-    assert.equal(migrated.body.pools.find((pool) => pool.name === 'WIXS-USDC')?.value, 0);
+    assert.equal(migrated.body.pools.some((pool) => pool.name === 'WIXS-USDC'), false);
     const rwaPools = migrated.body.pools.filter((pool) => pool.type === 'RWA');
     assert.equal(rwaPools.length, 4);
     for (const pool of rwaPools) {

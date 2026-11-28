@@ -7,6 +7,7 @@ import { formatValue, formatAddress, formatUsd, formatNumber } from '@/lib/utils
 import { PRIVATE_ENTRY as DEFAULT_PRIVATE_ENTRY, PUBLIC_DEALS as DEFAULT_PUBLIC_DEALS, TYPE_LABELS } from '@/lib/tvlConfig';
 import { getTotalSupply } from '@/lib/supply';
 import { ROBINHOOD } from '@/lib/robinhoodConfig';
+import { POOLS } from '@/lib/poolsConfig';
 import LAYOUT from '@/lib/layoutConfig';
 // Removed circle chart dependency (recharts) per request — keep visual summaries
 
@@ -376,9 +377,9 @@ export default function BurnStats({
   const totalTvl = tvlPrivateVal === null || tvlPoolsVal === null || vaultTvlVal === null
     ? null
     : tvlPrivateVal + tvlPoolsVal + vaultTvlVal; // Excluded launchpad from TVL
-  // Only list pools covered by the cumulative volume indexer. TVL-only pools
-  // must not create empty rows or contribute liquidity to the volume total.
-  const cryptoPools = pools.filter((pool) => pool.type === 'Crypto' &&
+  // Volume membership is independent of TVL inclusion. Continue showing pools
+  // covered by the live cumulative indexer even when their TVL is excluded.
+  const cryptoPools = POOLS.filter((pool) => pool.type === 'Crypto' &&
     poolVolumeMap && pool.address.toLowerCase() in poolVolumeMap);
   const poolsByType = pools.reduce<Record<string, Pool[]>>((acc, pool) => {
     const key = pool.type || 'Other';
@@ -496,7 +497,7 @@ export default function BurnStats({
                           return (
                             <div key={`${p.network}-${p.name}-${i}`} className={insetRowClass}>
                               <div className={`flex items-center ${LAYOUT.itemGap}`}>
-                                <ChainIcon network={p.network} alt={p.network === 'robinhood' ? 'Robinhood Chain' : p.network} />
+                                <ChainIcon network={p.network} alt={p.network} />
                                 <div className="text-sm font-medium text-white">{p.name}</div>
                               </div>
                               <div className="text-sm font-mono font-bold text-white">{display}</div>

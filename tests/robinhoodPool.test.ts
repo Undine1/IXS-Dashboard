@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { decodeRobinhoodLiquidity, computeRobinhoodPool, ROBINHOOD_TVL_CALL } from '../lib/robinhoodPoolService';
 import { ROBINHOOD, ROBINHOOD_POOL } from '../lib/robinhoodConfig';
 import { isCurrentPoolsSnapshot } from '../lib/poolsService';
-import { POOLS } from '../lib/poolsConfig';
+import { POOLS, TVL_POOLS } from '../lib/poolsConfig';
 import { createSnapshotRpcReadGroups } from '../lib/snapshotRpcBatch';
 import { abiWords, robinhoodResults, robinhoodAggregateResponse } from './fixtures/robinhood';
 import { ethereumPoolFixture } from './fixtures/ethereum';
@@ -54,10 +54,14 @@ test('rejects custom hook accounting and excludes hook reserves from core princi
 });
 
 test('snapshot requires new pool exactly once and keeps all four RWA pools', () => {
-  const legacy = POOLS.map((pool) => ({ ...pool, value: 10 }));
+  const legacy = TVL_POOLS.map((pool) => ({ ...pool, value: 10 }));
   assert.equal(isCurrentPoolsSnapshot({ pools: legacy }), false);
   const pools = [{ ...ROBINHOOD_POOL, value: 14_000 }, ethereumPoolFixture(), ...legacy];
   assert.equal(isCurrentPoolsSnapshot({ pools }), true);
+  const volumeOnlyPool = POOLS.find((pool) => pool.name === 'WIXS-USDC');
+  assert.ok(volumeOnlyPool);
+  assert.equal(isCurrentPoolsSnapshot({ pools: [...pools, { ...volumeOnlyPool, value: 10 }] }), false,
+    'an older snapshot must not reintroduce excluded liquidity into TVL');
   assert.equal(isCurrentPoolsSnapshot({ pools: [pools[0], pools[0], ...pools.slice(2)] }), false);
   assert.equal(isCurrentPoolsSnapshot({ pools: [{ ...pools[0], value: null }, ...pools.slice(1)] }), false);
   assert.equal(pools.filter((pool) => pool.type === 'RWA').length, 4);

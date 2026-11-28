@@ -4,7 +4,7 @@ import type { ChainNetwork, Pool, PoolNetwork } from '../types';
 import { getRpcUrls, hasAnyRpcConfigured, rpcCall, sleep } from './rpc';
 import { bigintToDecimalNumber, normalizeAddressFromHex, parseHexInt } from './poolMath';
 import { poolReserveReadKey, type PrefetchedOnchainReads } from './onchainReadKeys';
-import { POOLS, type PoolConfig } from './poolsConfig';
+import { POOLS, TVL_POOLS, type PoolConfig } from './poolsConfig';
 import { readSnapshotSection } from './onchainSnapshot';
 import { computeRobinhoodPool } from './robinhoodPoolService';
 import { ROBINHOOD, ROBINHOOD_POOL } from './robinhoodConfig';
@@ -78,7 +78,7 @@ export type PoolsServiceResult = {
 
 export function isCurrentPoolsSnapshot(body: PoolsResponseBody | undefined): boolean {
   if (!body || !Array.isArray(body.pools) || body.warnings?.length) return false;
-  const expected = [ROBINHOOD_POOL, ETHEREUM_IXS_POOL, ...POOLS];
+  const expected = [ROBINHOOD_POOL, ETHEREUM_IXS_POOL, ...TVL_POOLS];
   if (body.pools.length !== expected.length) return false;
   return expected.every((config) => {
     const matches = body.pools.filter((pool) => pool?.network === config.network &&
@@ -416,13 +416,7 @@ export async function computePoolsBody(
 
   POOLS.forEach((pool, index) => {
     const result = resultsByIndex[index];
-    const displayPool: PoolConfig = migrationPriced.has(index) ? { ...pool, priceBasis: 'migration-1-to-10' } : pool;
-    if (result.debug.error) {
-      warnings.push(`${pool.name} (${pool.network}): ${result.debug.error}`);
-    }
-
     if (debugMode) {
-      poolsData.push({ ...displayPool, value: result.usdValue, debug: result.debug });
       poolsDebug.push({
         name: pool.name,
         address: pool.address,
@@ -430,9 +424,15 @@ export async function computePoolsBody(
         debug: result.debug,
         derivedIxsPrice: result.derivedIxsPrice,
       });
-    } else {
-      poolsData.push({ ...displayPool, value: result.usdValue });
     }
+
+    // Keep the pricing read above, but omit its liquidity from every TVL consumer.
+    if (pool.includeInTvl === false) return;
+    const displayPool: PoolConfig = migrationPriced.has(index) ? { ...pool, priceBasis: 'migration-1-to-10' } : pool;
+    if (result.debug.error) {
+      warnings.push(`${pool.name} (${pool.network}): ${result.debug.error}`);
+    }
+    poolsData.push({ ...displayPool, value: result.usdValue, ...(debugMode ? { debug: result.debug } : {}) });
   });
 
   poolsData.unshift(robinhoodPool, ethereumPool);
