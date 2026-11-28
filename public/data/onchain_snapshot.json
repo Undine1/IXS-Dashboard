@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-11-28T04:52:58.304Z",
+    "generatedAt": "2026-11-28T03:57:58.233Z",
     "data": {
       "pools": [
         {
@@ -15,7 +15,7 @@
           "valuation": "liquidity-principal",
           "value": 205743.3909349273,
           "tokenPriceUsd": 0.0021800513416793915,
-          "observedAt": "2026-11-28T04:52:56.000Z"
+          "observedAt": "2026-11-28T03:57:56.000Z"
         },
         {
           "type": "Crypto",
@@ -26,18 +26,18 @@
           "poolManager": "0x000000000004444c5dc75cb358380d2e3de08a90",
           "protocol": "uniswap-v2+v4",
           "explorerUrl": "https://dexscreener.com/ethereum/0x73d7c860998ca3c01ce8c808f5577d94d545d1b4",
-          "value": 328734.42768765904,
-          "observedAt": "2026-11-28T04:52:47.000Z",
+          "value": 328183.3948979575,
+          "observedAt": "2026-11-28T03:57:47.000Z",
           "underlyingPools": [
             {
               "address": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
               "protocol": "uniswap-v2",
-              "value": 126776.46780858267
+              "value": 126563.96195327431
             },
             {
               "address": "0xd54a5e98dc3d0a90a058d4e46b2db9e7d92dbf50598833035e1f27eac4f23a4f",
               "protocol": "uniswap-v4",
-              "value": 201957.9598790764
+              "value": 201619.4329446832
             }
           ]
         },
@@ -58,24 +58,16 @@
         },
         {
           "type": "Crypto",
-          "name": "WIXS-WPOL",
-          "address": "0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
+          "name": "WIXS-USDC",
+          "address": "0xd093a031df30f186976a1e2936b16d95ca7919d6",
           "network": "polygon",
-          "explorerUrl": "https://dexscreener.com/polygon/0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b",
-          "usdQuote": {
-            "token": "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270",
-            "feed": "0xab594600376ec9fd91f8e885dadf0ce036862de0",
-            "decimals": 8,
-            "chainId": 137,
-            "maxAgeSeconds": 120
-          },
           "meta": {
-            "token0": "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270",
-            "token1": "0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8",
+            "token0": "0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8",
+            "token1": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
             "decimals0": 18,
-            "decimals1": 18
+            "decimals1": 6
           },
-          "value": 6129.800739481513
+          "value": 671.403546
         },
         {
           "type": "RWA",
@@ -88,7 +80,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 9758.719445401744
+          "value": 9677.385840988924
         },
         {
           "type": "RWA",
@@ -101,7 +93,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 4178.378726007698
+          "value": 4143.554218110999
         },
         {
           "type": "RWA",
@@ -115,7 +107,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 2485.2480328438273
+          "value": 2464.5348458829803
         },
         {
           "type": "RWA",
@@ -129,7 +121,7 @@
             "decimals0": 18,
             "decimals1": 18
           },
-          "value": 1.9294084923225319
+          "value": 1.91332792479077
         }
       ]
     }

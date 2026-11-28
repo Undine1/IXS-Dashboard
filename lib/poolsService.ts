@@ -5,7 +5,6 @@ import { getRpcUrls, hasAnyRpcConfigured, rpcCall, sleep } from './rpc';
 import { bigintToDecimalNumber, normalizeAddressFromHex, parseHexInt } from './poolMath';
 import { poolReserveReadKey, type PrefetchedOnchainReads } from './onchainReadKeys';
 import { POOLS, type PoolConfig } from './poolsConfig';
-import { getPoolReadRequests, readPoolQuoteUsd } from './poolUsdPricing';
 import { readSnapshotSection } from './onchainSnapshot';
 import { computeRobinhoodPool } from './robinhoodPoolService';
 import { ROBINHOOD, ROBINHOOD_POOL } from './robinhoodConfig';
@@ -117,7 +116,7 @@ const IXS_ADDRESS_BY_NETWORK: Record<ChainNetwork, string> = {
 // the same network need for their valuation. Processing in tier order makes
 // that derivation independent of the POOLS config order.
 function poolPricingTier(pool: PoolConfig): number {
-  if (pool.usdQuote || pool.priceSource) return 0;
+  if (pool.priceSource) return 0;
   const stables = STABLE_TOKENS_BY_NETWORK[pool.network] || [];
   if (
     pool.meta &&
@@ -133,11 +132,15 @@ async function prefetchLivePoolReserveReads(): Promise<PrefetchedOnchainReads> {
   const seen = new Set<string>();
 
   for (const pool of POOLS) {
-    for (const call of getPoolReadRequests(pool)) {
-      if (seen.has(call.key)) continue;
-      seen.add(call.key);
-      grouped[pool.network].push(call);
-    }
+    const key = poolReserveReadKey(pool.network, pool.address);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    grouped[pool.network].push({
+      key,
+      target: pool.address,
+      allowFailure: true,
+      callData: '0x0902f1ac',
+    });
   }
 
   // Failed batches and failed subcalls remain absent so fetchPoolValue uses
@@ -223,13 +226,6 @@ async function fetchPoolValue(
     const reserve0Float = bigintToDecimalNumber(reserve0, decimals0);
     const reserve1Float = bigintToDecimalNumber(reserve1, decimals1);
 
-    if (reserve0 === BigInt(0) && reserve1 === BigInt(0)) {
-      return { usdValue: 0, derivedIxsPrice: null, debug: { token0, token1, decimals0, decimals1, reserve0Float, reserve1Float, usdValue: 0 } };
-    }
-    if (pool.usdQuote && (reserve0 === BigInt(0) || reserve1 === BigInt(0))) {
-      throw new Error('Invalid one-sided pool reserves');
-    }
-
     const ixsAddress = IXS_ADDRESS_BY_NETWORK[pool.network];
     const stableTokens = STABLE_TOKENS_BY_NETWORK[pool.network] || [];
     const knownIxsUsd = prices[pool.network]?.ixs?.usd;
@@ -250,12 +246,9 @@ async function fetchPoolValue(
       price1 = 1;
     }
 
-    if (pool.usdQuote) {
-      const quoteToken = pool.usdQuote.token.toLowerCase();
-      if (token0Lower !== quoteToken && token1Lower !== quoteToken) throw new Error('USD quote token is not in the pool');
-      const quoteUsd = await readPoolQuoteUsd(pool, prefetchedReads);
-      if (token0Lower === quoteToken) price0 = quoteUsd;
-      if (token1Lower === quoteToken) price1 = quoteUsd;
+    if (pool.priceSource) {
+      if (token0Lower === ixsAddress && price1 === null) price1 = 1;
+      if (token1Lower === ixsAddress && price0 === null) price0 = 1;
     }
 
     if (price0 !== null && price0 > 0 && price1 === null && reserve1Float > 0) {
