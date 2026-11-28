@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { robinhoodAggregateResponse } from './fixtures/robinhood';
 import { ethereumAggregateResponse } from './fixtures/ethereum';
+import { polygonQuoteResults } from './fixtures/polygonQuote';
+import { abiWords } from './fixtures/robinhood';
 
 const word = (value: number | bigint) => BigInt(value).toString(16).padStart(64, '0');
 
@@ -56,9 +58,10 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
   process.env.NEXT_PUBLIC_BASE_BURN_ADDRESSES = `0x${'4'.repeat(40)}`;
 
   const reserves = `0x${word(1_000_000)}${word(1_000_000_000_000_000_000n)}${word(0)}`;
+  const polygonReserves = abiWords(10n * 10n ** 18n, 100n * 10n ** 18n, 0);
   const balance = `0x${word(42)}`;
   const requests: string[] = [];
-  let phase: 'pools' | 'burns' | 'pool-fallback' | 'pool-subcall-fallback' | 'pool-migration' = 'pools';
+  let phase: 'pools' | 'burns' | 'pool-fallback' | 'pool-subcall-fallback' | 'pool-migration' | 'pool-quote-fallback' | 'pool-stale-quote' | 'pool-one-sided' = 'pools';
 
   globalThis.fetch = (async (url: string | URL, options?: RequestInit) => {
     if (String(url).includes('robinhood')) {
@@ -89,15 +92,24 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
     const failedIndexes =
       phase === 'pool-subcall-fallback' && network === 'polygon-mainnet'
         ? new Set([0])
+        : phase === 'pool-quote-fallback' && network === 'polygon-mainnet' && isBatch && aggregateCallCount(data) > 4
+          ? new Set([1])
         : undefined;
+    const quote = polygonQuoteResults().map((result) => result.returnData);
+    if (phase === 'pool-stale-quote') {
+      const stale = Math.floor(Date.now() / 1000) - 121;
+      quote[0] = abiWords(100, 10_000_000, stale, stale, 100);
+    }
+    const newPoolReserves = phase === 'pool-migration' ? abiWords(0, 0, 0)
+      : phase === 'pool-one-sided' ? abiWords(0, 100n * 10n ** 18n, 0) : polygonReserves;
     const result = isBatch
       ? encodeAggregateResults(
           aggregateCallCount(data),
-          phase === 'burns' ? balance : phase === 'pool-migration' && network === 'polygon-mainnet'
-            ? [`0x${word(0)}${word(0)}${word(0)}`, ...Array(4).fill(reserves)] : reserves,
+          phase === 'burns' ? balance : network === 'polygon-mainnet'
+            ? aggregateCallCount(data) === 4 ? quote : [newPoolReserves, ...quote, ...Array(4).fill(reserves)] : reserves,
           failedIndexes,
         )
-      : reserves;
+      : network === 'polygon-mainnet' ? newPoolReserves : reserves;
     return {
       ok: true,
       status: 200,
@@ -116,6 +128,12 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
     assert.equal(pools.healthy, true);
     assert.equal(pools.body.pools.length, 8);
     assert.ok(pools.body.pools.every((pool) => typeof pool.value === 'number'));
+    assert.equal(pools.body.pools.find((pool) => pool.name === 'WIXS-WPOL')?.value, 2, '10 WPOL at $0.10 plus 100 WIXS at $0.01');
+    assert.equal(pools.body.pools.some((pool) => pool.name === 'WIXS-USDC'), false);
+    for (const pool of pools.body.pools.filter((pool) => pool.type === 'RWA')) {
+      assert.ok(Math.abs((pool.value ?? 0) - 2e-14) < 1e-24, 'RWA pools use the WIXS price derived from WPOL/USD');
+      assert.equal(pool.priceBasis, undefined);
+    }
     const batchedPoolValues = pools.body.pools.map((pool) => pool.value);
     assert.deepEqual(
       requests.filter((entry) => entry.startsWith('pools:')),
@@ -172,10 +190,27 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
         'pool-subcall-fallback:polygon-mainnet:0x0902f1ac',
       ],
     );
+    phase = 'pool-quote-fallback';
+    const quoteFallback = await computePoolsBody();
+    assert.equal(quoteFallback.healthy, true);
+    assert.deepEqual(quoteFallback.body.pools.map((pool) => pool.value), batchedPoolValues);
+    assert.deepEqual(requests.filter((entry) => entry.startsWith('pool-quote-fallback:')), [
+      'pool-quote-fallback:polygon-mainnet:batch', 'pool-quote-fallback:base-mainnet:batch', 'pool-quote-fallback:polygon-mainnet:batch',
+    ]);
+
+    for (const failure of ['pool-stale-quote', 'pool-one-sided'] as const) {
+      phase = failure;
+      const unhealthy = await computePoolsBody();
+      assert.equal(unhealthy.healthy, false);
+      assert.equal(unhealthy.body.pools.find((pool) => pool.name === 'WIXS-WPOL')?.value, null);
+      assert.ok(unhealthy.body.warnings?.some((warning) => warning.includes('WIXS-WPOL')));
+      assert.ok(unhealthy.body.pools.filter((pool) => pool.type === 'RWA').every((pool) => pool.priceBasis === 'migration-1-to-10'));
+    }
+
     phase = 'pool-migration';
     const migrated = await computePoolsBody();
     assert.equal(migrated.healthy, true);
-    assert.equal(migrated.body.pools.find((pool) => pool.name === 'WIXS-USDC')?.value, 0);
+    assert.equal(migrated.body.pools.find((pool) => pool.name === 'WIXS-WPOL')?.value, 0);
     const rwaPools = migrated.body.pools.filter((pool) => pool.type === 'RWA');
     assert.equal(rwaPools.length, 4);
     for (const pool of rwaPools) {

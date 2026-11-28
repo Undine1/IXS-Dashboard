@@ -7,10 +7,19 @@ export type PoolMeta = {
   decimals1: number;
 };
 
+export type PoolUsdQuote = {
+  token: string;
+  feed: string;
+  decimals: number;
+  chainId: number;
+  maxAgeSeconds: number;
+};
+
 // V2 pairs only: never send getReserves/token0/token1 to a v4 pool ID.
 export type PoolConfig = Omit<Pool, 'value' | 'network'> & {
   network: ChainNetwork;
   priceSource?: boolean;
+  usdQuote?: PoolUsdQuote;
   tokenContract?: string;
   // Immutable pair metadata. When present, the pools route skips the
   // token0/token1/decimals eth_calls (constant for a V2 pair) and only reads
@@ -18,13 +27,12 @@ export type PoolConfig = Omit<Pool, 'value' | 'network'> & {
   meta?: PoolMeta;
 };
 
-// Pricing derivation note: pools paired with a non-stable token (the RWA
-// pools) are valued using the network's IXS price, which is derived from a
-// priceSource or stable-paired pool on the same network. lib/poolsService.ts
+// RWA pools use the network's IXS price, derived from a stable-paired pool
+// or an oracle-priced quote token (e.g. WPOL). lib/poolsService.ts
 // processes those price-yielding pools first regardless of order here, so the
 // order of this array is presentational only (it drives the UI listing).
 // Every network that has dependent pools must keep at least one
-// priceSource/stable-paired pool, or the dependent pools will value as null.
+// oracle/stable-paired pool, or use the explicit migration-price fallback.
 
 export const POOLS: PoolConfig[] = [
   {
@@ -43,14 +51,26 @@ export const POOLS: PoolConfig[] = [
   },
   {
     type: 'Crypto',
-    name: 'WIXS-USDC',
-    address: '0xd093a031df30f186976a1e2936b16d95ca7919d6',
+    name: 'WIXS-WPOL',
+    address: '0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b',
     network: 'polygon',
+    explorerUrl: 'https://dexscreener.com/polygon/0xf87b839077db0e5ea5bf8b6460c8413abe72bc2b',
+    usdQuote: {
+      token: '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270',
+      // Chainlink's legacy MATIC/USD proxy now quotes POL (docs.baseAsset=POL).
+      // https://reference-data-directory.vercel.app/feeds-matic-mainnet.json
+      feed: '0xab594600376ec9fd91f8e885dadf0ce036862de0',
+      decimals: 8,
+      chainId: 137,
+      // Published heartbeat: 27s. Allow delivery jitter, reject prices >2m old.
+      maxAgeSeconds: 120,
+    },
     meta: {
-      token0: '0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8',
-      token1: '0x2791bca1f2de4661ed88a30c99a7a9449aa84174',
+      // Verified together at Polygon block 0x5d8be36 on 2026-11-28.
+      token0: '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270',
+      token1: '0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8',
       decimals0: 18,
-      decimals1: 6,
+      decimals1: 18,
     },
   },
   {
