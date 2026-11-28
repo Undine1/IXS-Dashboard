@@ -1,6 +1,6 @@
 {
   "pools": {
-    "generatedAt": "2026-11-27T23:08:09.500Z",
+    "generatedAt": "2026-11-28T00:27:51.921Z",
     "data": {
       "pools": [
         {
@@ -13,9 +13,9 @@
           "protocol": "uniswap-v4",
           "explorerUrl": "https://dexscreener.com/robinhood/0x252827c9712732983d1d720e87ff5f2d875fae840ff128c0331cce0baa6a4bf8",
           "valuation": "liquidity-principal",
-          "value": 204735.2240331585,
-          "tokenPriceUsd": 0.0021693688327693826,
-          "observedAt": "2026-11-27T23:08:08.000Z"
+          "value": 205787.76209348842,
+          "tokenPriceUsd": 0.002180521497261612,
+          "observedAt": "2026-11-28T00:27:50.000Z"
         },
         {
           "type": "Crypto",
@@ -26,18 +26,18 @@
           "poolManager": "0x000000000004444c5dc75cb358380d2e3de08a90",
           "protocol": "uniswap-v2+v4",
           "explorerUrl": "https://dexscreener.com/ethereum/0x73d7c860998ca3c01ce8c808f5577d94d545d1b4",
-          "value": 328145.24392838066,
-          "observedAt": "2026-11-27T23:07:59.000Z",
+          "value": 328926.3175128909,
+          "observedAt": "2026-11-28T00:27:47.000Z",
           "underlyingPools": [
             {
               "address": "0xc09bf2b1bc8725903c509e8caeef9190857215a8",
               "protocol": "uniswap-v2",
-              "value": 126911.9527448554
+              "value": 127214.0371897217
             },
             {
               "address": "0xd54a5e98dc3d0a90a058d4e46b2db9e7d92dbf50598833035e1f27eac4f23a4f",
               "protocol": "uniswap-v4",
-              "value": 201233.2911835253
+              "value": 201712.28032316922
             }
           ]
         },
@@ -127,7 +127,7 @@
     }
   },
   "burnStats": {
-    "generatedAt": "2026-11-27T23:08:09.500Z",
+    "generatedAt": "2026-11-28T00:27:51.921Z",
     "data": {
       "ethereum": {
         "balances": {
@@ -149,7 +149,7 @@
     }
   },
   "vaultTvl": {
-    "generatedAt": "2026-11-27T23:08:09.500Z",
+    "generatedAt": "2026-11-28T00:27:51.921Z",
     "data": {
       "vaults": [
         {
