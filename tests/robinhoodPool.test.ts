@@ -53,7 +53,7 @@ test('rejects custom hook accounting and excludes hook reserves from core princi
   assert.throws(() => decodeRobinhoodLiquidity(results, now), /accounting/);
 });
 
-test('snapshot requires new pool exactly once and keeps all four RWA pools', () => {
+test('snapshot requires new pool exactly once and keeps the three configured RWA pools', () => {
   const legacy = TVL_POOLS.map((pool) => ({ ...pool, value: 10 }));
   assert.equal(isCurrentPoolsSnapshot({ pools: legacy }), false);
   const pools = [{ ...ROBINHOOD_POOL, value: 14_000 }, ethereumPoolFixture(), ...legacy];
@@ -64,7 +64,7 @@ test('snapshot requires new pool exactly once and keeps all four RWA pools', () 
     'an older snapshot must not reintroduce excluded liquidity into TVL');
   assert.equal(isCurrentPoolsSnapshot({ pools: [pools[0], pools[0], ...pools.slice(2)] }), false);
   assert.equal(isCurrentPoolsSnapshot({ pools: [{ ...pools[0], value: null }, ...pools.slice(1)] }), false);
-  assert.equal(pools.filter((pool) => pool.type === 'RWA').length, 4);
+  assert.equal(pools.filter((pool) => pool.type === 'RWA').length, 3);
   assert.ok(Object.values(createSnapshotRpcReadGroups()).flat().every((call) => call.target.length === 42));
 });
 

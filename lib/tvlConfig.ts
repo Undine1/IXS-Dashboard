@@ -2,7 +2,7 @@ import { TvlPrivateEntry, TvlPublicDeal } from '@/types';
 
 export const PRIVATE_ENTRY: TvlPrivateEntry = {
   label: 'Private',
-  value: 91450000,
+  value: 101830000,
   verifiedBy: { label: 'RWA.IO', href: 'https://app.rwa.io/project/ixs-finance?tab=Project-Token' },
 };
 

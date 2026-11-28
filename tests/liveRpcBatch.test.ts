@@ -94,7 +94,7 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
       ? encodeAggregateResults(
           aggregateCallCount(data),
           phase === 'burns' ? balance : phase === 'pool-migration' && network === 'polygon-mainnet'
-            ? [`0x${word(0)}${word(0)}${word(0)}`, ...Array(4).fill(reserves)] : reserves,
+            ? [`0x${word(0)}${word(0)}${word(0)}`, ...Array(3).fill(reserves)] : reserves,
           failedIndexes,
         )
       : reserves;
@@ -114,7 +114,8 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
 
     const pools = await computePoolsBody({ debug: true });
     assert.equal(pools.healthy, true);
-    assert.equal(pools.body.pools.length, 7);
+    assert.equal(pools.body.pools.length, 6);
+    assert.equal(pools.body.pools.some((pool) => pool.name === 'CKGP'), false);
     assert.equal(pools.body.pools.some((pool) => pool.name === 'WIXS-USDC'), false);
     const polygonPrice = pools.body.debug?.pools.find((pool) => pool.name === 'WIXS-USDC')?.derivedIxsPrice;
     assert.ok(typeof polygonPrice === 'number' && polygonPrice > 0);
@@ -184,7 +185,7 @@ test('live pool and burn reads batch per chain and retain individual fallback', 
     assert.equal(migrated.healthy, true);
     assert.equal(migrated.body.pools.some((pool) => pool.name === 'WIXS-USDC'), false);
     const rwaPools = migrated.body.pools.filter((pool) => pool.type === 'RWA');
-    assert.equal(rwaPools.length, 4);
+    assert.equal(rwaPools.length, 3);
     for (const pool of rwaPools) {
       assert.equal(pool.priceBasis, 'migration-1-to-10');
       assert.ok(Math.abs((pool.value ?? 0) - 4e-10) < 1e-20, 'RWA valuation uses 10 new IXS per legacy IXS');

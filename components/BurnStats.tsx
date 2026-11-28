@@ -8,6 +8,7 @@ import { PRIVATE_ENTRY as DEFAULT_PRIVATE_ENTRY, PUBLIC_DEALS as DEFAULT_PUBLIC_
 import { getTotalSupply } from '@/lib/supply';
 import { ROBINHOOD } from '@/lib/robinhoodConfig';
 import { POOLS } from '@/lib/poolsConfig';
+import { getTvlBreakdown } from '@/lib/tvlBreakdown';
 import LAYOUT from '@/lib/layoutConfig';
 // Removed circle chart dependency (recharts) per request — keep visual summaries
 
@@ -362,26 +363,18 @@ export default function BurnStats({
   const burnedPct = burnedTokens === null ? null : Math.min(100, Math.max(0, (burnedTokens / MAX_SUPPLY) * 100));
 
   // 2. TVL Items
-  const tvlPrivateVal = toFiniteNumberOrNull(privateEntry.value);
+  const { privateValue: tvlPrivateVal, pools: tvlPools, vaults: tvlVaults, total: totalTvl } =
+    getTvlBreakdown(privateEntry.value, pools, vault);
   const launchpadValues = publicDeals.map((deal) => toFiniteNumberOrNull(deal.value));
   const hasUnknownLaunchpadValues = launchpadValues.some((value) => value === null);
   const tvlLaunchpadVal = hasUnknownLaunchpadValues
     ? null
     : launchpadValues.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-  const poolValues = pools.map((pool) => toFiniteNumberOrNull(pool.value));
-  const hasUnknownPoolValues = poolValues.some((value) => value === null);
-  const tvlPoolsVal = hasUnknownPoolValues
-    ? null
-    : poolValues.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-  const vaultTvlVal = toFiniteNumberOrNull(vault?.totalValueUsd);
-  const totalTvl = tvlPrivateVal === null || tvlPoolsVal === null || vaultTvlVal === null
-    ? null
-    : tvlPrivateVal + tvlPoolsVal + vaultTvlVal; // Excluded launchpad from TVL
   // Volume membership is independent of TVL inclusion. Continue showing pools
   // covered by the live cumulative indexer even when their TVL is excluded.
   const cryptoPools = POOLS.filter((pool) => pool.type === 'Crypto' &&
     poolVolumeMap && pool.address.toLowerCase() in poolVolumeMap);
-  const poolsByType = pools.reduce<Record<string, Pool[]>>((acc, pool) => {
+  const poolsByType = tvlPools.reduce<Record<string, Pool[]>>((acc, pool) => {
     const key = pool.type || 'Other';
     if (!acc[key]) acc[key] = [];
     acc[key].push(pool);
@@ -711,7 +704,6 @@ export default function BurnStats({
                                 </div>
                               ))}
                             </div>
-                            {type === 'Crypto' && items.some((pool) => pool.protocol?.includes('v4')) && <p className="text-xs text-slate-400">Uniswap v4 values exclude uncollected fees.</p>}
                             {items.some((pool) => pool.priceBasis === 'migration-1-to-10') && <p className="text-xs text-slate-400">IXS valued at the 1:10 migration conversion because the legacy pool price is unavailable.</p>}
                           </div>
                         ))}
@@ -721,7 +713,7 @@ export default function BurnStats({
                             Vaults
                           </div>
                           <div className={insetListClass}>
-                            {vault?.vaults?.length ? vault.vaults.map((entry) => {
+                            {tvlVaults.length ? tvlVaults.map((entry) => {
                               const navUpdatedAt = formatNavUpdatedAt(entry.navUpdatedAt);
                               return (
                                 <div key={entry.address} className={insetDetailRowClass}>

@@ -68,11 +68,11 @@ test('hourly snapshot prefetch emits one Multicall3 request per configured chain
       Object.fromEntries(
         Object.entries(grouped).map(([network, calls]) => [network, calls.length]),
       ),
-      { ethereum: 3, polygon: 6, base: 2 },
+      { ethereum: 3, polygon: 5, base: 2 },
     );
     const reads = await prefetchSnapshotRpcReads();
 
-    assert.equal(reads.size, 11);
+    assert.equal(reads.size, 10);
     assert.deepEqual(Object.fromEntries(callsByNetwork), {
       'eth-mainnet': 1,
       'polygon-mainnet': 1,

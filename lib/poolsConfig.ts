@@ -93,19 +93,6 @@ export const POOLS: PoolConfig[] = [
       decimals1: 18,
     },
   },
-  {
-    type: 'RWA',
-    name: 'CKGP',
-    address: '0xec86ceccd8046ed956060988f91c754e7a13328f',
-    tokenContract: '0x47d8608e1adb7d600e038ef995ed3951e4b7ded5',
-    network: 'polygon',
-    meta: {
-      token0: '0x1ba17c639bdaecd8dc4aac37df062d17ee43a1b8',
-      token1: '0x47d8608e1adb7d600e038ef995ed3951e4b7ded5',
-      decimals0: 18,
-      decimals1: 18,
-    },
-  },
 ];
 
 export const TVL_POOLS = POOLS.filter((pool) => pool.includeInTvl !== false);
